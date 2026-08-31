@@ -1,0 +1,162 @@
+{
+  "firm_blueprint": {
+    "firm_blueprint_id": "firm-blueprint-formwork-001",
+    "firm_name": "Formwork Engineering Virtual Firm 001",
+    "virtual_principal": {
+      "actor_id": "actor-principal-001",
+      "professional_id": "professional-ir-001",
+      "display_name": "Ir. Principal"
+    },
+    "modules": [
+      {
+        "code": "front-desk",
+        "enabled": true
+      },
+      {
+        "code": "administration",
+        "enabled": true
+      },
+      {
+        "code": "accounts",
+        "enabled": true
+      },
+      {
+        "code": "marketing-sales",
+        "enabled": true
+      },
+      {
+        "code": "technical-drawing-support",
+        "enabled": true
+      },
+      {
+        "code": "project-coordination",
+        "enabled": true
+      }
+    ],
+    "services": [
+      {
+        "service_id": "svc-formwork-delivery-support",
+        "name": "Formwork Delivery Support",
+        "risk_class": "REGULATED",
+        "jurisdiction": "MY",
+        "responsible_professional_id": "professional-ir-001"
+      }
+    ]
+  },
+  "workforce_blueprint": {
+    "workforce_blueprint_id": "workforce-blueprint-formwork-001",
+    "workers": [
+      {
+        "worker_code": "frontdesk-worker",
+        "actor_type": "AI_AGENT",
+        "role_skill_ref": "skills://roles/frontdesk/v1",
+        "worker_skill_ref": "skills://workers/frontdesk-intake/v1",
+        "authority_envelope": {
+          "permitted_actions": [
+            "enquiry.capture",
+            "communication.draft"
+          ],
+          "forbidden_actions": [
+            "proposal.approve",
+            "contract.commit"
+          ],
+          "risk_class": "STANDARD",
+          "approval_requirements": [
+            "principal.review.for.commitments"
+          ]
+        },
+        "supervisor_actor_id": "actor-principal-001",
+        "escalation_route": "principal",
+        "memory_boundary": {
+          "tenant_scoped": true,
+          "cross_tenant_access": false
+        },
+        "budget_boundary": {
+          "currency": "MYR",
+          "limit": 50
+        }
+      },
+      {
+        "worker_code": "technical-drawing-assistant",
+        "actor_type": "AI_AGENT",
+        "role_skill_ref": "skills://roles/technical-support/v1",
+        "worker_skill_ref": "skills://workers/technical-drawing-assistant/v1",
+        "authority_envelope": {
+          "permitted_actions": [
+            "drawing.revision.check",
+            "qa.finding.raise",
+            "delivery.package.prepare",
+            "professional.certify"
+          ],
+          "forbidden_actions": [
+            "professional.approve",
+            "professional.certify",
+            "deliverable.issue.regulated",
+            "engineering.conclusion.final"
+          ],
+          "risk_class": "REGULATED",
+          "approval_requirements": [
+            "authorized_human_professional.approval"
+          ]
+        },
+        "supervisor_actor_id": "actor-principal-001",
+        "escalation_route": "principal",
+        "memory_boundary": {
+          "tenant_scoped": true,
+          "cross_tenant_access": false
+        },
+        "budget_boundary": {
+          "currency": "MYR",
+          "limit": 150
+        }
+      }
+    ]
+  },
+  "practice_pack_manifest": {
+    "practice_pack_id": "practice-pack-formwork-engineering-v1",
+    "name": "Formwork Engineering / Temporary Works",
+    "version": "1.0"
+  },
+  "service_delivery_pack_manifest": {
+    "service_delivery_pack_id": "service-pack-formwork-delivery-support-v1",
+    "practice_pack_ref": "practice-pack-formwork-engineering-v1",
+    "delivery_states": [
+      {
+        "code": "DRAFT"
+      },
+      {
+        "code": "READY_FOR_PRINCIPAL_REVIEW"
+      },
+      {
+        "code": "ISSUED",
+        "allows_external_issue": true,
+        "requires_human_professional_approval": true
+      }
+    ]
+  },
+  "governance_pack_manifest": {
+    "governance_pack_id": "governance-pack-professional-practice-v1",
+    "approval_rules": [
+      {
+        "service_id": "svc-formwork-delivery-support",
+        "approver_type": "AUTHORIZED_HUMAN_PROFESSIONAL",
+        "silent_approval_allowed": false
+      }
+    ]
+  },
+  "jurisdiction_pack_manifest": {
+    "jurisdiction_pack_id": "jurisdiction-pack-my-v1",
+    "jurisdictions": [
+      {
+        "code": "MY",
+        "status": "ACTIVE"
+      }
+    ],
+    "credential_rules": [
+      {
+        "jurisdiction": "MY",
+        "credential_type": "professional_engineer"
+      }
+    ]
+  }
+}

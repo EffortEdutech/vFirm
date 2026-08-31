@@ -1,0 +1,28 @@
+﻿{
+  "event_id": "event-tenant-created-001",
+  "event_type": "tenant.created",
+  "event_version": "1.0",
+  "occurred_at": "2026-08-24T00:00:00.000Z",
+  "recorded_at": "2026-08-24T00:00:00.000Z",
+  "actor_id": "system-actor-001",
+  "actor_type": "SYSTEM",
+  "tenant_id": "tenant-001",
+  "firm_id": null,
+  "aggregate_type": "Tenant",
+  "aggregate_id": "tenant-001",
+  "aggregate_version": 1,
+  "correlation_id": "correlation-001",
+  "causation_id": null,
+  "idempotency_key": "tenant-created-001",
+  "payload": {
+    "tenant_id": "tenant-001",
+    "name": "Demo Tenant",
+    "default_region": "MY",
+    "data_residency_policy": "MVP_DEFAULT"
+  },
+  "payload_ref": null,
+  "payload_summary": "Tenant created for MVP fixture.",
+  "policy_decision_id": null,
+  "audit_event_id": "audit-001",
+  "provenance": { "source": "fixture" }
+}

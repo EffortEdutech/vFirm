@@ -1,0 +1,18 @@
+﻿{
+  "command_id": "command-proposal-send-001",
+  "idempotency_key": "proposal-send-001",
+  "actor_context": {
+    "actor_id": "principal-actor-001",
+    "actor_type": "HUMAN",
+    "tenant_id": "tenant-001",
+    "firm_id": "firm-001",
+    "authentication_strength": "MFA"
+  },
+  "resource": {
+    "proposal_id": "proposal-001",
+    "expected_version": 1,
+    "target_state": "SENT"
+  },
+  "reason": "Send approved proposal to client.",
+  "metadata": {}
+}

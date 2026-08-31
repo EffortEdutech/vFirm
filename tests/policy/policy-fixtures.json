@@ -1,0 +1,50 @@
+﻿[
+  {
+    "name": "deny_cross_tenant_access",
+    "input": {
+      "actor": { "actor_id": "00000000-0000-0000-0000-000000000001", "actor_type": "HUMAN", "tenant_id": "tenant-a", "firm_id": "firm-a" },
+      "action": "client.read",
+      "resource": { "resource_type": "Client", "resource_id": "client-b", "tenant_id": "tenant-b", "firm_id": "firm-b", "risk_class": "STANDARD" }
+    },
+    "expected_result": "DENY"
+  },
+  {
+    "name": "deny_ai_worker_approval",
+    "input": {
+      "actor": { "actor_id": "worker-actor", "actor_type": "AI_AGENT", "tenant_id": "tenant-a", "firm_id": "firm-a", "worker_instance_id": "worker-1" },
+      "action": "approval.grant",
+      "resource": { "resource_type": "Deliverable", "resource_id": "deliverable-1", "tenant_id": "tenant-a", "firm_id": "firm-a", "risk_class": "CONTROLLED" }
+    },
+    "expected_result": "DENY"
+  },
+  {
+    "name": "require_commercial_approval_for_threshold",
+    "input": {
+      "actor": { "actor_id": "principal-actor", "actor_type": "HUMAN", "tenant_id": "tenant-a", "firm_id": "firm-a" },
+      "action": "proposal.send",
+      "resource": { "resource_type": "Proposal", "resource_id": "proposal-1", "tenant_id": "tenant-a", "firm_id": "firm-a", "risk_class": "STANDARD" },
+      "context": { "commercial_threshold_exceeded": true }
+    },
+    "expected_result": "REQUIRE_APPROVAL"
+  },
+  {
+    "name": "allow_authorized_human_approval",
+    "input": {
+      "actor": { "actor_id": "professional-actor", "actor_type": "HUMAN", "tenant_id": "tenant-a", "firm_id": "firm-a" },
+      "action": "approval.grant",
+      "resource": { "resource_type": "Deliverable", "resource_id": "deliverable-1", "tenant_id": "tenant-a", "firm_id": "firm-a", "risk_class": "CONTROLLED" },
+      "context": { "professional_authority_valid": true, "evidence_bundle_id": "evidence-1" }
+    },
+    "expected_result": "ALLOW"
+  },
+  {
+    "name": "deny_deliverable_issue_without_evidence",
+    "input": {
+      "actor": { "actor_id": "professional-actor", "actor_type": "HUMAN", "tenant_id": "tenant-a", "firm_id": "firm-a" },
+      "action": "deliverable.issue",
+      "resource": { "resource_type": "Deliverable", "resource_id": "deliverable-1", "tenant_id": "tenant-a", "firm_id": "firm-a", "risk_class": "CONTROLLED", "subject_version_or_hash": "hash-v2" },
+      "context": { "required_approval_id": "approval-1", "approval_subject_version_or_hash": "hash-v2" }
+    },
+    "expected_result": "DENY"
+  }
+]

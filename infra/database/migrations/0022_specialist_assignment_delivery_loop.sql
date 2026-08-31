@@ -1,0 +1,35 @@
+create table if not exists specialist_assignments (
+  id uuid primary key,
+  tenant_id uuid not null references tenants(id),
+  workspace_id uuid not null references collaboration_workspaces(id),
+  responsibility_matrix_id uuid not null references responsibility_matrices(id),
+  requesting_firm_id uuid not null references firms(id),
+  provider_firm_id uuid not null references firms(id),
+  assignment_title text not null,
+  assignment_scope text not null,
+  assignment_status text not null default 'REQUESTED',
+  requested_by_actor_id uuid references actors(id),
+  accepted_by_actor_id uuid references actors(id),
+  started_by_actor_id uuid references actors(id),
+  delivered_by_actor_id uuid references actors(id),
+  reviewed_by_actor_id uuid references actors(id),
+  approved_by_actor_id uuid references actors(id),
+  closed_by_actor_id uuid references actors(id),
+  evidence_refs jsonb not null default '[]',
+  review_summary text,
+  approval_summary text,
+  requested_at timestamptz not null default now(),
+  accepted_at timestamptz,
+  started_at timestamptz,
+  delivered_at timestamptz,
+  reviewed_at timestamptz,
+  approved_at timestamptz,
+  closed_at timestamptz,
+  updated_at timestamptz not null default now(),
+  metadata jsonb not null default '{}',
+  constraint chk_specialist_assignment_status check (assignment_status in ('REQUESTED','ACCEPTED','IN_PROGRESS','DELIVERED','REVIEWED','APPROVED','CLOSED')),
+  constraint chk_specialist_assignment_evidence_array check (jsonb_typeof(evidence_refs) = 'array')
+);
+
+create index if not exists idx_specialist_assignments_matrix on specialist_assignments(tenant_id, responsibility_matrix_id, assignment_status);
+create index if not exists idx_specialist_assignments_firms on specialist_assignments(tenant_id, requesting_firm_id, provider_firm_id, assignment_status);

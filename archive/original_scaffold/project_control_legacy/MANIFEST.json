@@ -1,0 +1,561 @@
+{
+  "project": "Virtual Firm Platform",
+  "baseline": "VF-00 to VF-24 / repository v1.0",
+  "files": [
+    {
+      "path": "00_foundation/VF-00_Virtual_Firm_Master_Architecture_v1.0.md",
+      "bytes": 3241,
+      "sha256": "d0a76431625939ad86a697dacde925eeb4c223934374db3b97d9a0d4c9cc3a6a"
+    },
+    {
+      "path": "00_foundation/VF-01_Virtual_Firm_Foundation_v1.0_DRAFT.md",
+      "bytes": 1151,
+      "sha256": "4a6ac769198b479f7a28d5b28b52bba7aa5bd2cde5e3b03c1adc334fdd84e70a"
+    },
+    {
+      "path": "00_foundation/VF-02_Workforce_Catalogue_and_Provisioning_v1.0_DRAFT.md",
+      "bytes": 1093,
+      "sha256": "5efc6e6f4989695e4694845311d613c9ee6eb537f5ddcbfd72a0f74412d6d2f2"
+    },
+    {
+      "path": "00_foundation/Virtual_Workforce_Master_Catalogue_v1.0.md",
+      "bytes": 2155,
+      "sha256": "ad73f3e6b099c2f4ce4689320a33f4069aa60d99a29174789a34135ad975bcd0"
+    },
+    {
+      "path": "01_business_infrastructure/VF-03_Client_and_CRM/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "01_business_infrastructure/VF-03_to_VF-08_Business_Operating_Infrastructure_v1.0.md",
+      "bytes": 2294,
+      "sha256": "8737c75f5738a9ded8b0b867e39c3ea06de0f496188845fa4f9797923a30a859"
+    },
+    {
+      "path": "01_business_infrastructure/VF-04_Sales_Intake_and_Proposal/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "01_business_infrastructure/VF-05_Contract_and_Commercial/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "01_business_infrastructure/VF-06_Project_Operations/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "01_business_infrastructure/VF-07_Finance_Accounting_Billing_and_Payments/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "01_business_infrastructure/VF-08_Documents_Knowledge_and_Client_Portal/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "02_workforce/VF-09_Virtual_Workforce_Runtime_Architecture_v1.0.md",
+      "bytes": 2427,
+      "sha256": "b9f51102c2c657a9a79a6c8a0aef547a0524208340d87354d1992c600ed3a429"
+    },
+    {
+      "path": "02_workforce/workforce_catalogue/common_workforce/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "02_workforce/workforce_catalogue/management_workforce/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "02_workforce/workforce_catalogue/specialist_workforce/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "02_workforce/workforce_catalogue/workforce_roles/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "03_platform_infrastructure/VF-10_Control_Plane_and_Platform_Infrastructure_v1.0.md",
+      "bytes": 2188,
+      "sha256": "7a758e1932ea8cec290b2f2007947aab645d68842f78ac3fba80be41895ffa33"
+    },
+    {
+      "path": "04_governance/VF-11_Professional_Governance_Compliance_and_Trust_v1.0.md",
+      "bytes": 2173,
+      "sha256": "d32294942e216aff758888dfed0e7b84cbfc5eb12623bb8e4620b1d54069c457"
+    },
+    {
+      "path": "04_governance/governance_packs/accounting/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "04_governance/governance_packs/energy/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "04_governance/governance_packs/engineering/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "04_governance/governance_packs/fire_safety/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "04_governance/governance_packs/legal/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "05_commercial/VF-12_Commercial_and_Economic_Engine_v1.0.md",
+      "bytes": 1906,
+      "sha256": "c5b172236869b0610c7cc2736298c09b09221221101f3cd1e4d945de23828ff6"
+    },
+    {
+      "path": "06_intelligence/VF-13_Intelligence_and_Decision_Engine_v1.0.md",
+      "bytes": 2162,
+      "sha256": "ae6bb218bbfd8ecf3db4a5ed89ef3c0787caea60b2c430e50b83d7764f72b8b5"
+    },
+    {
+      "path": "07_marketplace/VF-14_Marketplace_and_Network_Engine_v1.0.md",
+      "bytes": 2034,
+      "sha256": "ef6ba0c06e340567290f91e2988be401e625aa5dab790459030bbe987c734449"
+    },
+    {
+      "path": "08_client_experience/VF-15_Client_Experience_and_Relationship_Engine_v1.0.md",
+      "bytes": 2523,
+      "sha256": "060dedc57bb78698f459130788146e83152348f44c9be140144ffcd20cfc6dc4"
+    },
+    {
+      "path": "09_data_knowledge_memory/VF-16_Data_Knowledge_and_Memory_Architecture_v1.0.md",
+      "bytes": 3806,
+      "sha256": "dbf13e2136e838f82e4d26810e6a1cba38fe5383e5ce0b0587be57a205e48d63"
+    },
+    {
+      "path": "10_security/VF-17_Security_Identity_and_Trust_Infrastructure_v1.0.md",
+      "bytes": 3888,
+      "sha256": "5242f16558251190e56cbea723ae89f93711cd1bbb5d2cc32919813d79e3cc3c"
+    },
+    {
+      "path": "11_ai_governance/VF-18_AI_Governance_Agent_Safety_and_Autonomous_Operations_v1.0.md",
+      "bytes": 4139,
+      "sha256": "57ad2047b05e00b29999b24873095b430df7486a6679d817f0ad60d60b1af48c"
+    },
+    {
+      "path": "12_service_delivery/VF-19_Service_Delivery_and_Professional_Practice_Engine_v1.0.md",
+      "bytes": 3970,
+      "sha256": "84e16d27327cdf1bc4c572ecad0748e376198a009c261e13467f6cc34fbffc8c"
+    },
+    {
+      "path": "12_service_delivery/practice_packs/accounting/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "12_service_delivery/practice_packs/data_analytics/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "12_service_delivery/practice_packs/energy/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "12_service_delivery/practice_packs/engineering/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "12_service_delivery/practice_packs/fire_safety/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "12_service_delivery/practice_packs/legal/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "12_service_delivery/practice_packs/management_consulting/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "12_service_delivery/practice_packs/technical_writing/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "12_service_delivery/service_delivery_packs/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "13_productization/VF-20_Productization_Service_Pack_and_Industry_Expansion_Engine_v1.0.md",
+      "bytes": 3626,
+      "sha256": "32c7083081c67c731e220d914d67cd9acd194094901c37ff79dff973525a9b1e"
+    },
+    {
+      "path": "13_productization/industry_packs/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "13_productization/jurisdiction_packs/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "13_productization/service_bundles/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "13_productization/service_products/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "13_productization/service_skus/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "14_firm_launch/VF-21_Onboarding_Certification_and_Firm_Launch_Engine_v1.0.md",
+      "bytes": 3706,
+      "sha256": "bb91204851f307646f066faadd1a36b149cf382a22cc733b9aa0faea4cb259fc"
+    },
+    {
+      "path": "14_firm_launch/certification/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "14_firm_launch/firm_blueprints/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "14_firm_launch/firm_templates/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "14_firm_launch/readiness_tests/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "15_network_federation/VF-22_Network_Collaboration_and_Enterprise_Federation_Engine_v1.0.md",
+      "bytes": 3377,
+      "sha256": "eba649685e6f30d3509da4868e4879b82b41b7eb3caa1c09fcfcd961e4e99d22"
+    },
+    {
+      "path": "15_network_federation/capability_registry/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "15_network_federation/collaboration_templates/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "15_network_federation/enterprise_federation/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "15_network_federation/federation_templates/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "16_capacity_economy/VF-23_Global_Capacity_Supply_Demand_and_Workforce_Economy_Engine_v1.0.md",
+      "bytes": 4161,
+      "sha256": "2472b97aac4456b1cc08887052d9e06cf58343ba62ce3c7f9f996cf7c38e9896"
+    },
+    {
+      "path": "16_capacity_economy/capacity_models/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "16_capacity_economy/demand_models/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "16_capacity_economy/pricing_models/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "16_capacity_economy/workforce_economics/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "17_market_observatory/VF-24_Global_Intelligence_Benchmarking_and_Market_Observatory_v1.0.md",
+      "bytes": 3929,
+      "sha256": "a47dca487d60da1a5f153befc4f9ae660cebb72d0ff56251bed04bc5f311d230"
+    },
+    {
+      "path": "17_market_observatory/benchmarks/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "17_market_observatory/geographic_observatories/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "17_market_observatory/industry_observatories/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "17_market_observatory/market_indicators/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "17_market_observatory/market_models/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "18_shared_assets/VF_DEPENDENCY_MAP.md",
+      "bytes": 727,
+      "sha256": "be81cb57ab409789be53e4ebd159bb6f8c917ef7a05fea59234745ad41942d14"
+    },
+    {
+      "path": "18_shared_assets/api_contracts/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "18_shared_assets/event_catalogue/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "18_shared_assets/ontologies/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "18_shared_assets/policy_definitions/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "18_shared_assets/schemas/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "18_shared_assets/state_machines/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "18_shared_assets/taxonomies/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "18_shared_assets/templates/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "19_reference_implementations/VF-SP-001_Formwork_Engineering/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "19_reference_implementations/VF-SP-001_Formwork_Engineering/README.md",
+      "bytes": 803,
+      "sha256": "c447f49b22d35f035b5bc3b81105b17ac37eeabe583e52d3758629487d63d134"
+    },
+    {
+      "path": "19_reference_implementations/VF-SP-002_Technical_Writing/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "19_reference_implementations/VF-SP-003_Energy/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "19_reference_implementations/VF-SP-004_Fire_Safety/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "19_reference_implementations/VF-SP-005_Data_Analytics/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "19_reference_implementations/VF-SP-006_Accounting/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "19_reference_implementations/VF-SP-007_Management_Consulting/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "19_reference_implementations/VF-SP-008_Legal/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "20_implementation/agents/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "20_implementation/api/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "20_implementation/database/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "20_implementation/frontend/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "20_implementation/infrastructure/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "20_implementation/integrations/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "20_implementation/platform_architecture/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "20_implementation/workflows/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "21_testing_validation/agent_evaluations/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "21_testing_validation/architecture_validation/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "21_testing_validation/governance_tests/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "21_testing_validation/integration_tests/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "21_testing_validation/reference_scenarios/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "21_testing_validation/security_tests/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "21_testing_validation/service_pack_tests/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "99_archive/historical_versions/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "99_archive/superseded/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "99_archive/working_drafts/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "AGENTS.md",
+      "bytes": 3948,
+      "sha256": "f9f807345e5f1162a187344f70a6147242b5af744df45c1c0348b6f11a7c39b8"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "bytes": 648,
+      "sha256": "cc2f9d95187a6283f512406412e2bf4bc3b2377f0a6dd9d930432d6ec7745f7c"
+    },
+    {
+      "path": "DECISION_REGISTER.md",
+      "bytes": 3036,
+      "sha256": "78b7ec77eb7260750e9822ca6fa0fe4961e56274e01f18c133204e289ed24851"
+    },
+    {
+      "path": "DOCUMENT_REGISTER.md",
+      "bytes": 3798,
+      "sha256": "3ba127e2a75b13f61d18a70f2e02b777f7834ea74daee930efa94df92243fcdb"
+    },
+    {
+      "path": "GLOSSARY.md",
+      "bytes": 2573,
+      "sha256": "dc71583a44a58843ee571cfb1c79266ab4c64f18cf61e6a8cccd2e6a67c3307a"
+    },
+    {
+      "path": "MASTER_ARCHITECTURE.md",
+      "bytes": 2061,
+      "sha256": "1bff235081b396b101911f0c9e7a4aad85523148f915ebf23635eece1a242bf5"
+    },
+    {
+      "path": "NEXT_STEPS.md",
+      "bytes": 639,
+      "sha256": "4935ce691b451e0de91b2ccd725568bcbbe91c3e42bf3459c18ac8ceab300c7b"
+    },
+    {
+      "path": "README.md",
+      "bytes": 2400,
+      "sha256": "fd9d1ee5b2b43ed2e758d7198843c0af6a887dc1d64b158d2d1f7116caf68f78"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+﻿name: vfirm-stage2
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: vfirm-postgres
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5439:5432"
+    environment:
+      POSTGRES_DB: vfirm
+      POSTGRES_USER: vfirm
+      POSTGRES_PASSWORD: vfirm_dev_password
+    volumes:
+      - vfirm_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vfirm -d vfirm"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  vfirm_postgres_data:
