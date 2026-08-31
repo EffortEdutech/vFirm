@@ -2,7 +2,7 @@
 id: VFIRM-MARKETPLACE-ECOSYSTEM-INTELLIGENCE-RELEASE-PLAN
 title: "Virtual Firm Marketplace and Ecosystem Intelligence Release Plan"
 version: "1.0"
-status: "ME-S2 Complete - ME-S3 Decision Required"
+status: "ME-S3 Complete - ME-S4 Decision Required"
 source_status: "CREATED AFTER ARCHITECTURE BASELINE V1.0 FREEZE"
 ---
 
@@ -104,7 +104,7 @@ Explicitly out of scope unless separately approved:
 |---|---|---|
 | ME-S1 | Marketplace Governance Lock | Publication, qualification, matching, privacy, conflict, credential, and data-sharing policies are locked. |
 | ME-S2 | Qualified Directory and Service Publication | Firms and services can be published only through approved, verified, and revocable records. |
-| ME-S3 | Project Request and Qualification-First Matching | Project requests route through credential, jurisdiction, conflict, capacity, trust, and policy gates. |
+| ME-S3 | Private Directory Governance, Enquiry, and Renewal Controls | Directory Review Board decisions, manual private enquiries, enquiry-to-collaboration requests, and qualification renewal/expiry monitoring operate without public marketplace, live matching, ranking, capacity allocation, or autonomous award. |
 | ME-S4 | Marketplace Collaboration Contracts | Marketplace-origin work produces collaboration contracts, responsibility matrices, approvals, and audit records. |
 | ME-S5 | Capacity Economy Pilot | Capacity and demand signals are captured as bands and indicators, not automated price-first allocation. |
 | ME-S6 | Ecosystem Observatory Alpha | Aggregated, anonymized, provenance-backed observatory views operate under privacy thresholds. |
@@ -114,7 +114,7 @@ Explicitly out of scope unless separately approved:
 
 - ME-S1 passes when publication, qualification, matching, benchmark privacy, consent, and revocation policies are locked.
 - ME-S2 passes when firm/service publication requires approval and verified status and can be suspended or revoked.
-- ME-S3 passes when matching denies unqualified, conflicted, invalid-jurisdiction, or policy-failing candidates and price cannot outrank qualification gates.
+- ME-S3 passes when review board decisions, manual private enquiries, enquiry-to-collaboration requests, renewal/expiry reviews, private-directory boundaries, and audit records are all present and forbidden marketplace behaviors remain denied.
 - ME-S4 passes when marketplace-origin work creates formal collaboration records, responsibility matrices, approvals, and audit records.
 - ME-S5 passes when capacity and pricing intelligence remain aggregated bands and cannot allocate regulated work automatically.
 - ME-S6 passes when VF-24 observatory views meet privacy thresholds and remain separate from VF-13 firm intelligence.
@@ -183,7 +183,7 @@ Executable gate:
 npm run check:me:s1
 ```
 
-Next active step: product-owner decision for ME-S3. ME-S3 must be separately scoped before implementation begins.
+Next active step: product-owner decision for ME-S4. ME-S4 must be separately scoped before implementation begins.
 
 ## 15. ME-S2 completion record
 
@@ -208,4 +208,25 @@ Evidence command:
 npm run check:me:s2
 ```
 
-Next active step: product-owner decision for ME-S3. ME-S3 must be separately scoped before implementation begins.
+Next active step: product-owner decision for ME-S4. ME-S4 must be separately scoped before implementation begins.
+## 16. ME-S3 completion record
+
+Status: Completed for private directory governance, manual private enquiry, and qualification renewal/expiry monitoring.
+
+ME-S3 added:
+
+- Directory Review Board decision records;
+- private directory enquiries against qualified listings;
+- manual enquiry-to-collaboration request transition without matching, ranking, award, or capacity allocation;
+- qualification renewal and expiry review records;
+- ME-S3 readiness summary across review, enquiry, renewal, boundary, and audit evidence.
+
+ME-S3 explicitly does not implement public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, autonomous award, or autonomous regulated approval.
+
+Evidence command:
+
+```bash
+npm run check:me:s3
+```
+
+Next active step: product-owner decision for ME-S4. ME-S4 must be separately scoped before implementation begins.

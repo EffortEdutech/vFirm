@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { evaluatePolicy } from "../../../packages/policy-engine/src/index.mjs";
 import { apiContracts } from "../../../packages/core-domain/src/api-contracts.mjs";
 import { formworkServicePack } from "../../../packages/service-packs/src/formwork.mjs";
-import { acceptProposalRecord, approveProposalRecord, createClientRecord, completeTaskRecord, createDeliverableDraftRecord, createEvidenceBundleRecord, createFirmRecord, createIntakeSessionRecord, createInvoiceRecord, createMarketplaceListingRecord, updateMarketplaceListingStatusRecord, createCapacityOfferRecord, createCollaborationRequestRecord, createObservatorySnapshotRecord, createPolicyDecisionRecord, createProposalRecord, createTenantRecord, findValidProfessionalAuthority, invitePilotUserRecord, activatePilotUserRecord, revokePilotUserRecord, suspendPilotUserRecord, createSupportCaseRecord, updateSupportCaseRecord, createPilotIncidentRecord, updatePilotIncidentRecord, createPilotFeedbackRecord, createPilotAcceptanceReviewRecord, createPilotImprovementItemRecord, updatePilotImprovementItemRecord, createPilotReportPackRecord, createStakeholderReviewBoardRecord, createStakeholderReviewDecisionRecord, createPilotExpansionCohortRecord, updatePilotExpansionCohortRecord, activatePrivatePilotCohortRecord, createTenantOnboardingPlanRecord, updateTenantOnboardingPlanRecord, createReleaseCandidateGateRecord, createTenantPilotControlRecord, recordTenantUsageEventRecord, createBillingReadinessReviewRecord, createPaymentProviderConfigRecord, createSubscriptionPackageRecord, createCommercialLaunchControlRecord, issueDeliverableRecord, issueInvoiceRecord, produceTaskOutputRecord, provisionWorkerInstanceRecord, recordPaymentStatusRecord, requestToolInvocationRecord, reviewDeliverableRecord, activateWorkerInstanceRecord, assignTaskToWorkerRecord, startTaskRecord, getStoreInfo, newId, now, openProjectDeliveryRecord, readStore, requireFields, systemActor, withStore } from "./store.mjs";
+import { acceptProposalRecord, approveProposalRecord, createClientRecord, completeTaskRecord, createDeliverableDraftRecord, createEvidenceBundleRecord, createFirmRecord, createIntakeSessionRecord, createInvoiceRecord, createMarketplaceListingRecord, updateMarketplaceListingStatusRecord, createDirectoryReviewBoardDecisionRecord, createPrivateDirectoryEnquiryRecord, createDirectoryEnquiryCollaborationRequestRecord, createQualificationRenewalReviewRecord, createCapacityOfferRecord, createCollaborationRequestRecord, createObservatorySnapshotRecord, createPolicyDecisionRecord, createProposalRecord, createTenantRecord, findValidProfessionalAuthority, invitePilotUserRecord, activatePilotUserRecord, revokePilotUserRecord, suspendPilotUserRecord, createSupportCaseRecord, updateSupportCaseRecord, createPilotIncidentRecord, updatePilotIncidentRecord, createPilotFeedbackRecord, createPilotAcceptanceReviewRecord, createPilotImprovementItemRecord, updatePilotImprovementItemRecord, createPilotReportPackRecord, createStakeholderReviewBoardRecord, createStakeholderReviewDecisionRecord, createPilotExpansionCohortRecord, updatePilotExpansionCohortRecord, activatePrivatePilotCohortRecord, createTenantOnboardingPlanRecord, updateTenantOnboardingPlanRecord, createReleaseCandidateGateRecord, createTenantPilotControlRecord, recordTenantUsageEventRecord, createBillingReadinessReviewRecord, createPaymentProviderConfigRecord, createSubscriptionPackageRecord, createCommercialLaunchControlRecord, issueDeliverableRecord, issueInvoiceRecord, produceTaskOutputRecord, provisionWorkerInstanceRecord, recordPaymentStatusRecord, requestToolInvocationRecord, reviewDeliverableRecord, activateWorkerInstanceRecord, assignTaskToWorkerRecord, startTaskRecord, getStoreInfo, newId, now, openProjectDeliveryRecord, readStore, requireFields, systemActor, withStore } from "./store.mjs";
 import { createFrontDeskEnquiryRecord, qualifyFrontDeskEnquiryRecord, createClientCommunicationDraftRecord, handoffFrontDeskEnquiryRecord } from "./store.mjs";
 import { bindAdministrationSkillsRecord, createCorrespondenceRecord, registerDocumentRecord, addDocumentRevisionRecord, createAdministrativeDeadlineRecord, completeAdministrativeDeadlineRecord, createTransmittalDraftRecord } from "./store.mjs";
 import { bindCommercialSkillsRecord, createSalesPipelineRecord, updateSalesPipelineRecord, dispatchProposalRecord, createExpenseRecord, approveExpenseRecord, createReceivableFollowUpRecord, readCashSnapshot } from "./store.mjs";
@@ -1051,6 +1051,61 @@ async function readMEQualifiedDirectorySummary(req, url) {
   ];
   const failed = checks.filter((check) => check.status !== "PASS");
   return { release: "Marketplace / Ecosystem Intelligence", sprint: "ME-S2", status: failed.length === 0 ? "ME_S2_QUALIFIED_DIRECTORY_READY" : "ME_S2_QUALIFIED_DIRECTORY_BLOCKED", counts: { directory_listings: listings.length, published: published.length, suspended: suspended.length, revoked: revoked.length, directory_audit_events: auditEvents.length }, checks, blocked_reasons: failed.map((check) => `${check.key}: ${check.detail}`), boundaries: ["controlled_private_directory_only", "no_public_marketplace", "no_live_matching_engine", "no_price_first_ranking", "no_capacity_economy_allocation", "no_vf24_observatory_publication", "no_autonomous_regulated_award", "tenant_confidentiality", "human_governance_approval"] };
+}
+async function recordDirectoryReviewBoardDecision(body, req = null) {
+  requireFields(body, ["tenant_id", "provider_firm_id", "listing_id", "decision", "decision_summary", "evidence_refs"]);
+  const actor = actorFromBody(body, req, body.tenant_id, body.provider_firm_id);
+  assertMEGovernanceActor(actor, "ME-S3 directory review board decision");
+  return createDirectoryReviewBoardDecisionRecord(body, actor);
+}
+
+async function recordPrivateDirectoryEnquiry(body, req = null) {
+  requireFields(body, ["tenant_id", "requesting_firm_id", "provider_firm_id", "listing_id", "enquiry_summary"]);
+  const actor = actorFromBody(body, req, body.tenant_id, body.requesting_firm_id);
+  assertMEGovernanceActor(actor, "ME-S3 private directory enquiry");
+  return createPrivateDirectoryEnquiryRecord(body, actor);
+}
+
+async function requestPrivateDirectoryCollaboration(body, req = null) {
+  requireFields(body, ["tenant_id", "requesting_firm_id", "enquiry_id"]);
+  const actor = actorFromBody(body, req, body.tenant_id, body.requesting_firm_id);
+  assertMEGovernanceActor(actor, "ME-S3 enquiry-to-collaboration request");
+  return createDirectoryEnquiryCollaborationRequestRecord(body, actor);
+}
+
+async function recordQualificationRenewalReview(body, req = null) {
+  requireFields(body, ["tenant_id", "provider_firm_id", "qualification_gate_id", "listing_id", "review_status", "evidence_refs"]);
+  const actor = actorFromBody(body, req, body.tenant_id, body.provider_firm_id);
+  assertMEGovernanceActor(actor, "ME-S3 qualification renewal review");
+  return createQualificationRenewalReviewRecord(body, actor);
+}
+
+async function readMEPrivateDirectoryGovernanceSummary(req, url) {
+  assertActorScope(devActorFromHeaders(req), { tenant_id: url.searchParams.get("tenant_id"), firm_id: url.searchParams.get("firm_id") }, "ME-S3 private directory governance");
+  const store = await readStore();
+  const tenantId = url.searchParams.get("tenant_id");
+  const firmId = url.searchParams.get("firm_id");
+  const tenantScoped = (records) => (records ?? []).filter((item) => (!tenantId || item.tenant_id === tenantId));
+  const firmScoped = (records) => tenantScoped(records).filter((item) => !firmId || item.firm_id === firmId || item.provider_firm_id === firmId || item.requesting_firm_id === firmId);
+  const listings = firmScoped(store.marketplace_listings).filter((item) => item.commercial_model?.directory_type === "CONTROLLED_PRIVATE_QUALIFIED_DIRECTORY");
+  const reviewDecisions = firmScoped(store.directory_review_board_decisions);
+  const enquiries = firmScoped(store.directory_private_enquiries);
+  const renewalReviews = firmScoped(store.qualification_renewal_reviews);
+  const collaborationRequests = firmScoped(store.collaboration_requests).filter((item) => item.metadata?.source_directory_enquiry_id);
+  const auditActions = ["marketplace.directory_review_board_decision_recorded", "marketplace.private_directory_enquiry_recorded", "marketplace.directory_enquiry_collaboration_requested", "marketplace.qualification_renewal_review_recorded"];
+  const auditEvents = firmScoped(store.audit_events).filter((event) => auditActions.includes(event.action ?? event.event_type));
+  const unsafeListing = listings.some((item) => item.visibility !== "TRUSTED_NETWORK" || item.listing_scope !== "PRIVATE_NETWORK" || item.commercial_model?.matching_enabled === true || item.commercial_model?.public_directory === true);
+  const unsafeCollaboration = collaborationRequests.some((item) => item.capacity_offer_id || item.metadata?.no_live_matching !== true || item.metadata?.no_award !== true);
+  const checks = [
+    { key: "directory_review_board_decision", status: reviewDecisions.length > 0 ? "PASS" : "FAIL", detail: `${reviewDecisions.length} review board decision(s)` },
+    { key: "private_enquiry_recorded", status: enquiries.length > 0 ? "PASS" : "FAIL", detail: `${enquiries.length} private enquiry record(s)` },
+    { key: "enquiry_to_collaboration_without_matching", status: collaborationRequests.length > 0 && !unsafeCollaboration ? "PASS" : "FAIL", detail: `${collaborationRequests.length} manual collaboration request(s), unsafe=${unsafeCollaboration}` },
+    { key: "qualification_renewal_review", status: renewalReviews.length > 0 ? "PASS" : "FAIL", detail: `${renewalReviews.length} renewal/expiry review(s)` },
+    { key: "private_directory_boundaries", status: listings.length > 0 && !unsafeListing ? "PASS" : "FAIL", detail: `${listings.length} qualified private listing(s), unsafe=${unsafeListing}` },
+    { key: "me_s3_actions_audited", status: auditEvents.length >= 4 ? "PASS" : "FAIL", detail: `${auditEvents.length} ME-S3 audit event(s)` }
+  ];
+  const failed = checks.filter((check) => check.status !== "PASS");
+  return { release: "Marketplace / Ecosystem Intelligence", sprint: "ME-S3", status: failed.length === 0 ? "ME_S3_PRIVATE_DIRECTORY_GOVERNANCE_READY" : "ME_S3_PRIVATE_DIRECTORY_GOVERNANCE_BLOCKED", counts: { qualified_directory_listings: listings.length, review_board_decisions: reviewDecisions.length, private_enquiries: enquiries.length, collaboration_requests_from_enquiries: collaborationRequests.length, qualification_renewal_reviews: renewalReviews.length, me_s3_audit_events: auditEvents.length }, checks, blocked_reasons: failed.map((check) => `${check.key}: ${check.detail}`), boundaries: ["controlled_private_directory_only", "directory_review_board_only", "manual_private_enquiry_only", "qualification_renewal_monitoring", "no_public_marketplace", "no_live_matching_engine", "no_ranking", "no_capacity_allocation", "no_vf24_observatory_publication", "no_autonomous_award", "no_autonomous_regulated_approval", "tenant_confidentiality", "auditability"] };
 }
 async function createNetworkProfessionalProfile(body, req = null) {
   requireFields(body, ["tenant_id", "firm_id", "display_name"]);
@@ -2212,6 +2267,10 @@ const routes = new Map([
   ["POST /marketplace/directory-publications", publishQualifiedDirectoryListing],
   ["POST /marketplace/directory-publications/suspend", suspendQualifiedDirectoryListing],
   ["POST /marketplace/directory-publications/revoke", revokeQualifiedDirectoryListing],
+  ["POST /marketplace/directory-review-board/decisions", recordDirectoryReviewBoardDecision],
+  ["POST /marketplace/private-directory/enquiries", recordPrivateDirectoryEnquiry],
+  ["POST /marketplace/private-directory/enquiries/request-collaboration", requestPrivateDirectoryCollaboration],
+  ["POST /marketplace/qualification-renewal-reviews", recordQualificationRenewalReview],
   ["POST /capacity/offers", createCapacityOffer],
   ["POST /collaboration/requests", requestCollaboration],
   ["POST /observatory/snapshots", createObservatorySnapshot],
@@ -2326,6 +2385,7 @@ const server = createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/contracts") return sendJson(req, res, 200, { ok: true, data: apiContracts });
     if (req.method === "GET" && url.pathname === "/marketplace/governance-lock") return sendJson(req, res, 200, { ok: true, data: readMEGovernanceLock() });
     if (req.method === "GET" && url.pathname === "/marketplace/qualified-directory-summary") return sendJson(req, res, 200, { ok: true, data: await readMEQualifiedDirectorySummary(req, url) });
+    if (req.method === "GET" && url.pathname === "/marketplace/private-directory-governance-summary") return sendJson(req, res, 200, { ok: true, data: await readMEPrivateDirectoryGovernanceSummary(req, url) });
     if (req.method === "GET" && url.pathname === "/ops/readiness") return sendJson(req, res, 200, { ok: true, data: readOpsReadiness() });
     if (req.method === "GET" && url.pathname === "/ops/staging-package") return sendJson(req, res, 200, { ok: true, data: readStagingDeploymentPackage() });
     if (req.method === "GET" && url.pathname === "/ops/r4-staging-readiness") return sendJson(req, res, 200, { ok: true, data: readR4StagingDataProtectionReadiness() });

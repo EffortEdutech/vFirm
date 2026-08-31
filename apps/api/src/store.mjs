@@ -25,6 +25,9 @@ const initialStore = () => ({
   task_outputs: [],
   tool_invocations: [],
   marketplace_listings: [],
+  directory_review_board_decisions: [],
+  directory_private_enquiries: [],
+  qualification_renewal_reviews: [],
   capacity_offers: [],
   collaboration_requests: [],
   network_professional_profiles: [],
@@ -2204,6 +2207,91 @@ export async function updateMarketplaceListingStatusRecord(body, actor, nextStat
     return listing;
   } finally { clientConn.release(); }
 }
+export async function createDirectoryReviewBoardDecisionRecord(body, actor) {
+  requireHumanNetworkActor(actor, "ME-S3 directory review board decision");
+  if (!Array.isArray(body.evidence_refs) || body.evidence_refs.length === 0) invalidState("Directory review board decision requires evidence references.");
+  const decision = String(body.decision ?? "").toUpperCase();
+  if (!["APPROVE_PUBLICATION", "REVIEW_CONTINUE", "SUSPEND", "REVOKE"].includes(decision)) invalidState("Unsupported directory review board decision.");
+  if (body.live_matching === true || body.ranking_enabled === true || body.capacity_allocation === true || body.autonomous_award === true || body.autonomous_regulated_approval === true) invalidState("ME-S3 review board cannot authorize marketplace matching, ranking, allocation, award, or regulated approval.");
+  const timestamp = now();
+  if (storeBackend !== "postgres") return withStore((store) => {
+    store.directory_review_board_decisions ??= [];
+    const listing = (store.marketplace_listings ?? []).find((item) => item.id === body.listing_id && item.tenant_id === body.tenant_id && item.firm_id === body.provider_firm_id && item.commercial_model?.directory_type === "CONTROLLED_PRIVATE_QUALIFIED_DIRECTORY");
+    if (!listing) throwNotFound("marketplace_listings", body.listing_id);
+    if (listing.visibility !== "TRUSTED_NETWORK" || listing.listing_scope !== "PRIVATE_NETWORK") invalidState("Directory review board can only govern controlled private directory listings.");
+    const record = { id: newId("directory_review"), tenant_id: body.tenant_id, provider_firm_id: body.provider_firm_id, listing_id: listing.id, qualification_gate_id: listing.commercial_model?.qualification_gate_id ?? body.qualification_gate_id ?? null, board_ref: body.board_ref ?? "ME-S3-DIRECTORY-REVIEW-BOARD", decision, decision_summary: body.decision_summary, evidence_refs: body.evidence_refs, decided_by_actor_id: actorId(actor), decided_at: timestamp, created_at: timestamp, metadata: { ...(body.metadata ?? {}), boundaries: ["private_directory_only", "no_live_matching", "no_ranking", "no_capacity_allocation", "no_autonomous_award", "no_autonomous_regulated_approval"] } };
+    if (decision === "SUSPEND") listing.status = "SUSPENDED";
+    if (decision === "REVOKE") listing.status = "REVOKED";
+    if (["SUSPEND", "REVOKE"].includes(decision)) listing.updated_at = timestamp;
+    store.directory_review_board_decisions.push(record);
+    appendEventAndAudit(store, { event_type: "marketplace.directory_review_board_decision_recorded", actor, tenant_id: body.tenant_id, firm_id: body.provider_firm_id, aggregate_type: "DirectoryReviewBoardDecision", aggregate_id: record.id, payload: record, summary: "Private directory review board decision recorded." });
+    return record;
+  });
+  const record = { id: newUuid(), tenant_id: body.tenant_id, provider_firm_id: body.provider_firm_id, listing_id: body.listing_id, qualification_gate_id: body.qualification_gate_id ?? null, board_ref: body.board_ref ?? "ME-S3-DIRECTORY-REVIEW-BOARD", decision, decision_summary: body.decision_summary, evidence_refs: body.evidence_refs, decided_by_actor_id: actorId(actor), decided_at: timestamp, created_at: timestamp, metadata: body.metadata ?? {} };
+  await withAppState((store) => { store.directory_review_board_decisions ??= []; store.directory_review_board_decisions.push(record); appendEventAndAudit(store, { event_type: "marketplace.directory_review_board_decision_recorded", actor, tenant_id: body.tenant_id, firm_id: body.provider_firm_id, aggregate_type: "DirectoryReviewBoardDecision", aggregate_id: record.id, payload: record, summary: "Private directory review board decision recorded." }); return record; });
+  return record;
+}
+
+export async function createPrivateDirectoryEnquiryRecord(body, actor) {
+  requireHumanNetworkActor(actor, "ME-S3 private directory enquiry");
+  if (body.live_matching === true || body.auto_match === true || body.ranking_requested === true || body.award_requested === true || body.autonomous_award === true) invalidState("ME-S3 enquiry is manual/private only; live matching, ranking, and award are not authorized.");
+  const timestamp = now();
+  if (storeBackend !== "postgres") return withStore((store) => {
+    store.directory_private_enquiries ??= [];
+    const listing = (store.marketplace_listings ?? []).find((item) => item.id === body.listing_id && item.tenant_id === body.tenant_id && item.firm_id === body.provider_firm_id && item.status === "PUBLISHED" && item.visibility === "TRUSTED_NETWORK" && item.listing_scope === "PRIVATE_NETWORK" && item.commercial_model?.directory_type === "CONTROLLED_PRIVATE_QUALIFIED_DIRECTORY");
+    if (!listing) throwNotFound("marketplace_listings", body.listing_id);
+    if (body.requesting_firm_id === body.provider_firm_id) invalidState("Private directory enquiry requires a separate requesting firm.");
+    const enquiry = { id: newId("directory_enquiry"), tenant_id: body.tenant_id, requesting_firm_id: body.requesting_firm_id, provider_firm_id: body.provider_firm_id, listing_id: listing.id, enquiry_summary: body.enquiry_summary, status: "ENQUIRY_RECORDED", matching_mode: "MANUAL_REVIEW_ONLY", no_live_matching: true, no_ranking: true, no_award: true, created_by_actor_id: actorId(actor), created_at: timestamp, updated_at: timestamp, metadata: body.metadata ?? {} };
+    store.directory_private_enquiries.push(enquiry);
+    appendEventAndAudit(store, { event_type: "marketplace.private_directory_enquiry_recorded", actor, tenant_id: body.tenant_id, firm_id: body.requesting_firm_id, aggregate_type: "PrivateDirectoryEnquiry", aggregate_id: enquiry.id, payload: enquiry, summary: "Private directory enquiry recorded for manual governance review only." });
+    return enquiry;
+  });
+  const enquiry = { id: newUuid(), tenant_id: body.tenant_id, requesting_firm_id: body.requesting_firm_id, provider_firm_id: body.provider_firm_id, listing_id: body.listing_id, enquiry_summary: body.enquiry_summary, status: "ENQUIRY_RECORDED", matching_mode: "MANUAL_REVIEW_ONLY", no_live_matching: true, no_ranking: true, no_award: true, created_by_actor_id: actorId(actor), created_at: timestamp, updated_at: timestamp, metadata: body.metadata ?? {} };
+  await withAppState((store) => { store.directory_private_enquiries ??= []; store.directory_private_enquiries.push(enquiry); appendEventAndAudit(store, { event_type: "marketplace.private_directory_enquiry_recorded", actor, tenant_id: body.tenant_id, firm_id: body.requesting_firm_id, aggregate_type: "PrivateDirectoryEnquiry", aggregate_id: enquiry.id, payload: enquiry, summary: "Private directory enquiry recorded for manual governance review only." }); return enquiry; });
+  return enquiry;
+}
+
+export async function createDirectoryEnquiryCollaborationRequestRecord(body, actor) {
+  requireHumanNetworkActor(actor, "ME-S3 enquiry-to-collaboration request");
+  if (body.live_matching === true || body.ranking_requested === true || body.award_requested === true || body.autonomous_award === true) invalidState("ME-S3 collaboration request remains manual and cannot award work.");
+  const timestamp = now();
+  if (storeBackend !== "postgres") return withStore((store) => {
+    const enquiry = (store.directory_private_enquiries ?? []).find((item) => item.id === body.enquiry_id && item.tenant_id === body.tenant_id && item.requesting_firm_id === body.requesting_firm_id && item.status === "ENQUIRY_RECORDED");
+    if (!enquiry) throwNotFound("directory_private_enquiries", body.enquiry_id);
+    const request = { id: newId("collab_req"), tenant_id: body.tenant_id, requesting_firm_id: enquiry.requesting_firm_id, provider_firm_id: enquiry.provider_firm_id, service_pack_id: body.service_pack_id ?? null, project_id: body.project_id ?? null, capacity_offer_id: null, request_summary: body.request_summary ?? enquiry.enquiry_summary, data_room_policy: { allowed: false, reason: "ME-S3 private enquiry request only; no client data room opened by default.", permitted_evidence_refs: body.permitted_evidence_refs ?? [] }, status: "REQUESTED", created_at: timestamp, updated_at: timestamp, metadata: { ...(body.metadata ?? {}), source_directory_enquiry_id: enquiry.id, listing_id: enquiry.listing_id, no_live_matching: true, no_ranking: true, no_award: true } };
+    enquiry.status = "COLLABORATION_REQUESTED";
+    enquiry.updated_at = timestamp;
+    store.collaboration_requests.push(request);
+    appendEventAndAudit(store, { event_type: "marketplace.directory_enquiry_collaboration_requested", actor, tenant_id: body.tenant_id, firm_id: enquiry.requesting_firm_id, aggregate_type: "CollaborationRequest", aggregate_id: request.id, payload: request, summary: "Private directory enquiry progressed to manual collaboration request without matching or award." });
+    return { enquiry, collaboration_request: request };
+  });
+  const request = { id: newUuid(), tenant_id: body.tenant_id, requesting_firm_id: body.requesting_firm_id, provider_firm_id: body.provider_firm_id ?? null, service_pack_id: body.service_pack_id ?? null, project_id: body.project_id ?? null, capacity_offer_id: null, request_summary: body.request_summary, data_room_policy: { allowed: false, reason: "ME-S3 private enquiry request only; no client data room opened by default.", permitted_evidence_refs: body.permitted_evidence_refs ?? [] }, status: "REQUESTED", created_at: timestamp, updated_at: timestamp, metadata: { ...(body.metadata ?? {}), source_directory_enquiry_id: body.enquiry_id, no_live_matching: true, no_ranking: true, no_award: true } };
+  await withAppState((store) => { store.collaboration_requests ??= []; store.collaboration_requests.push(request); appendEventAndAudit(store, { event_type: "marketplace.directory_enquiry_collaboration_requested", actor, tenant_id: body.tenant_id, firm_id: body.requesting_firm_id, aggregate_type: "CollaborationRequest", aggregate_id: request.id, payload: request, summary: "Private directory enquiry progressed to manual collaboration request without matching or award." }); return request; });
+  return { collaboration_request: request };
+}
+
+export async function createQualificationRenewalReviewRecord(body, actor) {
+  requireHumanNetworkActor(actor, "ME-S3 qualification renewal review");
+  const reviewStatus = String(body.review_status ?? "").toUpperCase();
+  if (!["VALID", "EXPIRING", "EXPIRED", "RENEWAL_REQUIRED", "SUSPEND_PUBLICATION"].includes(reviewStatus)) invalidState("Unsupported qualification renewal review status.");
+  if (!Array.isArray(body.evidence_refs) || body.evidence_refs.length === 0) invalidState("Qualification renewal review requires evidence references.");
+  const timestamp = now();
+  if (storeBackend !== "postgres") return withStore((store) => {
+    store.qualification_renewal_reviews ??= [];
+    const gate = (store.network_qualification_gates ?? []).find((item) => item.id === body.qualification_gate_id && item.tenant_id === body.tenant_id && item.provider_firm_id === body.provider_firm_id);
+    if (!gate) throwNotFound("network_qualification_gates", body.qualification_gate_id);
+    const listing = (store.marketplace_listings ?? []).find((item) => item.id === body.listing_id && item.tenant_id === body.tenant_id && item.firm_id === body.provider_firm_id && item.commercial_model?.qualification_gate_id === gate.id);
+    if (!listing) throwNotFound("marketplace_listings", body.listing_id);
+    const record = { id: newId("qualification_renewal"), tenant_id: body.tenant_id, provider_firm_id: body.provider_firm_id, qualification_gate_id: gate.id, listing_id: listing.id, credential_id: gate.credential_id ?? listing.commercial_model?.credential_id ?? null, jurisdiction_ref: gate.jurisdiction_ref ?? null, review_status: reviewStatus, expires_at: body.expires_at ?? null, next_review_due_at: body.next_review_due_at ?? null, evidence_refs: body.evidence_refs, reviewed_by_actor_id: actorId(actor), reviewed_at: timestamp, created_at: timestamp, metadata: { ...(body.metadata ?? {}), tenant_confidential: true } };
+    if (["EXPIRED", "SUSPEND_PUBLICATION"].includes(reviewStatus)) { listing.status = "SUSPENDED"; listing.updated_at = timestamp; listing.commercial_model = { ...(listing.commercial_model ?? {}), renewal_status: reviewStatus, renewal_suspended_at: timestamp }; }
+    store.qualification_renewal_reviews.push(record);
+    appendEventAndAudit(store, { event_type: "marketplace.qualification_renewal_review_recorded", actor, tenant_id: body.tenant_id, firm_id: body.provider_firm_id, aggregate_type: "QualificationRenewalReview", aggregate_id: record.id, payload: record, summary: "Qualification renewal or expiry review recorded for private directory listing." });
+    return { renewal_review: record, listing };
+  });
+  const record = { id: newUuid(), tenant_id: body.tenant_id, provider_firm_id: body.provider_firm_id, qualification_gate_id: body.qualification_gate_id, listing_id: body.listing_id, credential_id: body.credential_id ?? null, jurisdiction_ref: body.jurisdiction_ref ?? null, review_status: reviewStatus, expires_at: body.expires_at ?? null, next_review_due_at: body.next_review_due_at ?? null, evidence_refs: body.evidence_refs, reviewed_by_actor_id: actorId(actor), reviewed_at: timestamp, created_at: timestamp, metadata: body.metadata ?? {} };
+  await withAppState((store) => { store.qualification_renewal_reviews ??= []; store.qualification_renewal_reviews.push(record); appendEventAndAudit(store, { event_type: "marketplace.qualification_renewal_review_recorded", actor, tenant_id: body.tenant_id, firm_id: body.provider_firm_id, aggregate_type: "QualificationRenewalReview", aggregate_id: record.id, payload: record, summary: "Qualification renewal or expiry review recorded for private directory listing." }); return record; });
+  return { renewal_review: record };
+}
 export async function createCapacityOfferRecord(body, actor) {
   const offer = buildCapacityOffer(body);
   if (storeBackend !== "postgres") return withStore((store)=>{ store.capacity_offers.push(offer); appendEventAndAudit(store,{event_type:"capacity_offer.created",actor,tenant_id:body.tenant_id,firm_id:body.firm_id,aggregate_type:"CapacityOffer",aggregate_id:offer.id,payload:offer,summary:"Capacity offer created for trusted network."}); return offer; });
@@ -3508,6 +3596,9 @@ function stripRelationalCollections(store) {
   task_outputs: [],
   tool_invocations: [],
   marketplace_listings: [],
+  directory_review_board_decisions: [],
+  directory_private_enquiries: [],
+  qualification_renewal_reviews: [],
   capacity_offers: [],
   collaboration_requests: [],
   network_professional_profiles: [],

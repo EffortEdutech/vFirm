@@ -203,3 +203,16 @@ Constraints: This decision does not authorize public marketplace, live matching,
 Evidence: `npm run check:me:s2`; `docs/10_post_freeze_technical_design/ME_S2_QUALIFIED_DIRECTORY_AND_SERVICE_PUBLICATION_COMPLETION_v1.0.md`.
 
 Follow-up: Product owner must explicitly authorize and bound ME-S3 before implementation begins.
+## ADR-030 - ME-S3 private directory governance enquiry renewal completed
+
+Date: 2026-08-31
+
+Decision: ME-S3 is completed as private Directory Review Board operations, manual private enquiry-to-collaboration request workflow, and qualification renewal/expiry monitoring.
+
+Rationale: The Virtual Firm Platform now has a governed operating surface around the private qualified directory without opening public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, autonomous award, or autonomous regulated approval.
+
+Constraints: Directory Review Board decisions do not grant professional authority. Private enquiries do not create appointments or awards. Collaboration requests remain manual and do not move client data by default. Renewal review can suspend publication but cannot approve regulated deliverables.
+
+Evidence: `npm run check:me:s3`; `docs/10_post_freeze_technical_design/ME_S3_PRIVATE_DIRECTORY_GOVERNANCE_ENQUIRY_RENEWAL_COMPLETION_v1.0.md`.
+
+Follow-up: Product owner must explicitly authorize and bound ME-S4 before implementation begins.

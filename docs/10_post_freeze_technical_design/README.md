@@ -232,3 +232,4 @@ After Stage 20, the governing sprint plan is `VFIRM_RELEASE_1_PRODUCT_TARGET_AND
 | ME_S1_MARKETPLACE_GOVERNANCE_LOCK_COMPLETION_v1.0.md | Completion evidence for ME-S1 marketplace governance lock policy, contract, and smoke gate. |
 
 | `ME_S2_QUALIFIED_DIRECTORY_AND_SERVICE_PUBLICATION_COMPLETION_v1.0.md` | Completion evidence for ME-S2 controlled private qualified directory publication, suspension, revocation, and smoke gate. |
+| `ME_S3_PRIVATE_DIRECTORY_GOVERNANCE_ENQUIRY_RENEWAL_COMPLETION_v1.0.md` | Completion evidence for ME-S3 private directory review board, enquiry-to-collaboration request, renewal/expiry monitoring, boundaries, and smoke gate. |
