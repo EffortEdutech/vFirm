@@ -189,3 +189,17 @@ Boundaries: This decision does not authorize public directory, live marketplace 
 Executable evidence: npm run check:me:s1 passes.
 
 Follow-up: Product owner must explicitly authorize ME-S2 - Qualified Directory and Service Publication before implementation begins.
+
+## ADR-029 - ME-S2 qualified directory and service publication completed
+
+Date: 2026-08-31
+
+Decision: ME-S2 is completed only as a controlled/private qualified directory and service publication capability.
+
+Rationale: The Virtual Firm Platform can now publish trusted-network service listings only when human governance approval, passed qualification gate, verified credential evidence, jurisdiction scope, revocation/suspension controls, tenant confidentiality, and auditability are present.
+
+Constraints: This decision does not authorize public marketplace, live matching, price-first ranking, capacity economy allocation, VF-24 observatory publication, autonomous regulated award, or autonomous professional approval.
+
+Evidence: `npm run check:me:s2`; `docs/10_post_freeze_technical_design/ME_S2_QUALIFIED_DIRECTORY_AND_SERVICE_PUBLICATION_COMPLETION_v1.0.md`.
+
+Follow-up: Product owner must explicitly authorize and bound ME-S3 before implementation begins.

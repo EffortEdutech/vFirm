@@ -2178,6 +2178,32 @@ export async function createMarketplaceListingRecord(body, actor) {
   const clientConn=await getPool().connect(); try{ await clientConn.query("insert into marketplace_listings (id, tenant_id, firm_id, service_pack_id, listing_scope, title, description, qualification_requirements, commercial_model, visibility, status, created_at, updated_at) values ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb,$10,$11,$12,$13)",[listing.id,listing.tenant_id,listing.firm_id,uuidOrNull(listing.service_pack_id),listing.listing_scope,listing.title,listing.description,JSON.stringify(listing.qualification_requirements),JSON.stringify(listing.commercial_model),listing.visibility,listing.status,listing.created_at,listing.updated_at]); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"marketplace.listing_published",actor,tenant_id:body.tenant_id,firm_id:body.firm_id,aggregate_type:"MarketplaceListing",aggregate_id:listing.id,payload:listing,summary:"Private network marketplace listing published."}); return listing;}); return listing;} finally{clientConn.release();}
 }
 
+
+export async function updateMarketplaceListingStatusRecord(body, actor, nextStatus) {
+  const timestamp = now();
+  const allowed = ["SUSPENDED", "REVOKED"];
+  if (!allowed.includes(nextStatus)) invalidState(`Unsupported marketplace directory status transition: ${nextStatus}`);
+  const eventType = nextStatus === "SUSPENDED" ? "marketplace.directory_publication_suspended" : "marketplace.directory_publication_revoked";
+  const summary = nextStatus === "SUSPENDED" ? "Qualified directory publication suspended by human governance operator." : "Qualified directory publication revoked by human governance operator.";
+  if (storeBackend !== "postgres") return withStore((store) => {
+    const listing = (store.marketplace_listings ?? []).find((item) => item.id === body.listing_id && item.tenant_id === body.tenant_id && item.firm_id === body.firm_id);
+    if (!listing) throwNotFound("marketplace_listings", body.listing_id);
+    if (!["PUBLISHED", "SUSPENDED"].includes(listing.status)) invalidState(`Marketplace listing cannot move from ${listing.status} to ${nextStatus}.`);
+    listing.status = nextStatus;
+    listing.updated_at = timestamp;
+    listing.commercial_model = { ...(listing.commercial_model ?? {}), governance_reason: body.reason ?? `${nextStatus.toLowerCase()} by governance operator` };
+    appendEventAndAudit(store,{event_type:eventType,actor,tenant_id:listing.tenant_id,firm_id:listing.firm_id,aggregate_type:"MarketplaceListing",aggregate_id:listing.id,payload:listing,summary});
+    return listing;
+  });
+  const clientConn = await getPool().connect();
+  try {
+    const result = await clientConn.query("update marketplace_listings set status=$1, updated_at=$2, commercial_model = commercial_model || $3::jsonb where id=$4 and tenant_id=$5 and firm_id=$6 and status in ('PUBLISHED','SUSPENDED') returning id::text, tenant_id::text, firm_id::text, service_pack_id::text, listing_scope, title, description, qualification_requirements, commercial_model, visibility, status, created_at, updated_at", [nextStatus, timestamp, JSON.stringify({ governance_reason: body.reason ?? `${nextStatus.toLowerCase()} by governance operator` }), body.listing_id, body.tenant_id, body.firm_id]);
+    if (result.rowCount === 0) throwNotFound("marketplace_listings", body.listing_id);
+    const listing = mapDbDates(result.rows[0]);
+    await withAppState((store)=>{appendEventAndAudit(store,{event_type:eventType,actor,tenant_id:listing.tenant_id,firm_id:listing.firm_id,aggregate_type:"MarketplaceListing",aggregate_id:listing.id,payload:listing,summary}); return listing;});
+    return listing;
+  } finally { clientConn.release(); }
+}
 export async function createCapacityOfferRecord(body, actor) {
   const offer = buildCapacityOffer(body);
   if (storeBackend !== "postgres") return withStore((store)=>{ store.capacity_offers.push(offer); appendEventAndAudit(store,{event_type:"capacity_offer.created",actor,tenant_id:body.tenant_id,firm_id:body.firm_id,aggregate_type:"CapacityOffer",aggregate_id:offer.id,payload:offer,summary:"Capacity offer created for trusted network."}); return offer; });

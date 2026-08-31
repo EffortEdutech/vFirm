@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { evaluatePolicy } from "../../../packages/policy-engine/src/index.mjs";
 import { apiContracts } from "../../../packages/core-domain/src/api-contracts.mjs";
 import { formworkServicePack } from "../../../packages/service-packs/src/formwork.mjs";
-import { acceptProposalRecord, approveProposalRecord, createClientRecord, completeTaskRecord, createDeliverableDraftRecord, createEvidenceBundleRecord, createFirmRecord, createIntakeSessionRecord, createInvoiceRecord, createMarketplaceListingRecord, createCapacityOfferRecord, createCollaborationRequestRecord, createObservatorySnapshotRecord, createPolicyDecisionRecord, createProposalRecord, createTenantRecord, findValidProfessionalAuthority, invitePilotUserRecord, activatePilotUserRecord, revokePilotUserRecord, suspendPilotUserRecord, createSupportCaseRecord, updateSupportCaseRecord, createPilotIncidentRecord, updatePilotIncidentRecord, createPilotFeedbackRecord, createPilotAcceptanceReviewRecord, createPilotImprovementItemRecord, updatePilotImprovementItemRecord, createPilotReportPackRecord, createStakeholderReviewBoardRecord, createStakeholderReviewDecisionRecord, createPilotExpansionCohortRecord, updatePilotExpansionCohortRecord, activatePrivatePilotCohortRecord, createTenantOnboardingPlanRecord, updateTenantOnboardingPlanRecord, createReleaseCandidateGateRecord, createTenantPilotControlRecord, recordTenantUsageEventRecord, createBillingReadinessReviewRecord, createPaymentProviderConfigRecord, createSubscriptionPackageRecord, createCommercialLaunchControlRecord, issueDeliverableRecord, issueInvoiceRecord, produceTaskOutputRecord, provisionWorkerInstanceRecord, recordPaymentStatusRecord, requestToolInvocationRecord, reviewDeliverableRecord, activateWorkerInstanceRecord, assignTaskToWorkerRecord, startTaskRecord, getStoreInfo, newId, now, openProjectDeliveryRecord, readStore, requireFields, systemActor, withStore } from "./store.mjs";
+import { acceptProposalRecord, approveProposalRecord, createClientRecord, completeTaskRecord, createDeliverableDraftRecord, createEvidenceBundleRecord, createFirmRecord, createIntakeSessionRecord, createInvoiceRecord, createMarketplaceListingRecord, updateMarketplaceListingStatusRecord, createCapacityOfferRecord, createCollaborationRequestRecord, createObservatorySnapshotRecord, createPolicyDecisionRecord, createProposalRecord, createTenantRecord, findValidProfessionalAuthority, invitePilotUserRecord, activatePilotUserRecord, revokePilotUserRecord, suspendPilotUserRecord, createSupportCaseRecord, updateSupportCaseRecord, createPilotIncidentRecord, updatePilotIncidentRecord, createPilotFeedbackRecord, createPilotAcceptanceReviewRecord, createPilotImprovementItemRecord, updatePilotImprovementItemRecord, createPilotReportPackRecord, createStakeholderReviewBoardRecord, createStakeholderReviewDecisionRecord, createPilotExpansionCohortRecord, updatePilotExpansionCohortRecord, activatePrivatePilotCohortRecord, createTenantOnboardingPlanRecord, updateTenantOnboardingPlanRecord, createReleaseCandidateGateRecord, createTenantPilotControlRecord, recordTenantUsageEventRecord, createBillingReadinessReviewRecord, createPaymentProviderConfigRecord, createSubscriptionPackageRecord, createCommercialLaunchControlRecord, issueDeliverableRecord, issueInvoiceRecord, produceTaskOutputRecord, provisionWorkerInstanceRecord, recordPaymentStatusRecord, requestToolInvocationRecord, reviewDeliverableRecord, activateWorkerInstanceRecord, assignTaskToWorkerRecord, startTaskRecord, getStoreInfo, newId, now, openProjectDeliveryRecord, readStore, requireFields, systemActor, withStore } from "./store.mjs";
 import { createFrontDeskEnquiryRecord, qualifyFrontDeskEnquiryRecord, createClientCommunicationDraftRecord, handoffFrontDeskEnquiryRecord } from "./store.mjs";
 import { bindAdministrationSkillsRecord, createCorrespondenceRecord, registerDocumentRecord, addDocumentRevisionRecord, createAdministrativeDeadlineRecord, completeAdministrativeDeadlineRecord, createTransmittalDraftRecord } from "./store.mjs";
 import { bindCommercialSkillsRecord, createSalesPipelineRecord, updateSalesPipelineRecord, dispatchProposalRecord, createExpenseRecord, approveExpenseRecord, createReceivableFollowUpRecord, readCashSnapshot } from "./store.mjs";
@@ -286,7 +286,7 @@ const marketplaceGovernancePolicy = Object.freeze({
     denied_snapshot_scopes: ["PUBLIC_OBSERVATORY", "VF24_PUBLICATION", "ECOSYSTEM_PUBLIC_BENCHMARK"],
     raw_tenant_data_publication_allowed: false
   },
-  implementation_boundaries: ["no_public_directory", "no_live_matching_engine", "no_capacity_economy_allocation", "no_vf24_observatory_publication", "no_autonomous_regulated_award", "no_live_payment_movement"]
+  implementation_boundaries: ["controlled_private_directory_only", "no_public_directory", "no_live_matching_engine", "no_capacity_economy_allocation", "no_vf24_observatory_publication", "no_autonomous_regulated_award", "no_live_payment_movement"]
 });
 
 function meS1Denied(message, code = "ME_S1_MARKETPLACE_GOVERNANCE_DENIED") {
@@ -986,6 +986,72 @@ function assertHumanNetworkActor(actor = {}) {
   }
 }
 
+
+function requireMEQualifiedDirectoryEvidence(body = {}, store = {}) {
+  const gate = (store.network_qualification_gates ?? []).find((item) => item.id === body.qualification_gate_id && item.tenant_id === body.tenant_id && item.provider_firm_id === body.firm_id);
+  if (!gate) meS1Denied("ME-S2 directory publication requires a qualification gate for the listed provider firm.", "ME_S2_QUALIFICATION_GATE_REQUIRED");
+  if (gate.gate_status !== "PASS") meS1Denied("ME-S2 directory publication requires a PASS qualification gate.", "ME_S2_QUALIFICATION_GATE_NOT_PASSED");
+  const capability = (store.network_capabilities ?? []).find((item) => item.id === gate.capability_id && item.tenant_id === body.tenant_id && item.firm_id === body.firm_id);
+  if (!capability || capability.qualification_required !== true) meS1Denied("ME-S2 directory publication requires a qualification-required capability.", "ME_S2_CAPABILITY_QUALIFICATION_REQUIRED");
+  const credential = (store.network_credentials ?? []).find((item) => item.id === gate.credential_id && item.tenant_id === body.tenant_id && item.firm_id === body.firm_id);
+  if (!credential || credential.verification_status !== "VERIFIED" || !Array.isArray(credential.evidence_refs) || credential.evidence_refs.length === 0) meS1Denied("ME-S2 directory publication requires verified credential evidence.", "ME_S2_VERIFIED_CREDENTIAL_REQUIRED");
+  if (!gate.jurisdiction_ref || !(capability.jurisdiction_refs ?? []).includes(gate.jurisdiction_ref) || !(credential.jurisdiction_refs ?? []).includes(gate.jurisdiction_ref)) meS1Denied("ME-S2 directory publication requires aligned jurisdiction scope.", "ME_S2_JURISDICTION_SCOPE_REQUIRED");
+  return { gate, capability, credential };
+}
+
+async function publishQualifiedDirectoryListing(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "qualification_gate_id", "title"]);
+  const actor = actorFromBody(body, req, body.tenant_id, body.firm_id);
+  assertMEPublicationGovernance({ ...body, visibility: body.visibility ?? "TRUSTED_NETWORK", listing_scope: body.listing_scope ?? "PRIVATE_NETWORK" }, actor);
+  if (body.matching_enabled === true || body.public_directory === true) meS1Denied("ME-S2 does not authorize public directory or live matching.", "ME_S2_PUBLIC_OR_MATCHING_DENIED");
+  const store = await readStore();
+  const evidence = requireMEQualifiedDirectoryEvidence(body, store);
+  return createMarketplaceListingRecord({
+    ...body,
+    visibility: "TRUSTED_NETWORK",
+    listing_scope: "PRIVATE_NETWORK",
+    status: "PUBLISHED",
+    qualification_requirements: ["qualification_gate_passed", "verified_credential", "jurisdiction_scope", "human_governance_approval", "revocation_supported"],
+    commercial_model: { ...(body.commercial_model ?? { pricing: "quotation_required" }), directory_type: "CONTROLLED_PRIVATE_QUALIFIED_DIRECTORY", qualification_gate_id: evidence.gate.id, capability_id: evidence.capability.id, credential_id: evidence.credential.id, governance_approved_by_actor_id: actor.actor_id ?? actor.id ?? null, matching_enabled: false, public_directory: false, tenant_confidential: true }
+  }, actor);
+}
+
+async function suspendQualifiedDirectoryListing(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "listing_id"]);
+  const actor = actorFromBody(body, req, body.tenant_id, body.firm_id);
+  assertMEGovernanceActor(actor, "Qualified directory suspension");
+  return updateMarketplaceListingStatusRecord(body, actor, "SUSPENDED");
+}
+
+async function revokeQualifiedDirectoryListing(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "listing_id"]);
+  const actor = actorFromBody(body, req, body.tenant_id, body.firm_id);
+  assertMEGovernanceActor(actor, "Qualified directory revocation");
+  return updateMarketplaceListingStatusRecord(body, actor, "REVOKED");
+}
+
+async function readMEQualifiedDirectorySummary(req, url) {
+  assertActorScope(devActorFromHeaders(req), { tenant_id: url.searchParams.get("tenant_id"), firm_id: url.searchParams.get("firm_id") }, "ME-S2 qualified directory");
+  const store = await readStore();
+  const tenantId = url.searchParams.get("tenant_id");
+  const firmId = url.searchParams.get("firm_id");
+  const scope = (records) => (records ?? []).filter((item) => (!tenantId || item.tenant_id === tenantId) && (!firmId || item.firm_id === firmId || item.provider_firm_id === firmId));
+  const listings = scope(store.marketplace_listings).filter((item) => item.commercial_model?.directory_type === "CONTROLLED_PRIVATE_QUALIFIED_DIRECTORY");
+  const published = listings.filter((item) => item.status === "PUBLISHED");
+  const suspended = listings.filter((item) => item.status === "SUSPENDED");
+  const revoked = listings.filter((item) => item.status === "REVOKED");
+  const unsafe = listings.filter((item) => item.visibility !== "TRUSTED_NETWORK" || item.listing_scope !== "PRIVATE_NETWORK" || item.commercial_model?.matching_enabled === true || item.commercial_model?.public_directory === true || item.commercial_model?.tenant_confidential !== true);
+  const auditEvents = scope(store.audit_events).filter((event) => ["marketplace.listing_published", "marketplace.directory_publication_suspended", "marketplace.directory_publication_revoked"].includes(event.action ?? event.event_type));
+  const checks = [
+    { key: "qualified_directory_publication_exists", status: published.length > 0 ? "PASS" : "FAIL", detail: `${published.length} published qualified directory listing(s)` },
+    { key: "private_controlled_visibility", status: listings.length > 0 && unsafe.length === 0 ? "PASS" : "FAIL", detail: `${unsafe.length} unsafe listing(s)` },
+    { key: "verified_qualification_evidence", status: published.every((item) => item.commercial_model?.qualification_gate_id && item.commercial_model?.credential_id && item.commercial_model?.capability_id) ? "PASS" : "FAIL", detail: "Published directory listings retain gate, credential, and capability references." },
+    { key: "suspension_and_revocation_paths", status: suspended.length > 0 && revoked.length > 0 ? "PASS" : "FAIL", detail: `${suspended.length} suspended, ${revoked.length} revoked listing(s)` },
+    { key: "directory_actions_audited", status: auditEvents.length >= 3 ? "PASS" : "FAIL", detail: `${auditEvents.length} directory audit event(s)` }
+  ];
+  const failed = checks.filter((check) => check.status !== "PASS");
+  return { release: "Marketplace / Ecosystem Intelligence", sprint: "ME-S2", status: failed.length === 0 ? "ME_S2_QUALIFIED_DIRECTORY_READY" : "ME_S2_QUALIFIED_DIRECTORY_BLOCKED", counts: { directory_listings: listings.length, published: published.length, suspended: suspended.length, revoked: revoked.length, directory_audit_events: auditEvents.length }, checks, blocked_reasons: failed.map((check) => `${check.key}: ${check.detail}`), boundaries: ["controlled_private_directory_only", "no_public_marketplace", "no_live_matching_engine", "no_price_first_ranking", "no_capacity_economy_allocation", "no_vf24_observatory_publication", "no_autonomous_regulated_award", "tenant_confidentiality", "human_governance_approval"] };
+}
 async function createNetworkProfessionalProfile(body, req = null) {
   requireFields(body, ["tenant_id", "firm_id", "display_name"]);
   const actor = actorFromBody(body, req, body.tenant_id, body.firm_id);
@@ -2143,6 +2209,9 @@ const routes = new Map([
   ["POST /proposals/accept", acceptProposal],
   ["POST /evidence-bundles", createEvidenceBundle],
   ["POST /marketplace/listings", publishMarketplaceListing],
+  ["POST /marketplace/directory-publications", publishQualifiedDirectoryListing],
+  ["POST /marketplace/directory-publications/suspend", suspendQualifiedDirectoryListing],
+  ["POST /marketplace/directory-publications/revoke", revokeQualifiedDirectoryListing],
   ["POST /capacity/offers", createCapacityOffer],
   ["POST /collaboration/requests", requestCollaboration],
   ["POST /observatory/snapshots", createObservatorySnapshot],
@@ -2256,6 +2325,7 @@ const server = createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/health") return sendJson(req, res, 200, { ok: true, service: "vfirm-api", phase: "persistent-mvp-command-loop", ...getStoreInfo(), port_family: "309#", api_port: port });
     if (req.method === "GET" && url.pathname === "/contracts") return sendJson(req, res, 200, { ok: true, data: apiContracts });
     if (req.method === "GET" && url.pathname === "/marketplace/governance-lock") return sendJson(req, res, 200, { ok: true, data: readMEGovernanceLock() });
+    if (req.method === "GET" && url.pathname === "/marketplace/qualified-directory-summary") return sendJson(req, res, 200, { ok: true, data: await readMEQualifiedDirectorySummary(req, url) });
     if (req.method === "GET" && url.pathname === "/ops/readiness") return sendJson(req, res, 200, { ok: true, data: readOpsReadiness() });
     if (req.method === "GET" && url.pathname === "/ops/staging-package") return sendJson(req, res, 200, { ok: true, data: readStagingDeploymentPackage() });
     if (req.method === "GET" && url.pathname === "/ops/r4-staging-readiness") return sendJson(req, res, 200, { ok: true, data: readR4StagingDataProtectionReadiness() });

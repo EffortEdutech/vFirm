@@ -2,7 +2,7 @@
 id: VFIRM-MARKETPLACE-ECOSYSTEM-INTELLIGENCE-RELEASE-PLAN
 title: "Virtual Firm Marketplace and Ecosystem Intelligence Release Plan"
 version: "1.0"
-status: "ME-S1 Complete - ME-S2 Decision Required"
+status: "ME-S2 Complete - ME-S3 Decision Required"
 source_status: "CREATED AFTER ARCHITECTURE BASELINE V1.0 FREEZE"
 ---
 
@@ -183,4 +183,29 @@ Executable gate:
 npm run check:me:s1
 ```
 
-Next active step: product-owner decision for ME-S2 - Qualified Directory and Service Publication.
+Next active step: product-owner decision for ME-S3. ME-S3 must be separately scoped before implementation begins.
+
+## 15. ME-S2 completion record
+
+Status: Completed for controlled/private qualified directory and service publication only.
+
+ME-S2 implemented a private qualified directory publication path with these controls:
+
+- listing requires human governance approval;
+- listing requires a passed qualification gate;
+- qualification gate must reference verified credential evidence;
+- qualification, credential, and capability must share jurisdiction scope;
+- publication is forced to trusted-network visibility and private-network scope;
+- listing metadata records gate, credential, capability, governance approver, tenant confidentiality, and disabled public/matching flags;
+- suspension and revocation are explicit human-governed state transitions;
+- directory publication, suspension, and revocation are auditable.
+
+ME-S2 explicitly does not implement public marketplace, live matching, price-first ranking, capacity economy allocation, VF-24 observatory publication, or autonomous regulated award.
+
+Evidence command:
+
+```bash
+npm run check:me:s2
+```
+
+Next active step: product-owner decision for ME-S3. ME-S3 must be separately scoped before implementation begins.
