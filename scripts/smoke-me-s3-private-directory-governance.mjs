@@ -5,9 +5,19 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
-const port = 3116;
+const postgres = process.argv.includes("--postgres");
+const port = postgres ? 3117 : 3116;
 const tmp = await mkdtemp(join(tmpdir(), "vfirm-me-s3-"));
-const api = spawn(process.execPath, ["apps/api/src/server.mjs"], { cwd: root, env: { ...process.env, VFIRM_API_PORT: String(port), VFIRM_STORE_PATH: join(tmp, "store.json"), DATABASE_URL: "", VFIRM_STORE_BACKEND: "json" }, stdio: ["ignore", "pipe", "pipe"] });
+const env = { ...process.env, VFIRM_API_PORT: String(port) };
+if (postgres) {
+  env.VFIRM_STORE_BACKEND = "postgres";
+  delete env.VFIRM_STORE_PATH;
+} else {
+  env.VFIRM_STORE_BACKEND = "json";
+  env.VFIRM_STORE_PATH = join(tmp, "store.json");
+  env.DATABASE_URL = "";
+}
+const api = spawn(process.execPath, ["apps/api/src/server.mjs"], { cwd: root, env, stdio: ["ignore", "pipe", "pipe"] });
 let stderr = "";
 api.stderr.on("data", (chunk) => { stderr += chunk.toString(); });
 api.on("error", (error) => { stderr += String(error.stack ?? error); });
@@ -21,6 +31,7 @@ function authHeaders(firm) { return { "x-vfirm-actor-id": firm.principal_actor.i
 
 try {
   await waitForHealth();
+  if (postgres) await post("/mvp/reset", {});
   const contracts = await get("/contracts");
   for (const path of ["/marketplace/private-directory-governance-summary", "/marketplace/directory-review-board/decisions", "/marketplace/private-directory/enquiries", "/marketplace/private-directory/enquiries/request-collaboration", "/marketplace/qualification-renewal-reviews"]) assert(contracts.some((contract) => contract.path === path), `${path} contract missing.`);
 
@@ -67,7 +78,11 @@ try {
   for (const boundary of ["controlled_private_directory_only", "directory_review_board_only", "manual_private_enquiry_only", "qualification_renewal_monitoring", "no_public_marketplace", "no_live_matching_engine", "no_ranking", "no_capacity_allocation", "no_vf24_observatory_publication", "no_autonomous_award", "no_autonomous_regulated_approval"]) assert(summary.boundaries.includes(boundary), `${boundary} boundary missing.`);
   const auditEvents = await get(`/audit-events?tenant_id=${tenant.id}&firm_id=${provider.firm.id}`, providerHeaders);
   for (const action of ["marketplace.directory_review_board_decision_recorded", "marketplace.qualification_renewal_review_recorded"]) assert(auditEvents.some((event) => (event.action ?? event.event_type) === action), `${action} audit event missing.`);
-  console.log("ME-S3 private directory governance, enquiry, and renewal smoke passed.");
+  const reviewRecords = await get(`/directory-review-board-decisions?tenant_id=${tenant.id}`, providerHeaders);
+  const enquiryRecords = await get(`/directory-private-enquiries?tenant_id=${tenant.id}`, providerHeaders);
+  const renewalRecords = await get(`/qualification-renewal-reviews?tenant_id=${tenant.id}`, providerHeaders);
+  assert(reviewRecords.length === 1 && enquiryRecords.length === 1 && renewalRecords.length === 1, "ME-S3 SQL-backed read collections should expose persisted governance records.");
+  console.log(`ME-S3 private directory governance, enquiry, and renewal smoke passed (${postgres ? "postgres" : "json"}).`);
 } finally {
   api.kill();
   await rm(tmp, { recursive: true, force: true });

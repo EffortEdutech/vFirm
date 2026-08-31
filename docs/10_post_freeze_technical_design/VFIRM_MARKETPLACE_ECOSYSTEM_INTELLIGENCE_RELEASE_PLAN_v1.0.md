@@ -2,7 +2,7 @@
 id: VFIRM-MARKETPLACE-ECOSYSTEM-INTELLIGENCE-RELEASE-PLAN
 title: "Virtual Firm Marketplace and Ecosystem Intelligence Release Plan"
 version: "1.0"
-status: "ME-S3 Complete - ME-S4 Decision Required"
+status: "ME-S4 Complete - ME-S5 Decision Required"
 source_status: "CREATED AFTER ARCHITECTURE BASELINE V1.0 FREEZE"
 ---
 
@@ -105,7 +105,7 @@ Explicitly out of scope unless separately approved:
 | ME-S1 | Marketplace Governance Lock | Publication, qualification, matching, privacy, conflict, credential, and data-sharing policies are locked. |
 | ME-S2 | Qualified Directory and Service Publication | Firms and services can be published only through approved, verified, and revocable records. |
 | ME-S3 | Private Directory Governance, Enquiry, and Renewal Controls | Directory Review Board decisions, manual private enquiries, enquiry-to-collaboration requests, and qualification renewal/expiry monitoring operate without public marketplace, live matching, ranking, capacity allocation, or autonomous award. |
-| ME-S4 | Marketplace Collaboration Contracts | Marketplace-origin work produces collaboration contracts, responsibility matrices, approvals, and audit records. |
+| ME-S4 | SQL Persistence Hardening for ME-S2/ME-S3 Records | Private directory publication, review board, enquiry, collaboration-origin metadata, and renewal records have SQL-backed persistence and Postgres smoke evidence. |
 | ME-S5 | Capacity Economy Pilot | Capacity and demand signals are captured as bands and indicators, not automated price-first allocation. |
 | ME-S6 | Ecosystem Observatory Alpha | Aggregated, anonymized, provenance-backed observatory views operate under privacy thresholds. |
 | ME-S7 | Marketplace/Ecosystem Release Gate | Governance review proves marketplace widening is safe. |
@@ -115,7 +115,7 @@ Explicitly out of scope unless separately approved:
 - ME-S1 passes when publication, qualification, matching, benchmark privacy, consent, and revocation policies are locked.
 - ME-S2 passes when firm/service publication requires approval and verified status and can be suspended or revoked.
 - ME-S3 passes when review board decisions, manual private enquiries, enquiry-to-collaboration requests, renewal/expiry reviews, private-directory boundaries, and audit records are all present and forbidden marketplace behaviors remain denied.
-- ME-S4 passes when marketplace-origin work creates formal collaboration records, responsibility matrices, approvals, and audit records.
+- ME-S4 passes when ME-S2/ME-S3 private directory records are backed by SQL migrations, hydrated from Postgres, reset safely, and verified by Postgres smoke evidence.
 - ME-S5 passes when capacity and pricing intelligence remain aggregated bands and cannot allocate regulated work automatically.
 - ME-S6 passes when VF-24 observatory views meet privacy thresholds and remain separate from VF-13 firm intelligence.
 - ME-S7 passes when marketplace governance, privacy, security, and professional authority reviews support go/no-go.
@@ -183,7 +183,7 @@ Executable gate:
 npm run check:me:s1
 ```
 
-Next active step: product-owner decision for ME-S4. ME-S4 must be separately scoped before implementation begins.
+Next active step: product-owner decision for ME-S5. ME-S5 must be separately scoped before implementation begins.
 
 ## 15. ME-S2 completion record
 
@@ -208,7 +208,7 @@ Evidence command:
 npm run check:me:s2
 ```
 
-Next active step: product-owner decision for ME-S4. ME-S4 must be separately scoped before implementation begins.
+Next active step: product-owner decision for ME-S5. ME-S5 must be separately scoped before implementation begins.
 ## 16. ME-S3 completion record
 
 Status: Completed for private directory governance, manual private enquiry, and qualification renewal/expiry monitoring.
@@ -229,4 +229,24 @@ Evidence command:
 npm run check:me:s3
 ```
 
-Next active step: product-owner decision for ME-S4. ME-S4 must be separately scoped before implementation begins.
+Next active step: product-owner decision for ME-S5. ME-S5 must be separately scoped before implementation begins.
+## 17. ME-S4 completion record
+
+Status: Completed for SQL persistence hardening of ME-S2/ME-S3 records.
+
+ME-S4 added SQL-backed persistence for:
+
+- Directory Review Board decisions;
+- private directory enquiries;
+- qualification renewal and expiry reviews;
+- enquiry-origin metadata on manual collaboration requests.
+
+Evidence command:
+
+```bash
+npm run check:me:s4
+```
+
+ME-S4 explicitly does not implement public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, autonomous award, or autonomous regulated approval.
+
+Next active step: product-owner decision for ME-S5. ME-S5 must be separately scoped before implementation begins.

@@ -216,3 +216,16 @@ Constraints: Directory Review Board decisions do not grant professional authorit
 Evidence: `npm run check:me:s3`; `docs/10_post_freeze_technical_design/ME_S3_PRIVATE_DIRECTORY_GOVERNANCE_ENQUIRY_RENEWAL_COMPLETION_v1.0.md`.
 
 Follow-up: Product owner must explicitly authorize and bound ME-S4 before implementation begins.
+## ADR-031 - ME-S4 SQL persistence hardening completed
+
+Date: 2026-08-31
+
+Decision: ME-S4 is completed as SQL persistence hardening for ME-S2/ME-S3 private directory records.
+
+Rationale: Private directory governance records now have Postgres-backed tables, migration coverage, reset behavior, read hydration, and executable Postgres smoke evidence.
+
+Constraints: This decision does not authorize public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, autonomous award, or autonomous regulated approval.
+
+Evidence: `npm run db:migrate:docker`; `npm run check:me:s4`; `docs/10_post_freeze_technical_design/ME_S4_SQL_PERSISTENCE_HARDENING_COMPLETION_v1.0.md`.
+
+Follow-up: Product owner must explicitly authorize and bound ME-S5 before implementation begins.
