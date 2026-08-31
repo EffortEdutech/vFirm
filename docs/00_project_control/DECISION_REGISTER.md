@@ -1,54 +1,54 @@
-# Virtual Firm Platform Ã¢â‚¬â€ Architecture Decision Register
+# Virtual Firm Platform ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Architecture Decision Register
 
-## ADR-001 Ã¢â‚¬â€ The Virtual Firm is the product
+## ADR-001 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â The Virtual Firm is the product
 AI agents, CRM, accounting, marketplace, knowledge and tools are supporting infrastructure.
 
-## ADR-002 Ã¢â‚¬â€ Human professional remains accountable authority
+## ADR-002 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Human professional remains accountable authority
 AI can assist, prepare, execute routine work and recommend. Professional judgement/sign-off remains human where law, profession, money or safety requires it.
 
-## ADR-003 Ã¢â‚¬â€ Hybrid/neuro-symbolic execution for high-risk work
+## ADR-003 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Hybrid/neuro-symbolic execution for high-risk work
 LLMs interpret, extract, route and draft. Deterministic engines calculate and enforce high-risk rules where feasible.
 
-## ADR-004 Ã¢â‚¬â€ RAG is retrieval, not compliance
+## ADR-004 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â RAG is retrieval, not compliance
 Codes/rules should become versioned machine-readable deterministic rules where possible. Vector search must not silently decide compliance.
 
-## ADR-005 Ã¢â‚¬â€ No private chain-of-thought exposure
+## ADR-005 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â No private chain-of-thought exposure
 Use evidence summaries: inputs, sources, rules, calculations, QA, exceptions, decisions and approvals.
 
-## ADR-006 Ã¢â‚¬â€ Strict multi-tenant isolation
+## ADR-006 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Strict multi-tenant isolation
 Firm/client/project data must be tenant-scoped and access-controlled at the data layer.
 
-## ADR-007 Ã¢â‚¬â€ AI workers have identities
+## ADR-007 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â AI workers have identities
 Every AI worker has an identity, permissions, tools, authority limits, budget and audit history.
 
-## ADR-008 Ã¢â‚¬â€ Workflow state is deterministic
+## ADR-008 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Workflow state is deterministic
 LLMs operate within workflow/state-machine boundaries; they do not arbitrarily mutate lifecycle state.
 
-## ADR-009 Ã¢â‚¬â€ Runtime and business logic are separate
+## ADR-009 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Runtime and business logic are separate
 VF-09 executes tasks safely. Domain modules own billing, contracts, projects, service logic, etc.
 
-## ADR-010 Ã¢â‚¬â€ Common kernel + specialist packs
+## ADR-010 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Common kernel + specialist packs
 One platform serves many professions through Practice Packs, Service Delivery Packs, Governance Packs and Jurisdiction Packs.
 
-## ADR-011 Ã¢â‚¬â€ Productized Professional Service is the commercial unit
+## ADR-011 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Productized Professional Service is the commercial unit
 Skills become practices; practices become services; services become measurable Service Products/SKUs.
 
-## ADR-012 Ã¢â‚¬â€ Platform marketplace is capability-first
+## ADR-012 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Platform marketplace is capability-first
 Mandatory credentials, jurisdiction and authority requirements are hard gates. Price cannot override eligibility.
 
-## ADR-013 Ã¢â‚¬â€ Firm data portability
+## ADR-013 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Firm data portability
 Professionals should be able to export client/project/business/financial/knowledge records where legally permissible. Compete by value, not lock-in.
 
-## ADR-014 Ã¢â‚¬â€ White-label firm identity
-The professionalÃ¢â‚¬â„¢s firm/brand is client-facing. AI remains workforce behind the firm.
+## ADR-014 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â White-label firm identity
+The professionalÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢s firm/brand is client-facing. AI remains workforce behind the firm.
 
-## ADR-015 Ã¢â‚¬â€ Network collaboration does not blur responsibility
+## ADR-015 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Network collaboration does not blur responsibility
 Cross-firm delivery must preserve who produced, reviewed, approved and signed each regulated deliverable.
 
-## ADR-016 Ã¢â‚¬â€ Benchmarking must protect confidentiality
+## ADR-016 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Benchmarking must protect confidentiality
 Ecosystem intelligence uses aggregation, anonymization, privacy thresholds and provenance.
 
-## ADR-017 Ã¢â‚¬â€ Avoid Ã¢â‚¬Å“Operating SystemÃ¢â‚¬Â positioning
+## ADR-017 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Avoid ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œOperating SystemÃƒÂ¢Ã¢â€šÂ¬Ã‚Â positioning
 Preferred product language: Virtual Firm Platform, Professional Practice Infrastructure, Virtual Firm Business Infrastructure.
 
 ## ADR-018 - Architecture baseline freeze before implementation
@@ -176,3 +176,16 @@ Boundaries: This acceptance does not authorize public marketplace launch, market
 Follow-up: Prepare the later Marketplace / Ecosystem Intelligence scope decision gate only. Implementation may begin only after a separate explicit product-owner authorization.
 
 Executable evidence: npm run check:r5 and npm run check passed after R5-S6.
+## ADR-028 - ME-S1 marketplace governance lock completed
+
+Date: 2026-08-31
+
+Decision: ME-S1 - Marketplace Governance Lock is completed. Marketplace/ecosystem implementation remains limited to governance lock only, and ME-S2 is not automatically authorized.
+
+Rationale: ME-S1 adds a deterministic marketplace governance policy surface and executable smoke gate that locks publication, matching, privacy, revocation, data-sharing, human governance, and VF-13/VF-24 separation boundaries before any public directory, matching engine, capacity economy, or VF-24 observatory work begins.
+
+Boundaries: This decision does not authorize public directory, live marketplace matching, capacity economy allocation, VF-24 observatory publication, autonomous regulated award, autonomous regulated approval, direct LLM-to-final regulated output, live payment movement, or uncontrolled tenant data sharing.
+
+Executable evidence: npm run check:me:s1 passes.
+
+Follow-up: Product owner must explicitly authorize ME-S2 - Qualified Directory and Service Publication before implementation begins.

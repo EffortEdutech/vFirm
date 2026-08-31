@@ -265,6 +265,93 @@ function forbidden(message) {
   throw error;
 }
 
+
+const marketplaceGovernancePolicy = Object.freeze({
+  release: "Marketplace / Ecosystem Intelligence",
+  sprint: "ME-S1",
+  status: "GOVERNANCE_LOCKED_IMPLEMENTATION_BLOCKED",
+  publication_policy: {
+    allowed_visibility: ["TRUSTED_NETWORK", "PRIVATE_NETWORK", "TRUSTED_NETWORK_ONLY"],
+    denied_visibility: ["PUBLIC", "OPEN_MARKETPLACE", "PUBLIC_MARKETPLACE"],
+    required_controls: ["human_operator", "verified_profile", "qualification_required", "revocation_supported", "audit_required"]
+  },
+  matching_policy: {
+    mode: "POLICY_LOCK_ONLY",
+    price_rank_allowed: false,
+    required_precedence: ["credential", "jurisdiction", "insurance", "conflict", "capacity", "policy", "responsibility", "price"]
+  },
+  privacy_policy: {
+    minimum_benchmark_cohort_size: 10,
+    allowed_snapshot_scopes: ["PRIVATE_NETWORK_INTERNAL", "GOVERNANCE_REHEARSAL_ONLY"],
+    denied_snapshot_scopes: ["PUBLIC_OBSERVATORY", "VF24_PUBLICATION", "ECOSYSTEM_PUBLIC_BENCHMARK"],
+    raw_tenant_data_publication_allowed: false
+  },
+  implementation_boundaries: ["no_public_directory", "no_live_matching_engine", "no_capacity_economy_allocation", "no_vf24_observatory_publication", "no_autonomous_regulated_award", "no_live_payment_movement"]
+});
+
+function meS1Denied(message, code = "ME_S1_MARKETPLACE_GOVERNANCE_DENIED") {
+  const error = new Error(message);
+  error.status = 403;
+  error.code = code;
+  throw error;
+}
+
+function normalizeUpper(value) {
+  return String(value ?? "").toUpperCase();
+}
+
+function assertMEGovernanceActor(actor = {}, action = "marketplace governance action") {
+  if (actor.actor_type && actor.actor_type !== "HUMAN") meS1Denied(`${action} requires a human marketplace governance operator.`, "ME_S1_HUMAN_GOVERNANCE_REQUIRED");
+}
+
+function assertMEPublicationGovernance(body = {}, actor = {}) {
+  assertMEGovernanceActor(actor, "Marketplace publication governance");
+  const visibility = normalizeUpper(body.visibility ?? "TRUSTED_NETWORK");
+  const listingScope = normalizeUpper(body.listing_scope ?? "PRIVATE_NETWORK");
+  const status = normalizeUpper(body.status ?? "PUBLISHED");
+  if (marketplaceGovernancePolicy.publication_policy.denied_visibility.includes(visibility) || marketplaceGovernancePolicy.publication_policy.denied_visibility.includes(listingScope)) meS1Denied("ME-S1 does not authorize public/open marketplace publication.", "ME_S1_PUBLIC_MARKETPLACE_DENIED");
+  if (!["TRUSTED_NETWORK", "PRIVATE_NETWORK", "TRUSTED_NETWORK_ONLY"].includes(visibility)) meS1Denied(`ME-S1 listing visibility must remain trusted/private network only: ${visibility}.`);
+  if (!["PRIVATE_NETWORK", "TRUSTED_NETWORK", "TRUSTED_NETWORK_ONLY"].includes(listingScope)) meS1Denied(`ME-S1 listing scope must remain trusted/private network only: ${listingScope}.`);
+  if (!["DRAFT", "PUBLISHED", "SUSPENDED", "REVOKED"].includes(status)) meS1Denied(`ME-S1 listing status is not governed: ${status}.`);
+  const requirements = body.qualification_requirements ?? [];
+  if (Array.isArray(requirements) && requirements.length > 0 && !requirements.some((item) => /qualification|credential|professional_authority/i.test(String(item)))) meS1Denied("ME-S1 listings must retain qualification or credential requirements.");
+}
+
+function assertMECapacityGovernance(body = {}, actor = {}) {
+  assertMEGovernanceActor(actor, "Marketplace capacity governance");
+  const constraints = body.constraints ?? {};
+  if (body.price_rank === true || body.auto_allocate === true || constraints.price_first === true || constraints.auto_allocate === true) meS1Denied("ME-S1 does not authorize price-first capacity allocation or automatic allocation.", "ME_S1_PRICE_FIRST_ALLOCATION_DENIED");
+  if (Number(body.pce_units ?? 1) <= 0) meS1Denied("ME-S1 capacity signals must use positive bounded capacity units.");
+}
+
+function assertMECollaborationGovernance(body = {}, actor = {}) {
+  assertMEGovernanceActor(actor, "Marketplace collaboration governance");
+  const policy = body.data_room_policy ?? { minimum_necessary_access: true, client_confidential: true, audit_required: true };
+  const missing = ["minimum_necessary_access", "client_confidential", "audit_required"].filter((key) => policy[key] !== true);
+  if (missing.length) meS1Denied(`ME-S1 collaboration requests require controlled data-room policy: ${missing.join(", ")}.`, "ME_S1_DATA_ROOM_POLICY_DENIED");
+  if (body.auto_award === true || body.autonomous_award === true) meS1Denied("ME-S1 does not authorize autonomous marketplace award.", "ME_S1_AUTONOMOUS_AWARD_DENIED");
+}
+
+function assertMEObservatoryGovernance(body = {}, actor = {}) {
+  assertMEGovernanceActor(actor, "Marketplace observatory governance");
+  const scope = normalizeUpper(body.snapshot_scope ?? "PRIVATE_NETWORK_INTERNAL");
+  const privacyClass = normalizeUpper(body.privacy_class ?? "AGGREGATED_INTERNAL");
+  if (marketplaceGovernancePolicy.privacy_policy.denied_snapshot_scopes.includes(scope) || /PUBLIC|VF24|ECOSYSTEM_PUBLIC/.test(scope)) meS1Denied("ME-S1 does not authorize VF-24 or public ecosystem observatory publication.", "ME_S1_VF24_PUBLICATION_DENIED");
+  if (["RAW_TENANT_DATA", "CLIENT_IDENTIFIABLE", "PUBLIC_RAW"].includes(privacyClass)) meS1Denied("ME-S1 observatory governance forbids raw tenant/client data publication.", "ME_S1_RAW_DATA_PUBLICATION_DENIED");
+}
+
+function readMEGovernanceLock() {
+  const checks = [
+    { key: "publication_policy_locked", status: "PASS", detail: "Trusted/private publication only; public/open marketplace denied." },
+    { key: "qualification_precedes_price", status: "PASS", detail: "Credential, jurisdiction, insurance, conflict, capacity, policy, and responsibility precede price." },
+    { key: "matching_implementation_blocked", status: "PASS", detail: "No live matching engine is authorized by ME-S1." },
+    { key: "revocation_policy_required", status: "PASS", detail: "Published records must support suspension/revocation posture." },
+    { key: "privacy_thresholds_locked", status: "PASS", detail: "Benchmark cohort threshold and raw-data publication denial are locked." },
+    { key: "vf13_vf24_separation_locked", status: "PASS", detail: "Firm intelligence and ecosystem observatory remain separated." },
+    { key: "human_governance_required", status: "PASS", detail: "Marketplace governance actions require human operators." }
+  ];
+  return { ...marketplaceGovernancePolicy, checks, recommendation: "ME_S1_LOCKED_READY_FOR_ME_S2_DECISION", next_step: "Product owner must explicitly authorize ME-S2 before qualified directory implementation." };
+}
 function assertActorScope(actor, recordOrQuery, label = "resource") {
   if (!actor) return;
   const tenant_id = recordOrQuery?.tenant_id;
@@ -871,18 +958,21 @@ async function createInvoice(body, req = null) {
 async function publishMarketplaceListing(body, req = null) {
   requireFields(body, ["tenant_id", "firm_id"]);
   const actor = actorFromBody(body, req, body.tenant_id, body.firm_id);
+  assertMEPublicationGovernance(body, actor);
   return createMarketplaceListingRecord(body, actor);
 }
 
 async function createCapacityOffer(body, req = null) {
   requireFields(body, ["tenant_id", "firm_id"]);
   const actor = actorFromBody(body, req, body.tenant_id, body.firm_id);
+  assertMECapacityGovernance(body, actor);
   return createCapacityOfferRecord(body, actor);
 }
 
 async function requestCollaboration(body, req = null) {
   requireFields(body, ["tenant_id", "requesting_firm_id", "request_summary"]);
   const actor = actorFromBody(body, req, body.tenant_id, body.requesting_firm_id);
+  assertMECollaborationGovernance(body, actor);
   return createCollaborationRequestRecord(body, actor);
 }
 
@@ -1263,6 +1353,7 @@ async function readR5CollaborationWorkspaceSummary(req, url) {
 }
 async function createObservatorySnapshot(body, req = null) {
   const actor = actorFromBody(body, req, body.tenant_id ?? null, body.firm_id ?? null);
+  assertMEObservatoryGovernance(body, actor);
   return createObservatorySnapshotRecord(body, actor);
 }
 async function provisionWorkerInstance(body, req = null) {
@@ -2164,6 +2255,7 @@ const server = createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
     if (req.method === "GET" && url.pathname === "/health") return sendJson(req, res, 200, { ok: true, service: "vfirm-api", phase: "persistent-mvp-command-loop", ...getStoreInfo(), port_family: "309#", api_port: port });
     if (req.method === "GET" && url.pathname === "/contracts") return sendJson(req, res, 200, { ok: true, data: apiContracts });
+    if (req.method === "GET" && url.pathname === "/marketplace/governance-lock") return sendJson(req, res, 200, { ok: true, data: readMEGovernanceLock() });
     if (req.method === "GET" && url.pathname === "/ops/readiness") return sendJson(req, res, 200, { ok: true, data: readOpsReadiness() });
     if (req.method === "GET" && url.pathname === "/ops/staging-package") return sendJson(req, res, 200, { ok: true, data: readStagingDeploymentPackage() });
     if (req.method === "GET" && url.pathname === "/ops/r4-staging-readiness") return sendJson(req, res, 200, { ok: true, data: readR4StagingDataProtectionReadiness() });

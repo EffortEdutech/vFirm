@@ -229,3 +229,4 @@ After Stage 20, the governing sprint plan is `VFIRM_RELEASE_1_PRODUCT_TARGET_AND
 | R5_ACCEPTANCE_DECISION_GATE_v1.0.md | Product-owner decision gate for accepting, holding, or rejecting Release 5 and deciding whether to authorize later marketplace/ecosystem scope. |
 | R5_ACCEPTANCE_AND_MARKETPLACE_SCOPE_DECISION_PREPARATION_AUTHORIZATION_v1.0.md | Records product-owner acceptance of Release 5 and authorization to prepare, but not implement, later marketplace/ecosystem scope. |
 | MARKETPLACE_ECOSYSTEM_INTELLIGENCE_SCOPE_DECISION_GATE_v1.0.md | Prepared decision gate for later marketplace/ecosystem scope authorization. |
+| ME_S1_MARKETPLACE_GOVERNANCE_LOCK_COMPLETION_v1.0.md | Completion evidence for ME-S1 marketplace governance lock policy, contract, and smoke gate. |

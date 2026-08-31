@@ -1,4 +1,4 @@
-﻿export const apiResponseEnvelope = {
+export const apiResponseEnvelope = {
   success: { ok: true, data: "resource | resource[] | summary" },
   failure: { ok: false, error: { code: "VALIDATION_ERROR | POLICY_DENIED | NOT_FOUND | INTERNAL_ERROR", message: "string" } }
 };
@@ -134,6 +134,7 @@ export const apiContracts = [
   { method: "GET", path: "/capacity-offers", purpose: "List trusted-network capacity offers", policyRequired: true, emittedEvents: [] },
   { method: "GET", path: "/collaboration-requests", purpose: "List firm collaboration requests", policyRequired: true, emittedEvents: [] },
   { method: "GET", path: "/observatory-snapshots", purpose: "List privacy-safe network observatory snapshots", policyRequired: true, emittedEvents: [] },
+  { method: "GET", path: "/marketplace/governance-lock", purpose: "Read ME-S1 marketplace governance policy lock and implementation boundaries", policyRequired: true, emittedEvents: [] },
   { method: "POST", path: "/marketplace/listings", purpose: "Publish private trusted-network service listing", policyRequired: true, emittedEvents: ["marketplace.listing_published"] },
   { method: "POST", path: "/capacity/offers", purpose: "Create capacity offer for trusted network", policyRequired: true, emittedEvents: ["capacity_offer.created"] },
   { method: "POST", path: "/collaboration/requests", purpose: "Request controlled firm collaboration through data-room policy", policyRequired: true, emittedEvents: ["collaboration.requested"] },

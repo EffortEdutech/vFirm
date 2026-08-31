@@ -2,7 +2,7 @@
 id: VFIRM-MARKETPLACE-ECOSYSTEM-INTELLIGENCE-RELEASE-PLAN
 title: "Virtual Firm Marketplace and Ecosystem Intelligence Release Plan"
 version: "1.0"
-status: "Scope Decision Gate Prepared - Implementation Not Authorized"
+status: "ME-S1 Complete - ME-S2 Decision Required"
 source_status: "CREATED AFTER ARCHITECTURE BASELINE V1.0 FREEZE"
 ---
 
@@ -156,6 +156,31 @@ Prepared decision gate:
 
 Recommended next implementation step, if later authorized:
 
-- `ME-S1 — Marketplace Governance Lock`
+- `ME-S1 â€” Marketplace Governance Lock`
 
 ME-S1 should remain policy/schema/test-first and must not implement public directory, matching, capacity economy, or VF-24 observatory publication unless separately approved.
+## 14. ME-S1 completion record
+
+Status: COMPLETED
+
+Date: 2026-08-31
+
+ME-S1 locks marketplace governance without opening marketplace implementation:
+
+- GET /marketplace/governance-lock exposes publication, matching, privacy, revocation, and implementation boundary policy.
+- Existing private trusted-network marketplace primitives remain allowed only within governed boundaries.
+- Public/open marketplace publication is denied.
+- Price-first capacity allocation is denied.
+- Autonomous marketplace award is denied.
+- Unsafe data-room collaboration is denied.
+- VF-24/public observatory publication is denied.
+- Raw tenant/client data publication is denied.
+- Human marketplace governance operator is required.
+
+Executable gate:
+
+```text
+npm run check:me:s1
+```
+
+Next active step: product-owner decision for ME-S2 - Qualified Directory and Service Publication.
