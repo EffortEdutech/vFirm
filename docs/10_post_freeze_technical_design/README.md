@@ -95,6 +95,7 @@ These documents may evolve during implementation. They must not rewrite Architec
 | `R4_ACCEPTANCE_DECISION_GATE_v1.0.md` | Product-owner decision gate for accepting, holding, or rejecting Release 4 and deciding whether to authorize Release 5 scope. |
 | `VFIRM_RELEASE_5_PRODUCT_TARGET_AND_SPRINT_PLAN_v1.0.md` | Defines trusted specialist network and firm-to-firm collaboration scope and sprints. |
 | `VFIRM_MARKETPLACE_ECOSYSTEM_INTELLIGENCE_RELEASE_PLAN_v1.0.md` | Defines later marketplace, capacity economy, and VF-24 ecosystem intelligence release boundaries. |
+| `ME_S5_PRIVATE_DIRECTORY_OPERATOR_UI_COMPLETION_v1.0.md` | Records ME-S5 private directory operator UI completion, workspace controls, forbidden behavior removal from active UI, and smoke evidence. |
 | Document | Purpose |
 |---|---|
 | `VFIRM_SOLOPRENEUR_FIRM_PRODUCT_TARGET_AND_SPRINT_PLAN_v1.0.md` | Governs the approved bounded build of the first operable solopreneur Formwork Engineering Virtual Firm. |

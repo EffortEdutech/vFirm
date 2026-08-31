@@ -229,3 +229,16 @@ Constraints: This decision does not authorize public marketplace, live matching,
 Evidence: `npm run db:migrate:docker`; `npm run check:me:s4`; `docs/10_post_freeze_technical_design/ME_S4_SQL_PERSISTENCE_HARDENING_COMPLETION_v1.0.md`.
 
 Follow-up: Product owner must explicitly authorize and bound ME-S5 before implementation begins.
+## ADR-032 - ME-S5 private directory operator UI completed
+
+Date: 2026-08-31
+
+Decision: ME-S5 is completed as the Private Directory Operator UI for the controlled private qualified directory.
+
+Rationale: The Virtual Firm Platform now exposes ME-S2/ME-S3 directory publication, review board, private enquiry, manual enquiry-to-collaboration, and renewal/expiry controls in the main workspace so an operator can run the private directory without leaving the Firm Runtime workspace.
+
+Constraints: This decision does not authorize public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, autonomous award, or autonomous regulated approval. The active Network UI no longer exposes capacity-offer creation or observatory-publication forms.
+
+Evidence: `node --check apps/web/public/app.js`; `npm run check:me:s5`; `docs/10_post_freeze_technical_design/ME_S5_PRIVATE_DIRECTORY_OPERATOR_UI_COMPLETION_v1.0.md`.
+
+Follow-up: Product owner must explicitly authorize and bound ME-S6 before implementation begins.

@@ -59,6 +59,30 @@ assert(renderRecordViewsBody.includes('safeRenderModule("#auditView", "Audit", r
 assert(!app.includes("renderFrontDeskModule is not defined"), "Debug text leaked into app source.");
 assert(!app.includes("personName is not defined"), "Debug text leaked into app source.");
 
+const meS5OperatorUiMarkers = [
+  "Private Directory Operator UI",
+  "qualifiedDirectoryPublishForm",
+  "/marketplace/directory-publications",
+  "directoryReviewDecisionForm",
+  "/marketplace/directory-review-board/decisions",
+  "privateDirectoryEnquiryForm",
+  "/marketplace/private-directory/enquiries",
+  "directoryEnquiryCollaborationForm",
+  "/marketplace/private-directory/enquiries/request-collaboration",
+  "qualificationRenewalReviewForm",
+  "/marketplace/qualification-renewal-reviews",
+  "directory_review_board_decisions",
+  "directory_private_enquiries",
+  "qualification_renewal_reviews",
+  "qualified_directory_summary",
+  "private_directory_governance_summary"
+];
+for (const marker of meS5OperatorUiMarkers) {
+  assert(app.includes(marker), `ME-S5 private directory operator UI marker missing: ${marker}`);
+}
+assert(!app.includes('id="capacityOfferForm"'), "ME-S5 Network UI must not expose capacity offer creation.");
+assert(!app.includes('id="observatorySnapshotForm"'), "ME-S5 Network UI must not expose observatory snapshot publication.");
+
 console.log(JSON.stringify({
   smoke: "web-navigation-renderers",
   result: "passed",

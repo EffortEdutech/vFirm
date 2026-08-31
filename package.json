@@ -87,7 +87,8 @@
                     "check:me":  "node scripts/smoke-me-s1-marketplace-governance-lock.mjs \u0026\u0026 node scripts/smoke-me-s2-qualified-directory-publication.mjs \u0026\u0026 node scripts/smoke-me-s3-private-directory-governance.mjs",
                     "check:me:s2":  "node scripts/smoke-me-s2-qualified-directory-publication.mjs",
                     "check:me:s3":  "node scripts/smoke-me-s3-private-directory-governance.mjs",
-                    "check:me:s4":  "node scripts/smoke-me-s3-private-directory-governance.mjs --postgres"
+                    "check:me:s4":  "node scripts/smoke-me-s3-private-directory-governance.mjs --postgres",
+                    "check:me:s5":  "node scripts/smoke-web-navigation-renderers.mjs"
                 },
     "engines":  {
                     "node":  "\u003e=22"
