@@ -75,7 +75,10 @@ const meS5OperatorUiMarkers = [
   "directory_private_enquiries",
   "qualification_renewal_reviews",
   "qualified_directory_summary",
-  "private_directory_governance_summary"
+  "private_directory_governance_summary",
+  "private_directory_intelligence_summary",
+  "/marketplace/private-directory-intelligence-summary",
+  "ME-S6 private readiness summary"
 ];
 for (const marker of meS5OperatorUiMarkers) {
   assert(app.includes(marker), `ME-S5 private directory operator UI marker missing: ${marker}`);

@@ -242,3 +242,16 @@ Constraints: This decision does not authorize public marketplace, live matching,
 Evidence: `node --check apps/web/public/app.js`; `npm run check:me:s5`; `docs/10_post_freeze_technical_design/ME_S5_PRIVATE_DIRECTORY_OPERATOR_UI_COMPLETION_v1.0.md`.
 
 Follow-up: Product owner must explicitly authorize and bound ME-S6 before implementation begins.
+## ADR-033 - ME-S6 private directory intelligence readiness view completed
+
+Date: 2026-08-31
+
+Decision: ME-S6 is completed as Private Directory Intelligence and Readiness View only.
+
+Rationale: The Virtual Firm Platform now provides a read-only internal summary of private directory governance metrics, pending review actions, private enquiry follow-ups, qualification renewal/expiry risks, manual collaboration request status, audit readiness, and forbidden behavior checks.
+
+Constraints: This decision does not authorize public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, pricing intelligence, autonomous award, or autonomous regulated approval.
+
+Evidence: `npm run check:me:s6`; `npm run check:me:s6:postgres`; `docs/10_post_freeze_technical_design/ME_S6_PRIVATE_DIRECTORY_INTELLIGENCE_READINESS_VIEW_COMPLETION_v1.0.md`.
+
+Follow-up: Product owner must explicitly authorize ME-S7 or a revised later-release gate before implementation begins.

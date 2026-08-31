@@ -96,6 +96,7 @@ These documents may evolve during implementation. They must not rewrite Architec
 | `VFIRM_RELEASE_5_PRODUCT_TARGET_AND_SPRINT_PLAN_v1.0.md` | Defines trusted specialist network and firm-to-firm collaboration scope and sprints. |
 | `VFIRM_MARKETPLACE_ECOSYSTEM_INTELLIGENCE_RELEASE_PLAN_v1.0.md` | Defines later marketplace, capacity economy, and VF-24 ecosystem intelligence release boundaries. |
 | `ME_S5_PRIVATE_DIRECTORY_OPERATOR_UI_COMPLETION_v1.0.md` | Records ME-S5 private directory operator UI completion, workspace controls, forbidden behavior removal from active UI, and smoke evidence. |
+| `ME_S6_PRIVATE_DIRECTORY_INTELLIGENCE_READINESS_VIEW_COMPLETION_v1.0.md` | Records ME-S6 private directory intelligence/readiness endpoint, workspace binding, pending action visibility, and JSON/PostgreSQL smoke evidence. |
 | Document | Purpose |
 |---|---|
 | `VFIRM_SOLOPRENEUR_FIRM_PRODUCT_TARGET_AND_SPRINT_PLAN_v1.0.md` | Governs the approved bounded build of the first operable solopreneur Formwork Engineering Virtual Firm. |

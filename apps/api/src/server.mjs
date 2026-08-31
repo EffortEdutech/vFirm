@@ -1110,6 +1110,76 @@ async function readMEPrivateDirectoryGovernanceSummary(req, url) {
   const failed = checks.filter((check) => check.status !== "PASS");
   return { release: "Marketplace / Ecosystem Intelligence", sprint: "ME-S3", status: failed.length === 0 ? "ME_S3_PRIVATE_DIRECTORY_GOVERNANCE_READY" : "ME_S3_PRIVATE_DIRECTORY_GOVERNANCE_BLOCKED", counts: { qualified_directory_listings: listings.length, review_board_decisions: reviewDecisions.length, private_enquiries: enquiries.length, collaboration_requests_from_enquiries: collaborationRequests.length, qualification_renewal_reviews: renewalReviews.length, me_s3_audit_events: auditEvents.length }, checks, blocked_reasons: failed.map((check) => `${check.key}: ${check.detail}`), boundaries: ["controlled_private_directory_only", "directory_review_board_only", "manual_private_enquiry_only", "qualification_renewal_monitoring", "no_public_marketplace", "no_live_matching_engine", "no_ranking", "no_capacity_allocation", "no_vf24_observatory_publication", "no_autonomous_award", "no_autonomous_regulated_approval", "tenant_confidentiality", "auditability"] };
 }
+
+async function readMEPrivateDirectoryIntelligenceSummary(req, url) {
+  assertActorScope(devActorFromHeaders(req), { tenant_id: url.searchParams.get("tenant_id"), firm_id: url.searchParams.get("firm_id") }, "ME-S6 private directory intelligence");
+  const store = await readStore();
+  const tenantId = url.searchParams.get("tenant_id");
+  const firmId = url.searchParams.get("firm_id");
+  const tenantScoped = (records) => (records ?? []).filter((item) => !tenantId || item.tenant_id === tenantId);
+  const firmScoped = (records) => tenantScoped(records).filter((item) => !firmId || item.firm_id === firmId || item.provider_firm_id === firmId || item.requesting_firm_id === firmId);
+  const listings = firmScoped(store.marketplace_listings).filter((item) => item.commercial_model?.directory_type === "CONTROLLED_PRIVATE_QUALIFIED_DIRECTORY");
+  const publishedListings = listings.filter((item) => item.status === "PUBLISHED");
+  const reviewDecisions = firmScoped(store.directory_review_board_decisions);
+  const enquiries = firmScoped(store.directory_private_enquiries);
+  const collaborationRequests = firmScoped(store.collaboration_requests).filter((item) => item.metadata?.source_directory_enquiry_id);
+  const renewalReviews = firmScoped(store.qualification_renewal_reviews);
+  const auditActions = ["marketplace.listing_published", "marketplace.directory_publication_suspended", "marketplace.directory_publication_revoked", "marketplace.directory_review_board_decision_recorded", "marketplace.private_directory_enquiry_recorded", "marketplace.directory_enquiry_collaboration_requested", "marketplace.qualification_renewal_review_recorded"];
+  const auditEvents = firmScoped(store.audit_events).filter((event) => auditActions.includes(event.action ?? event.event_type));
+  const reviewedListingIds = new Set(reviewDecisions.map((decision) => decision.listing_id));
+  const enquiryCollaborationIds = new Set(collaborationRequests.map((request) => request.metadata?.source_directory_enquiry_id).filter(Boolean));
+  const now = new Date();
+  const soon = new Date(now.getTime() + 45 * 86400000);
+  const renewalRiskStatuses = new Set(["EXPIRING", "RENEWAL_REQUIRED", "SUSPEND_PUBLICATION"]);
+  const renewalRisks = renewalReviews.filter((review) => renewalRiskStatuses.has(review.review_status) || (review.next_review_due_at && new Date(review.next_review_due_at) <= soon) || (review.expires_at && new Date(review.expires_at) <= soon));
+  const pendingReviewListings = publishedListings.filter((listing) => !reviewedListingIds.has(listing.id));
+  const pendingEnquiries = enquiries.filter((enquiry) => enquiry.status === "ENQUIRY_RECORDED" && !enquiryCollaborationIds.has(enquiry.id));
+  const pendingActions = [
+    ...pendingReviewListings.map((listing) => ({ type: "REVIEW_BOARD_DECISION_DUE", severity: "MEDIUM", listing_id: listing.id, provider_firm_id: listing.firm_id, summary: `Listing ${listing.title ?? listing.id} has no review board decision recorded.` })),
+    ...pendingEnquiries.map((enquiry) => ({ type: "PRIVATE_ENQUIRY_FOLLOW_UP", severity: "MEDIUM", enquiry_id: enquiry.id, listing_id: enquiry.listing_id, requesting_firm_id: enquiry.requesting_firm_id, provider_firm_id: enquiry.provider_firm_id, summary: enquiry.enquiry_summary ?? "Private enquiry requires manual follow-up." })),
+    ...renewalRisks.map((review) => ({ type: "QUALIFICATION_RENEWAL_RISK", severity: review.review_status === "SUSPEND_PUBLICATION" ? "HIGH" : "MEDIUM", renewal_review_id: review.id, listing_id: review.listing_id, provider_firm_id: review.provider_firm_id, summary: `${review.review_status} qualification renewal review requires operator attention.` }))
+  ];
+  const unsafeListings = listings.filter((item) => item.visibility !== "TRUSTED_NETWORK" || item.listing_scope !== "PRIVATE_NETWORK" || item.commercial_model?.matching_enabled === true || item.commercial_model?.public_directory === true || item.commercial_model?.tenant_confidential !== true || item.commercial_model?.ranking_enabled === true || item.commercial_model?.price_first === true);
+  const unsafeCollaborations = collaborationRequests.filter((item) => item.capacity_offer_id || item.metadata?.no_live_matching !== true || item.metadata?.no_award !== true || item.metadata?.price_first === true);
+  const unsafeObservatory = tenantScoped(store.observatory_snapshots).filter((item) => ["VF24_PUBLICATION", "PUBLIC", "PUBLIC_OBSERVATORY"].includes(String(item.snapshot_scope ?? "").toUpperCase()) || ["PUBLIC_RAW", "RAW_TENANT_DATA"].includes(String(item.privacy_class ?? "").toUpperCase()));
+  const checks = [
+    { key: "internal_readiness_view_only", status: "PASS", detail: "ME-S6 is read-only private directory intelligence; it creates no public publication, matching, ranking, allocation, or award endpoint." },
+    { key: "qualified_directory_context_available", status: listings.length > 0 ? "PASS" : "FAIL", detail: `${listings.length} qualified private listing(s)` },
+    { key: "pending_actions_visible", status: pendingActions.length > 0 ? "PASS" : "FAIL", detail: `${pendingActions.length} pending operator action(s)` },
+    { key: "enquiry_collaboration_status_visible", status: enquiries.length > 0 && collaborationRequests.length > 0 ? "PASS" : "FAIL", detail: `${enquiries.length} private enquiry record(s), ${collaborationRequests.length} manual collaboration request(s)` },
+    { key: "expiry_risk_visible", status: renewalRisks.length > 0 ? "PASS" : "FAIL", detail: `${renewalRisks.length} renewal or expiry risk item(s)` },
+    { key: "audit_readiness_visible", status: auditEvents.length >= 5 ? "PASS" : "FAIL", detail: `${auditEvents.length} private directory audit event(s)` },
+    { key: "forbidden_marketplace_behaviour_absent", status: unsafeListings.length === 0 && unsafeCollaborations.length === 0 && unsafeObservatory.length === 0 ? "PASS" : "FAIL", detail: `${unsafeListings.length} unsafe listing(s), ${unsafeCollaborations.length} unsafe collaboration(s), ${unsafeObservatory.length} unsafe observatory snapshot(s)` }
+  ];
+  const failed = checks.filter((check) => check.status !== "PASS");
+  return {
+    release: "Marketplace / Ecosystem Intelligence",
+    sprint: "ME-S6",
+    status: failed.length === 0 ? "ME_S6_PRIVATE_DIRECTORY_INTELLIGENCE_READY" : "ME_S6_PRIVATE_DIRECTORY_INTELLIGENCE_BLOCKED",
+    scope: "Private Directory Intelligence and Readiness View only",
+    counts: {
+      qualified_directory_listings: listings.length,
+      published_listings: publishedListings.length,
+      review_board_decisions: reviewDecisions.length,
+      private_enquiries: enquiries.length,
+      manual_collaboration_requests: collaborationRequests.length,
+      renewal_reviews: renewalReviews.length,
+      renewal_risks: renewalRisks.length,
+      pending_actions: pendingActions.length,
+      private_directory_audit_events: auditEvents.length
+    },
+    pending_actions: pendingActions,
+    readiness: {
+      review_board_pending: pendingReviewListings.length,
+      enquiry_follow_up_pending: pendingEnquiries.length,
+      qualification_renewal_risk: renewalRisks.length,
+      audit_events: auditEvents.length
+    },
+    checks,
+    blocked_reasons: failed.map((check) => `${check.key}: ${check.detail}`),
+    boundaries: ["private_internal_readiness_view_only", "controlled_private_directory_only", "no_public_marketplace", "no_live_matching", "no_ranking", "no_capacity_allocation", "no_vf24_observatory_publication", "no_pricing_intelligence", "no_autonomous_award", "no_autonomous_regulated_approval", "tenant_confidentiality", "auditability"]
+  };
+}
 async function createNetworkProfessionalProfile(body, req = null) {
   requireFields(body, ["tenant_id", "firm_id", "display_name"]);
   const actor = actorFromBody(body, req, body.tenant_id, body.firm_id);
@@ -2389,6 +2459,7 @@ const server = createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/marketplace/governance-lock") return sendJson(req, res, 200, { ok: true, data: readMEGovernanceLock() });
     if (req.method === "GET" && url.pathname === "/marketplace/qualified-directory-summary") return sendJson(req, res, 200, { ok: true, data: await readMEQualifiedDirectorySummary(req, url) });
     if (req.method === "GET" && url.pathname === "/marketplace/private-directory-governance-summary") return sendJson(req, res, 200, { ok: true, data: await readMEPrivateDirectoryGovernanceSummary(req, url) });
+    if (req.method === "GET" && url.pathname === "/marketplace/private-directory-intelligence-summary") return sendJson(req, res, 200, { ok: true, data: await readMEPrivateDirectoryIntelligenceSummary(req, url) });
     if (req.method === "GET" && url.pathname === "/ops/readiness") return sendJson(req, res, 200, { ok: true, data: readOpsReadiness() });
     if (req.method === "GET" && url.pathname === "/ops/staging-package") return sendJson(req, res, 200, { ok: true, data: readStagingDeploymentPackage() });
     if (req.method === "GET" && url.pathname === "/ops/r4-staging-readiness") return sendJson(req, res, 200, { ok: true, data: readR4StagingDataProtectionReadiness() });

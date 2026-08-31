@@ -2,7 +2,7 @@
 id: VFIRM-MARKETPLACE-ECOSYSTEM-INTELLIGENCE-RELEASE-PLAN
 title: "Virtual Firm Marketplace and Ecosystem Intelligence Release Plan"
 version: "1.0"
-status: "ME-S5 Complete - ME-S6 Decision Required"
+status: "ME-S6 Complete - ME-S7 Decision Required"
 source_status: "CREATED AFTER ARCHITECTURE BASELINE V1.0 FREEZE"
 ---
 
@@ -107,7 +107,7 @@ Explicitly out of scope unless separately approved:
 | ME-S3 | Private Directory Governance, Enquiry, and Renewal Controls | Directory Review Board decisions, manual private enquiries, enquiry-to-collaboration requests, and qualification renewal/expiry monitoring operate without public marketplace, live matching, ranking, capacity allocation, or autonomous award. |
 | ME-S4 | SQL Persistence Hardening for ME-S2/ME-S3 Records | Private directory publication, review board, enquiry, collaboration-origin metadata, and renewal records have SQL-backed persistence and Postgres smoke evidence. |
 | ME-S5 | Private Directory Operator UI | The main workspace exposes controlled private directory publication, review board, manual enquiry, collaboration request, and renewal controls without public marketplace behavior. |
-| ME-S6 | Ecosystem Observatory Alpha | Aggregated, anonymized, provenance-backed observatory views operate under privacy thresholds. |
+| ME-S6 | Private Directory Intelligence and Readiness View | Internal directory governance metrics, pending actions, expiry risks, enquiry/collaboration status, and audit readiness are visible without public marketplace or ecosystem observatory behavior. |
 | ME-S7 | Marketplace/Ecosystem Release Gate | Governance review proves marketplace widening is safe. |
 
 ## 9. Sprint acceptance summaries
@@ -117,7 +117,7 @@ Explicitly out of scope unless separately approved:
 - ME-S3 passes when review board decisions, manual private enquiries, enquiry-to-collaboration requests, renewal/expiry reviews, private-directory boundaries, and audit records are all present and forbidden marketplace behaviors remain denied.
 - ME-S4 passes when ME-S2/ME-S3 private directory records are backed by SQL migrations, hydrated from Postgres, reset safely, and verified by Postgres smoke evidence.
 - ME-S5 passes when the private directory operator UI exposes ME-S2/ME-S3 controls while hiding unauthorized capacity-offer creation and VF-24 observatory-publication actions from the active workspace.
-- ME-S6 passes when VF-24 observatory views meet privacy thresholds and remain separate from VF-13 firm intelligence.
+- ME-S6 passes when private internal directory readiness metrics, pending actions, expiry risks, enquiry/collaboration status, and audit readiness are visible without public marketplace, live matching, ranking, capacity allocation, VF-24 publication, pricing intelligence, or autonomous award.
 - ME-S7 passes when marketplace governance, privacy, security, and professional authority reviews support go/no-go.
 
 ## 10. Acceptance criteria
@@ -273,3 +273,28 @@ npm run check:me:s5
 ME-S5 explicitly does not implement public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, autonomous award, or autonomous regulated approval.
 
 Next active step: product-owner decision for ME-S6. ME-S6 must be separately scoped before implementation begins.
+## 19. ME-S6 completion record
+
+Status: Completed for Private Directory Intelligence and Readiness View only.
+
+ME-S6 added:
+
+- read-only private directory intelligence summary endpoint;
+- pending Directory Review Board action visibility;
+- private enquiry follow-up visibility;
+- qualification renewal and expiry risk visibility;
+- manual enquiry-to-collaboration status visibility;
+- private directory audit readiness visibility;
+- Network page readiness binding;
+- JSON and PostgreSQL smoke evidence.
+
+Evidence commands:
+
+```bash
+npm run check:me:s6
+npm run check:me:s6:postgres
+```
+
+ME-S6 explicitly does not implement public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, pricing intelligence, autonomous award, or autonomous regulated approval.
+
+Next active step: product-owner decision for ME-S7 or revised later-release gate. Any widening beyond private directory readiness requires separate explicit authorization.
