@@ -268,3 +268,16 @@ Constraints: This decision does not authorize public marketplace, live matching,
 Evidence: `npm run check:me:s7`; `docs/10_post_freeze_technical_design/ME_S7_MARKETPLACE_ECOSYSTEM_RELEASE_GATE_COMPLETION_v1.0.md`.
 
 Follow-up: Any later public marketplace, ecosystem observatory, capacity economy, or pricing intelligence work requires a new bounded product-owner authorization.
+## ADR-035 - PD-H1 planning before implementation
+
+Date: 2026-09-01
+
+Decision: Before writing PD-H1 product code, create a full sprint plan and checklist for Private Directory Product Hardening and Operator Walkthrough, then update the GitHub repository.
+
+Rationale: ME-S7 closed the controlled private directory release gate. The next safe step is operator-focused hardening and rehearsal planning, not public marketplace widening. A plan/checklist first keeps implementation aligned with the Virtual Firm Platform boundaries and gives the product owner a clear checkpoint before code changes.
+
+Constraints: This decision does not authorize public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, pricing intelligence, autonomous award, autonomous regulated approval, or uncontrolled tenant/client data sharing.
+
+Evidence: `docs/10_post_freeze_technical_design/PD_H1_PRIVATE_DIRECTORY_PRODUCT_HARDENING_AND_OPERATOR_WALKTHROUGH_SPRINT_PLAN_v1.0.md`; `docs/10_post_freeze_technical_design/PD_H1_PRIVATE_DIRECTORY_PRODUCT_HARDENING_AND_OPERATOR_WALKTHROUGH_CHECKLIST_v1.0.md`.
+
+Follow-up: Product owner should review/accept the PD-H1 plan and checklist before implementation begins.
