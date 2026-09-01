@@ -362,3 +362,16 @@ Constraints: This decision does not authorize public marketplace, live matching,
 Evidence: `npm run check:pd:h5`; `docs/10_post_freeze_technical_design/PD_H5_CONTROLLED_PRIVATE_DIRECTORY_PILOT_CLOSEOUT_REVIEW_v1.0.md`.
 
 Follow-up: Recommended next step is PD-H6 - Private Directory Pilot Learning Backlog and Next Scope Decision.
+## ADR-042 - PD-H6 private directory pilot learning backlog and next scope decision prepared
+
+Date: 2026-09-02
+
+Decision: PD-H6 is completed as the Private Directory Pilot Learning Backlog and Next Scope Decision preparation. Product-owner next-scope decision is required before PD-H7 implementation or any marketplace-widening work begins.
+
+Rationale: PD-H5 prepared closeout evidence and made clear that real production pilot closeout requires filled human pilot logs. PD-H6 classifies learning backlog items, separates operator usability, evidence quality, data protection, governance control, integration readiness, blockers, accepted limitations, and scope-widening requests, then prepares explicit next-scope options.
+
+Constraints: This decision does not authorize PD-H7 implementation by itself and does not authorize public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, pricing intelligence, autonomous award, autonomous regulated approval, external sending, live payment movement, uncontrolled tenant/client data sharing, or production legal/regulatory/insurance/liability determination.
+
+Evidence: `npm run check:pd:h6`; `docs/10_post_freeze_technical_design/PD_H6_PRIVATE_DIRECTORY_PILOT_LEARNING_BACKLOG_AND_NEXT_SCOPE_DECISION_v1.0.md`.
+
+Follow-up: Product owner should choose the next scope option: continue private directory pilot hardening, run a real controlled human pilot day first, hold for named blockers, or prepare a separate marketplace-widening decision gate for discussion only.
