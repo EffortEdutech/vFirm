@@ -1,4 +1,4 @@
-﻿:root {
+:root {
   color-scheme: light;
   --bg: #f5f2eb;
   --panel: #fffdf8;
@@ -170,3 +170,38 @@ button[disabled] { position: relative; }
 .boundary-note { display: grid; gap: 4px; margin-bottom: 14px; border: 1px solid #ecd28a; background: #fff7db; color: #7a5618; border-radius: 14px; padding: 12px; }
 .boundary-note strong { text-transform: uppercase; letter-spacing: .08em; font-size: 12px; }
 .boundary-note span { color: #7a5618; line-height: 1.35; font-weight: 700; }
+.operator-walkthrough-panel {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid rgba(81, 92, 230, 0.18);
+  border-radius: 16px;
+  background: rgba(81, 92, 230, 0.04);
+}
+
+.operator-action-grid,
+.operator-boundary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.metric-card.warning {
+  border-color: rgba(226, 148, 52, 0.35);
+  background: rgba(226, 148, 52, 0.08);
+}
+
+.boundary-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.25rem;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid rgba(162, 38, 64, 0.24);
+  border-radius: 999px;
+  color: #8a1230;
+  background: rgba(162, 38, 64, 0.06);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-align: center;
+}

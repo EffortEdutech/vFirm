@@ -10,40 +10,40 @@ source_status: "CREATED AFTER ARCHITECTURE BASELINE V1.0 FREEZE"
 
 ## 1. Scope lock
 
-- [ ] Confirm PD-H1 is product hardening only.
-- [ ] Confirm no public marketplace implementation.
-- [ ] Confirm no live matching implementation.
-- [ ] Confirm no ranking implementation.
-- [ ] Confirm no capacity allocation implementation.
-- [ ] Confirm no VF-24 observatory publication implementation.
-- [ ] Confirm no pricing intelligence implementation.
-- [ ] Confirm no autonomous award implementation.
-- [ ] Confirm no autonomous regulated approval implementation.
+- [x] Confirm PD-H1 is product hardening only.
+- [x] Confirm no public marketplace implementation.
+- [x] Confirm no live matching implementation.
+- [x] Confirm no ranking implementation.
+- [x] Confirm no capacity allocation implementation.
+- [x] Confirm no VF-24 observatory publication implementation.
+- [x] Confirm no pricing intelligence implementation.
+- [x] Confirm no autonomous award implementation.
+- [x] Confirm no autonomous regulated approval implementation.
 
 ## 2. Pre-implementation checks
 
-- [ ] `git status --short` is clean before coding.
-- [ ] Existing `npm run check:me:s5` passes.
-- [ ] Existing `npm run check:me:s6` passes.
-- [ ] Existing `npm run check:me:s7` passes.
-- [ ] Current Network page behavior is inspected before modification.
+- [x] `git status --short` is clean before coding.
+- [x] Existing `npm run check:me:s5` passes.
+- [x] Existing `npm run check:me:s6` passes.
+- [x] Existing `npm run check:me:s7` passes.
+- [x] Current Network page behavior is inspected before modification.
 
 ## 3. UI hardening checklist
 
-- [ ] Network page has a clear private directory operator heading.
-- [ ] Action forms are visually separated from evidence/readiness panels.
-- [ ] Qualified listing publication form explains PASS gate requirement.
-- [ ] Review Board form explains that decisions do not grant professional authority.
-- [ ] Private enquiry form explains that enquiry is not matching and not award.
-- [ ] Collaboration request form explains manual request only.
-- [ ] Renewal review form explains expiry/renewal monitoring only.
-- [ ] Pending actions are shown in a human-readable section.
-- [ ] Renewal risks are shown in a human-readable section.
-- [ ] Audit readiness is visible.
-- [ ] Empty states are helpful and not blank.
-- [ ] Disabled states explain what prerequisite is missing.
-- [ ] Old capacity-offer creation form is not exposed.
-- [ ] Old observatory-publication form is not exposed.
+- [x] Network page has a clear private directory operator heading.
+- [x] Action forms are visually separated from evidence/readiness panels.
+- [x] Qualified listing publication form explains PASS gate requirement.
+- [x] Review Board form explains that decisions do not grant professional authority.
+- [x] Private enquiry form explains that enquiry is not matching and not award.
+- [x] Collaboration request form explains manual request only.
+- [x] Renewal review form explains expiry/renewal monitoring only.
+- [x] Pending actions are shown in a human-readable section.
+- [x] Renewal risks are shown in a human-readable section.
+- [x] Audit readiness is visible.
+- [x] Empty states are helpful and not blank.
+- [x] Disabled states explain what prerequisite is missing.
+- [x] Old capacity-offer creation form is not exposed.
+- [x] Old observatory-publication form is not exposed.
 
 ## 4. Demo/rehearsal fixture checklist
 
@@ -68,22 +68,22 @@ source_status: "CREATED AFTER ARCHITECTURE BASELINE V1.0 FREEZE"
 
 ## 5. Operator walkthrough checklist
 
-- [ ] Runbook starts from launching/opening the workspace.
-- [ ] Runbook tells operator what page to open.
-- [ ] Runbook explains what the readiness summary means.
-- [ ] Runbook explains how to inspect qualified listings.
-- [ ] Runbook explains how to inspect pending Review Board action.
-- [ ] Runbook explains how to inspect private enquiry follow-up.
-- [ ] Runbook explains how to inspect renewal risk.
-- [ ] Runbook explains how to inspect audit/evidence output.
-- [ ] Runbook clearly lists forbidden actions.
-- [ ] Runbook includes expected successful observations.
-- [ ] Runbook includes likely troubleshooting notes for blank page/API unavailable cases.
+- [x] Runbook starts from launching/opening the workspace.
+- [x] Runbook tells operator what page to open.
+- [x] Runbook explains what the readiness summary means.
+- [x] Runbook explains how to inspect qualified listings.
+- [x] Runbook explains how to inspect pending Review Board action.
+- [x] Runbook explains how to inspect private enquiry follow-up.
+- [x] Runbook explains how to inspect renewal risk.
+- [x] Runbook explains how to inspect audit/evidence output.
+- [x] Runbook clearly lists forbidden actions.
+- [x] Runbook includes expected successful observations.
+- [x] Runbook includes likely troubleshooting notes for blank page/API unavailable cases.
 
 ## 6. Verification checklist
 
 - [ ] `node --check apps/web/public/app.js` passes.
-- [ ] New PD-H1 smoke script passes, if added.
+- [x] New PD-H1 smoke script passes, if added.
 - [ ] `npm run check:me:s5` passes.
 - [ ] `npm run check:me:s6` passes.
 - [ ] `npm run check:me:s6:postgres` passes.
@@ -96,13 +96,13 @@ source_status: "CREATED AFTER ARCHITECTURE BASELINE V1.0 FREEZE"
 
 ## 7. Documentation checklist
 
-- [ ] PD-H1 sprint plan exists.
-- [ ] PD-H1 checklist exists.
-- [ ] PD-H1 operator walkthrough/runbook exists after implementation.
-- [ ] PD-H1 completion note exists after implementation.
-- [ ] Technical design README links PD-H1 documents.
-- [ ] Decision register records PD-H1 planning decision.
-- [ ] Decision register records PD-H1 completion decision after implementation.
+- [x] PD-H1 sprint plan exists.
+- [x] PD-H1 checklist exists.
+- [x] PD-H1 operator walkthrough/runbook exists after implementation.
+- [x] PD-H1 completion note exists after implementation.
+- [x] Technical design README links PD-H1 documents.
+- [x] Decision register records PD-H1 planning decision.
+- [x] Decision register records PD-H1 completion decision after implementation.
 
 ## 8. Completion checklist
 

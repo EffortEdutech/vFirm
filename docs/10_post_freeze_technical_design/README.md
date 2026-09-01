@@ -100,6 +100,8 @@ These documents may evolve during implementation. They must not rewrite Architec
 | `ME_S7_MARKETPLACE_ECOSYSTEM_RELEASE_GATE_COMPLETION_v1.0.md` | Records ME-S7 release gate outcome for controlled private directory operation and blocked marketplace widening. |
 | `PD_H1_PRIVATE_DIRECTORY_PRODUCT_HARDENING_AND_OPERATOR_WALKTHROUGH_SPRINT_PLAN_v1.0.md` | Defines the private directory product-hardening sprint before any further marketplace widening. |
 | `PD_H1_PRIVATE_DIRECTORY_PRODUCT_HARDENING_AND_OPERATOR_WALKTHROUGH_CHECKLIST_v1.0.md` | Tracks PD-H1 scope lock, UI hardening, rehearsal fixture, walkthrough, verification, documentation, and completion criteria. |
+| `PD_H1_PRIVATE_DIRECTORY_OPERATOR_WALKTHROUGH_RUNBOOK_v1.0.md` | Provides a plain-language operator walkthrough for the controlled private directory cockpit. |
+| `PD_H1_PRIVATE_DIRECTORY_PRODUCT_HARDENING_COMPLETION_v1.0.md` | Records PD-H1 completed work, ad hoc work, evidence commands, limitations, and next plan. |
 | Document | Purpose |
 |---|---|
 | `VFIRM_SOLOPRENEUR_FIRM_PRODUCT_TARGET_AND_SPRINT_PLAN_v1.0.md` | Governs the approved bounded build of the first operable solopreneur Formwork Engineering Virtual Firm. |

@@ -281,3 +281,16 @@ Constraints: This decision does not authorize public marketplace, live matching,
 Evidence: `docs/10_post_freeze_technical_design/PD_H1_PRIVATE_DIRECTORY_PRODUCT_HARDENING_AND_OPERATOR_WALKTHROUGH_SPRINT_PLAN_v1.0.md`; `docs/10_post_freeze_technical_design/PD_H1_PRIVATE_DIRECTORY_PRODUCT_HARDENING_AND_OPERATOR_WALKTHROUGH_CHECKLIST_v1.0.md`.
 
 Follow-up: Product owner should review/accept the PD-H1 plan and checklist before implementation begins.
+## ADR-036 - PD-H1 private directory product hardening completed
+
+Date: 2026-09-01
+
+Decision: PD-H1 is completed as Private Directory Product Hardening and Operator Walkthrough.
+
+Rationale: The Virtual Firm Platform private directory now has clearer operator next-action visibility, forbidden-boundary reminders, walkthrough documentation, and executable hardening smoke evidence before any further marketplace widening is considered.
+
+Constraints: This decision does not authorize public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, pricing intelligence, autonomous award, autonomous regulated approval, or uncontrolled tenant/client data sharing.
+
+Evidence: `npm run check:pd:h1`; `docs/10_post_freeze_technical_design/PD_H1_PRIVATE_DIRECTORY_OPERATOR_WALKTHROUGH_RUNBOOK_v1.0.md`; `docs/10_post_freeze_technical_design/PD_H1_PRIVATE_DIRECTORY_PRODUCT_HARDENING_COMPLETION_v1.0.md`.
+
+Follow-up: Recommended next step is PD-H2 - Private Directory Pilot Rehearsal and Evidence Pack.
