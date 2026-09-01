@@ -197,4 +197,4 @@ If implementation reveals that a requested hardening item requires public market
 
 After this plan and checklist are accepted, implementation may proceed as:
 
-`PD-H1 — Private Directory Product Hardening and Operator Walkthrough`
+`PD-H1 - Private Directory Product Hardening and Operator Walkthrough`

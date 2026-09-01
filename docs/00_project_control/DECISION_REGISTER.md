@@ -294,3 +294,17 @@ Constraints: This decision does not authorize public marketplace, live matching,
 Evidence: `npm run check:pd:h1`; `docs/10_post_freeze_technical_design/PD_H1_PRIVATE_DIRECTORY_OPERATOR_WALKTHROUGH_RUNBOOK_v1.0.md`; `docs/10_post_freeze_technical_design/PD_H1_PRIVATE_DIRECTORY_PRODUCT_HARDENING_COMPLETION_v1.0.md`.
 
 Follow-up: Recommended next step is PD-H2 - Private Directory Pilot Rehearsal and Evidence Pack.
+
+## ADR-037 - PD-H2 private directory pilot rehearsal completed
+
+Date: 2026-09-01
+
+Decision: PD-H2 is completed as Private Directory Pilot Rehearsal and Evidence Pack.
+
+Rationale: The Virtual Firm Platform private directory now has an executable rehearsal that proves the PD-H1 operator walkthrough against a realistic private pilot scenario, including qualification evidence, private listing, Review Board decision, private enquiry, manual collaboration request, renewal risk, readiness summaries, and audit evidence.
+
+Constraints: This decision does not authorize public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, pricing intelligence, autonomous award, autonomous regulated approval, external sending, live payment movement, or uncontrolled tenant/client data sharing.
+
+Evidence: `npm run check:pd:h2`; `npm run check:pd:h2:postgres`; `docs/10_post_freeze_technical_design/PD_H2_PRIVATE_DIRECTORY_PILOT_REHEARSAL_EVIDENCE_PACK_v1.0.md`; `docs/10_post_freeze_technical_design/PD_H2_PRIVATE_DIRECTORY_PILOT_REHEARSAL_COMPLETION_v1.0.md`.
+
+Follow-up: Recommended next step is PD-H3 - Private Directory Pilot Acceptance Gate.

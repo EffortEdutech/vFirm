@@ -102,6 +102,8 @@ These documents may evolve during implementation. They must not rewrite Architec
 | `PD_H1_PRIVATE_DIRECTORY_PRODUCT_HARDENING_AND_OPERATOR_WALKTHROUGH_CHECKLIST_v1.0.md` | Tracks PD-H1 scope lock, UI hardening, rehearsal fixture, walkthrough, verification, documentation, and completion criteria. |
 | `PD_H1_PRIVATE_DIRECTORY_OPERATOR_WALKTHROUGH_RUNBOOK_v1.0.md` | Provides a plain-language operator walkthrough for the controlled private directory cockpit. |
 | `PD_H1_PRIVATE_DIRECTORY_PRODUCT_HARDENING_COMPLETION_v1.0.md` | Records PD-H1 completed work, ad hoc work, evidence commands, limitations, and next plan. |
+| `PD_H2_PRIVATE_DIRECTORY_PILOT_REHEARSAL_EVIDENCE_PACK_v1.0.md` | Records PD-H2 private directory pilot rehearsal evidence pack structure and proof points. |
+| `PD_H2_PRIVATE_DIRECTORY_PILOT_REHEARSAL_COMPLETION_v1.0.md` | Records PD-H2 completed work, ad hoc work, verification evidence, limitations, and next plan. |
 | Document | Purpose |
 |---|---|
 | `VFIRM_SOLOPRENEUR_FIRM_PRODUCT_TARGET_AND_SPRINT_PLAN_v1.0.md` | Governs the approved bounded build of the first operable solopreneur Formwork Engineering Virtual Firm. |
