@@ -321,3 +321,18 @@ Constraints: This decision does not accept pilot operation by itself and does no
 Evidence: `npm run check:pd:h3`; `docs/10_post_freeze_technical_design/PD_H3_PRIVATE_DIRECTORY_PILOT_ACCEPTANCE_GATE_v1.0.md`.
 
 Follow-up: Product owner should choose accept, hold, or reject using the PD-H3 decision gate wording.
+## ADR-039 - PD-H3 private directory pilot readiness accepted
+
+Date: 2026-09-01
+
+Decision: Product owner accepts PD-H3 private directory pilot readiness with the listed limitations and authorizes controlled human pilot operation for the private directory only.
+
+Recorded wording: "Bismillah... I accept PD-H3 private directory pilot readiness with the listed limitations. I authorize controlled human pilot operation for the private directory only, and I do not authorize public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, pricing intelligence, autonomous award, or autonomous regulated approval."
+
+Rationale: PD-H1 and PD-H2 evidence proves the private directory operator walkthrough, pilot rehearsal, JSON and PostgreSQL evidence paths, readiness summaries, pending actions, renewal risk, and audit evidence. PD-H3 made acceptance explicit before moving from rehearsal to controlled human pilot operation.
+
+Constraints: This acceptance does not authorize public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, pricing intelligence, autonomous award, autonomous regulated approval, external sending, live payment movement, uncontrolled tenant/client data sharing, or production legal/regulatory/insurance/liability determination.
+
+Evidence: `npm run check:pd:h3`; `npm run check:pd:h3:acceptance`; `docs/10_post_freeze_technical_design/PD_H3_PRIVATE_DIRECTORY_PILOT_ACCEPTANCE_DECISION_v1.0.md`.
+
+Follow-up: Recommended next step is PD-H4 - Controlled Private Directory Pilot Operation Runbook and Pilot Log.

@@ -105,6 +105,7 @@ These documents may evolve during implementation. They must not rewrite Architec
 | `PD_H2_PRIVATE_DIRECTORY_PILOT_REHEARSAL_EVIDENCE_PACK_v1.0.md` | Records PD-H2 private directory pilot rehearsal evidence pack structure and proof points. |
 | `PD_H2_PRIVATE_DIRECTORY_PILOT_REHEARSAL_COMPLETION_v1.0.md` | Records PD-H2 completed work, ad hoc work, verification evidence, limitations, and next plan. |
 | `PD_H3_PRIVATE_DIRECTORY_PILOT_ACCEPTANCE_GATE_v1.0.md` | Product-owner decision gate for accepting, holding, or rejecting controlled private directory pilot readiness. |
+| `PD_H3_PRIVATE_DIRECTORY_PILOT_ACCEPTANCE_DECISION_v1.0.md` | Records product-owner acceptance of controlled private directory pilot readiness and locked boundaries. |
 | Document | Purpose |
 |---|---|
 | `VFIRM_SOLOPRENEUR_FIRM_PRODUCT_TARGET_AND_SPRINT_PLAN_v1.0.md` | Governs the approved bounded build of the first operable solopreneur Formwork Engineering Virtual Firm. |
