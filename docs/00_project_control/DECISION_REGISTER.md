@@ -336,3 +336,16 @@ Constraints: This acceptance does not authorize public marketplace, live matchin
 Evidence: `npm run check:pd:h3`; `npm run check:pd:h3:acceptance`; `docs/10_post_freeze_technical_design/PD_H3_PRIVATE_DIRECTORY_PILOT_ACCEPTANCE_DECISION_v1.0.md`.
 
 Follow-up: Recommended next step is PD-H4 - Controlled Private Directory Pilot Operation Runbook and Pilot Log.
+## ADR-040 - PD-H4 controlled private directory pilot operation runbook completed
+
+Date: 2026-09-01
+
+Decision: PD-H4 is completed as the Controlled Private Directory Pilot Operation Runbook and Pilot Log.
+
+Rationale: PD-H3 accepted private directory pilot readiness. PD-H4 converts that acceptance into an operating routine with pilot roles, responsibility boundaries, daily steps, pilot log fields, issue/incident path, evidence capture routine, closeout checklist, and sample log rows.
+
+Constraints: This decision authorizes only controlled private directory pilot operation under the accepted PD-H3 boundary. It does not authorize public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, pricing intelligence, autonomous award, autonomous regulated approval, external sending, live payment movement, uncontrolled tenant/client data sharing, or production legal/regulatory/insurance/liability determination.
+
+Evidence: `npm run check:pd:h4`; `docs/10_post_freeze_technical_design/PD_H4_CONTROLLED_PRIVATE_DIRECTORY_PILOT_OPERATION_RUNBOOK_AND_LOG_v1.0.md`.
+
+Follow-up: Recommended next step is PD-H5 - Controlled Private Directory Pilot Closeout Review.
