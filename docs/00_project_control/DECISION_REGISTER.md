@@ -349,3 +349,16 @@ Constraints: This decision authorizes only controlled private directory pilot op
 Evidence: `npm run check:pd:h4`; `docs/10_post_freeze_technical_design/PD_H4_CONTROLLED_PRIVATE_DIRECTORY_PILOT_OPERATION_RUNBOOK_AND_LOG_v1.0.md`.
 
 Follow-up: Recommended next step is PD-H5 - Controlled Private Directory Pilot Closeout Review.
+## ADR-041 - PD-H5 controlled private directory pilot closeout review completed
+
+Date: 2026-09-02
+
+Decision: PD-H5 is completed as the Controlled Private Directory Pilot Closeout Review.
+
+Rationale: PD-H4 prepared the operating runbook and pilot log. PD-H5 defines the closeout evidence pack, issue and incident classifications, accept/hold/reject decision options, human sign-off requirement, simulated closeout result, and next governed backlog decision path without claiming that a real external production pilot closeout has already occurred.
+
+Constraints: This decision does not authorize public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, pricing intelligence, autonomous award, autonomous regulated approval, external sending, live payment movement, uncontrolled tenant/client data sharing, or production legal/regulatory/insurance/liability determination.
+
+Evidence: `npm run check:pd:h5`; `docs/10_post_freeze_technical_design/PD_H5_CONTROLLED_PRIVATE_DIRECTORY_PILOT_CLOSEOUT_REVIEW_v1.0.md`.
+
+Follow-up: Recommended next step is PD-H6 - Private Directory Pilot Learning Backlog and Next Scope Decision.
