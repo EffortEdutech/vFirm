@@ -308,3 +308,16 @@ Constraints: This decision does not authorize public marketplace, live matching,
 Evidence: `npm run check:pd:h2`; `npm run check:pd:h2:postgres`; `docs/10_post_freeze_technical_design/PD_H2_PRIVATE_DIRECTORY_PILOT_REHEARSAL_EVIDENCE_PACK_v1.0.md`; `docs/10_post_freeze_technical_design/PD_H2_PRIVATE_DIRECTORY_PILOT_REHEARSAL_COMPLETION_v1.0.md`.
 
 Follow-up: Recommended next step is PD-H3 - Private Directory Pilot Acceptance Gate.
+## ADR-038 - PD-H3 private directory pilot acceptance gate prepared
+
+Date: 2026-09-01
+
+Decision: PD-H3 is prepared as the Private Directory Pilot Acceptance Gate. The gate is pending explicit product-owner acceptance, hold, or rejection.
+
+Rationale: PD-H1 and PD-H2 provide operator hardening, walkthrough, JSON rehearsal evidence, PostgreSQL rehearsal evidence, readiness summaries, and audit evidence for controlled private directory pilot operation. The acceptance gate makes the product-owner decision explicit before the private directory moves from rehearsal to controlled human pilot operation.
+
+Constraints: This decision does not accept pilot operation by itself and does not authorize public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, pricing intelligence, autonomous award, autonomous regulated approval, external sending, live payment movement, or uncontrolled tenant/client data sharing.
+
+Evidence: `npm run check:pd:h3`; `docs/10_post_freeze_technical_design/PD_H3_PRIVATE_DIRECTORY_PILOT_ACCEPTANCE_GATE_v1.0.md`.
+
+Follow-up: Product owner should choose accept, hold, or reject using the PD-H3 decision gate wording.
