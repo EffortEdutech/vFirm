@@ -255,3 +255,16 @@ Constraints: This decision does not authorize public marketplace, live matching,
 Evidence: `npm run check:me:s6`; `npm run check:me:s6:postgres`; `docs/10_post_freeze_technical_design/ME_S6_PRIVATE_DIRECTORY_INTELLIGENCE_READINESS_VIEW_COMPLETION_v1.0.md`.
 
 Follow-up: Product owner must explicitly authorize ME-S7 or a revised later-release gate before implementation begins.
+## ADR-034 - ME-S7 marketplace ecosystem release gate completed
+
+Date: 2026-09-01
+
+Decision: ME-S7 is completed as the Marketplace/Ecosystem release gate for the currently authorized controlled private directory slice.
+
+Rationale: ME-S1 through ME-S6 have completed governance lock, qualified private publication, private directory governance, SQL persistence, operator UI, and private readiness intelligence. The release gate accepts controlled private directory operation and rejects marketplace widening until a future explicit authorization.
+
+Constraints: This decision does not authorize public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, pricing intelligence, autonomous award, autonomous regulated approval, or uncontrolled tenant/client data sharing.
+
+Evidence: `npm run check:me:s7`; `docs/10_post_freeze_technical_design/ME_S7_MARKETPLACE_ECOSYSTEM_RELEASE_GATE_COMPLETION_v1.0.md`.
+
+Follow-up: Any later public marketplace, ecosystem observatory, capacity economy, or pricing intelligence work requires a new bounded product-owner authorization.
