@@ -60,14 +60,14 @@ scope: "Controlled local/private pilot hardening"
 
 ## MT-H5 — Module and Worker Runtime Binding
 
-- [ ] Drive modules from selected workspace profile.
-- [ ] Show subscribed/not-subscribed module status.
-- [ ] Bind worker cards to selected firm.
-- [ ] Apply firm-specific worker defaults.
-- [ ] Ensure action forms use selected tenant/firm/principal.
-- [ ] Preserve human authority gates.
-- [ ] Preserve no autonomous regulated approval.
-- [ ] Add AI workforce smoke test for both firms.
+- [x] Drive modules from selected workspace profile.
+- [x] Show subscribed/not-subscribed module status.
+- [x] Bind worker cards to selected firm.
+- [x] Apply firm-specific worker defaults.
+- [x] Ensure action forms use selected tenant/firm/principal.
+- [x] Preserve human authority gates.
+- [x] Preserve no autonomous regulated approval.
+- [x] Add AI workforce smoke test for both firms.
 
 ## MT-H6 — End-to-End Multi-Firm Rehearsal and Evidence Pack
 

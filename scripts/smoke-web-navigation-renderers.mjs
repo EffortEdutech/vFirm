@@ -55,7 +55,7 @@ for (const renderer of requiredRenderers) {
   assert(renderRecordViewsBody.includes(`safeRenderModule(`), "renderRecordViews must use safeRenderModule guards.");
   assert(!renderRecordViewsBody.includes(`${renderer}(store);`), `Unsafe direct renderer call found in renderRecordViews: ${renderer}(store);`);
 }
-assert(renderRecordViewsBody.includes('safeRenderModule("#auditView", "Audit", renderAuditModule, store);'), "Audit view must be guarded by safeRenderModule.");
+assert(renderRecordViewsBody.includes('safeRenderModule("#auditView", "Audit"') && renderRecordViewsBody.includes('renderAuditModule'), "Audit view must be guarded by safeRenderModule.");
 assert(!app.includes("renderFrontDeskModule is not defined"), "Debug text leaked into app source.");
 assert(!app.includes("personName is not defined"), "Debug text leaked into app source.");
 

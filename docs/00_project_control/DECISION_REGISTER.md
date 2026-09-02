@@ -469,3 +469,15 @@ Implementation: MT-H4 adds a frontend active workspace contract resolver, dynami
 Boundary: This decision does not approve public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, pricing intelligence, autonomous award, autonomous regulated approval, or live payment movement.
 
 Follow-up: MT-H5 must deepen module and worker runtime binding so each selected firm's available actions, forms, and worker defaults fully follow its subscription/profile.
+## ADR-050 - MT-H5 module and worker runtime binding completed
+Date: 2026-09-03
+
+Decision: Main workspace module availability and AI worker provisioning must be driven by the selected firm's workspace profile and active subscription package.
+
+Rationale: Multi-tenant workspace selection is misleading if every firm can still see and operate Formwork-specific module actions. NHL Global Solution requires an organization-support workspace while the Formwork pilot requires a technical delivery workspace. Module and worker bindings must therefore follow the selected firm's profile rather than the original reference vertical.
+
+Implementation: MT-H5 adds view-to-module mapping, subscribed/not-subscribed navigation state, subscription-boundary pages for modules outside the active profile, selected-firm worker template filtering, firm-specific worker defaults, Front Desk service hints from active service lines, and technical delivery gating for non-Formwork workspaces.
+
+Boundary: This decision does not approve public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, pricing intelligence, autonomous award, autonomous regulated approval, or live payment movement.
+
+Follow-up: MT-H6 must rehearse the multi-tenant pilot flow and collect evidence proving Formwork and NHL can be operated from the same local platform without workspace copy, module, worker, or record leakage.

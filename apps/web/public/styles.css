@@ -65,6 +65,8 @@ button:disabled { cursor: not-allowed; opacity: .55; transform: none; }
 .nav-button { background: transparent; color: var(--muted); border: 1px solid transparent; padding: 10px 12px; }
 .nav-button:hover { color: var(--accent-dark); background: var(--soft); transform: none; }
 .nav-button.active { background: var(--accent); color: white; }
+.nav-button.not-subscribed { opacity: .52; border-style: dashed; }
+.nav-button.not-subscribed::after { content: " - not subscribed"; font-size: 10px; text-transform: uppercase; letter-spacing: .04em; }
 .workspace-view { display: none; }
 .workspace-view.active { display: block; }
 .dashboard-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
