@@ -16,10 +16,13 @@ const operatorStrip = document.querySelector("#operatorStrip");
 const nextActions = document.querySelector("#nextActions");
 const commandFeedback = document.querySelector("#commandFeedback");
 const releaseBanner = document.querySelector("#releaseBanner");
+const activeWorkspace = document.querySelector("#activeWorkspace");
 
 let currentView = "dashboard";
 let lastStore = null;
 let state = defaultState();
+const ACTIVE_FIRM_STORAGE_KEY = "vfirm.activeFirmId";
+let activeFirmId = localStorage.getItem(ACTIVE_FIRM_STORAGE_KEY) ?? null;
 
 function defaultState() {
   return {
@@ -133,7 +136,7 @@ const workspaceCollections = [
 ];
 const steps = [
   { key: "tenant", title: "1. Create Tenant", endpoint: "POST /tenants", needs: [], run: () => request("/tenants", { method: "POST", body: JSON.stringify({ name: state.tenantName, default_region: "MY" }) }), apply: (data) => { state.tenant = data; } },
-  { key: "firm", title: "2. Create Firm", endpoint: "POST /firms", needs: ["tenant"], run: () => request("/firms", { method: "POST", body: JSON.stringify({ tenant_id: state.tenant.id, name: state.firmName, principal_name: state.principalName }) }), apply: (data) => { state.firm = data.firm; state.principal_actor = data.principal_actor; state.principal_person = data.principal_person; } },
+  { key: "firm", title: "2. Create Firm", endpoint: "POST /firms", needs: ["tenant"], run: () => request("/firms", { method: "POST", body: JSON.stringify({ tenant_id: state.tenant.id, name: state.firmName, principal_name: state.principalName }) }), apply: (data) => { state.firm = data.firm; state.principal_actor = data.principal_actor; state.principal_person = data.principal_person; activeFirmId = data.firm.id; localStorage.setItem(ACTIVE_FIRM_STORAGE_KEY, activeFirmId); } },
   { key: "client", title: "3. Create Client", endpoint: "POST /clients", needs: ["tenant", "firm"], run: () => request("/clients", { method: "POST", body: JSON.stringify({ tenant_id: state.tenant.id, firm_id: state.firm.id, name: state.clientName, actor: state.principal_actor }) }), apply: (data) => { state.client = data.client; state.relationship = data.relationship; } },
   { key: "intake", title: "4. Create Intake", endpoint: "POST /intake-sessions", needs: ["tenant", "firm", "relationship"], run: () => request("/intake-sessions", { method: "POST", body: JSON.stringify({ tenant_id: state.tenant.id, firm_id: state.firm.id, relationship_id: state.relationship.id, actor: state.principal_actor, provided_inputs: formworkInputs() }) }), apply: (data) => { state.lead = data.lead; state.intake = data.intake; } },
   { key: "proposal", title: "5. Create Proposal", endpoint: "POST /proposals", needs: ["tenant", "firm", "relationship", "intake"], run: () => request("/proposals", { method: "POST", body: JSON.stringify({ tenant_id: state.tenant.id, firm_id: state.firm.id, relationship_id: state.relationship.id, intake_session_id: state.intake.id, scope_summary: "Preliminary formwork design support package", final_price: Number(state.finalPrice), actor: state.principal_actor }) }), apply: (data) => { state.price = data.price; state.proposal = data.proposal; } },
@@ -144,8 +147,8 @@ const steps = [
 ];
 
 function devAuthHeaders() {
-  const firm = state.firm ?? latestRecord(lastStore, "firms");
-  const actor = state.principal_actor ?? (firm ? latestPrincipalActor(lastStore, firm.id) : null);
+  const firm = activeFirmInStore(lastStore) ?? state.firm ?? latestRecord(lastStore, "firms");
+  const actor = (firm ? latestPrincipalActor(lastStore, firm.id) : null) ?? state.principal_actor;
   if (!actor?.id && !actor?.actor_id) return {};
   return {
     "x-vfirm-actor-id": actor.actor_id ?? actor.id,
@@ -279,7 +282,9 @@ function renderReleaseBanner(store) {
   if (!releaseBanner) return;
   const backend = store._dashboard_summary?.health?.persistence?.backend ?? "unknown";
   const boundary = store.commercial_launch_summary?.boundary ?? "no_live_payment_capture";
-  releaseBanner.innerHTML = `<strong>Solopreneur firm build - SF-S6</strong><span>Formwork Engineering Virtual Firm | Persistence: ${escapeHtml(backend)} | Commercial boundary: ${escapeHtml(boundary)}</span>`;
+  const firm = store._active_firm ?? latestRecord(store, "firms");
+  const tenant = store._active_tenant ?? (firm ? (store.tenants ?? []).find((item) => item.id === firm.tenant_id) : latestRecord(store, "tenants"));
+  releaseBanner.innerHTML = `<strong>Multi-tenant firm workspace</strong><span>${escapeHtml(firm?.name ?? "No active firm")} | Tenant: ${escapeHtml(tenant?.name ?? "-")} | Persistence: ${escapeHtml(backend)} | Commercial boundary: ${escapeHtml(boundary)}</span>`;
 }
 
 function renderHealthCards(store) {
@@ -404,6 +409,102 @@ function latestRecord(store, collection) {
 function latestPrincipalActor(store, firmId) {
   const actors = store?.actors ?? [];
   return [...actors].reverse().find((actor) => actor.firm_id === firmId && actor.actor_type === "HUMAN") ?? null;
+}
+
+function activeFirmInStore(store) {
+  const firms = store?.firms ?? [];
+  return firms.find((firm) => firm.id === activeFirmId) ?? firms[firms.length - 1] ?? null;
+}
+
+function activeTenantInStore(store) {
+  const firm = activeFirmInStore(store);
+  return firm ? (store?.tenants ?? []).find((tenant) => tenant.id === firm.tenant_id) ?? null : latestRecord(store, "tenants");
+}
+
+function ensureActiveFirm(store) {
+  const firm = activeFirmInStore(store);
+  if (firm?.id && firm.id !== activeFirmId) {
+    activeFirmId = firm.id;
+    localStorage.setItem(ACTIVE_FIRM_STORAGE_KEY, activeFirmId);
+  }
+  return firm;
+}
+
+function activePrincipalActor(store) {
+  const firm = activeFirmInStore(store);
+  return firm ? latestPrincipalActor(store, firm.id) : null;
+}
+
+function scopedStoreForActiveFirm(store) {
+  const firm = ensureActiveFirm(store);
+  const tenant = firm ? (store.tenants ?? []).find((item) => item.id === firm.tenant_id) : latestRecord(store, "tenants");
+  if (!firm || !tenant) return store;
+  const firmIds = new Set([firm.id]);
+  const scopedRelationships = (store.firm_client_relationships ?? []).filter((item) => item.tenant_id === tenant.id && item.firm_id === firm.id);
+  const relationshipIds = new Set(scopedRelationships.map((item) => item.id));
+  const clientIds = new Set(scopedRelationships.map((item) => item.client_id));
+  const projectIds = new Set((store.projects ?? []).filter((item) => item.tenant_id === tenant.id && item.firm_id === firm.id).map((item) => item.id));
+  const globalCollections = new Set(["service_packs", "service_skus", "worker_templates", "auth_context", "ops_readiness", "staging_package", "data_protection_policy", "data_export_manifest", "pilot_package", "pilot_learning_loop", "support_summary"]);
+  const scoped = { ...store, _active_tenant: tenant, _active_firm: firm, _active_actor: activePrincipalActor(store) };
+  for (const [key, value] of Object.entries(store)) {
+    if (!Array.isArray(value)) continue;
+    if (key === "tenants") scoped[key] = [tenant];
+    else if (key === "firms") scoped[key] = [firm];
+    else if (globalCollections.has(key)) scoped[key] = value;
+    else if (key === "firm_client_relationships") scoped[key] = scopedRelationships;
+    else if (key === "clients") scoped[key] = value.filter((item) => item.tenant_id === tenant.id && (clientIds.has(item.id) || !(store.firm_client_relationships ?? []).some((rel) => rel.client_id === item.id)));
+    else if (["leads", "intake_sessions"].includes(key)) scoped[key] = value.filter((item) => item.tenant_id === tenant.id && (!item.relationship_id || relationshipIds.has(item.relationship_id)));
+    else if (["documents", "document_versions", "evidence_bundles"].includes(key)) scoped[key] = value.filter((item) => item.tenant_id === tenant.id && (!item.project_id || projectIds.has(item.project_id)) && (!item.firm_id || item.firm_id === firm.id));
+    else scoped[key] = value.filter((item) => {
+      if (item.tenant_id && item.tenant_id !== tenant.id) return false;
+      const scopedFirmValues = [item.firm_id, item.requesting_firm_id, item.provider_firm_id, item.accountable_firm_id].filter(Boolean);
+      if (scopedFirmValues.length) return scopedFirmValues.some((id) => firmIds.has(id));
+      if (item.relationship_id) return relationshipIds.has(item.relationship_id);
+      if (item.client_id) return clientIds.has(item.client_id);
+      if (item.project_id) return projectIds.has(item.project_id);
+      return item.tenant_id === tenant.id;
+    });
+  }
+  scoped._dashboard_summary = {
+    ...(store._dashboard_summary ?? {}),
+    counts: {
+      clients: scoped.clients?.length ?? 0,
+      open_intake: (scoped.intake_sessions ?? []).filter((item) => item.intake_status !== "COMPLETE").length,
+      proposals: scoped.proposals?.length ?? 0,
+      projects: scoped.projects?.length ?? 0,
+      approvals: scoped.approvals?.length ?? 0,
+      invoices: scoped.invoices?.length ?? 0,
+      events: scoped.event_log?.length ?? 0,
+      audit_events: scoped.audit_events?.length ?? 0
+    },
+    latest_activity: [...(scoped.event_log ?? [])].slice(-6).reverse()
+  };
+  if (scoped.daily_operations?.firm_id && scoped.daily_operations.firm_id !== firm.id) scoped.daily_operations = null;
+  return scoped;
+}
+
+function renderActiveWorkspaceSelector(rawStore, scopedStore) {
+  if (!activeWorkspace) return;
+  const firms = rawStore?.firms ?? [];
+  const tenants = rawStore?.tenants ?? [];
+  const activeFirm = scopedStore?._active_firm ?? activeFirmInStore(rawStore);
+  const activeTenant = scopedStore?._active_tenant ?? activeTenantInStore(rawStore);
+  if (!firms.length) {
+    activeWorkspace.innerHTML = `<div class="active-workspace-card"><span>No firm workspace yet</span><strong>Create a tenant and firm from Workflow.</strong></div>`;
+    return;
+  }
+  const options = firms.map((firm) => {
+    const tenant = tenants.find((item) => item.id === firm.tenant_id);
+    return `<option value="${escapeHtml(firm.id)}" ${firm.id === activeFirm?.id ? "selected" : ""}>${escapeHtml(firm.name)} — ${escapeHtml(tenant?.name ?? shortId(firm.tenant_id))}</option>`;
+  }).join("");
+  activeWorkspace.innerHTML = `<form id="activeFirmForm" class="active-workspace-form"><label>Active firm workspace<select id="activeFirmSelect" name="firm_id">${options}</select></label><div class="active-workspace-card"><span>Tenant boundary</span><strong>${escapeHtml(activeTenant?.name ?? "-")}</strong><small>Firm: ${escapeHtml(activeFirm?.name ?? "-")} · Principal: ${escapeHtml(scopedStore?._active_actor?.display_name ?? "Not resolved")}</small></div></form>`;
+  activeWorkspace.querySelector("#activeFirmSelect")?.addEventListener("change", (event) => {
+    activeFirmId = event.currentTarget.value;
+    localStorage.setItem(ACTIVE_FIRM_STORAGE_KEY, activeFirmId);
+    clearCommandFeedback();
+    setCommandFeedback("success", "Active firm switched", "Workspace views are now scoped to the selected tenant and firm.");
+    renderAll();
+  });
 }
 
 function renderFrontDeskModule(store) {
@@ -997,7 +1098,13 @@ function renderRecordViews(store) {
 
 function renderAll() {
   renderState();
-  if (lastStore) { renderSummary(lastStore); renderLatestActivity(lastStore); renderRecordViews(lastStore); }
+  if (lastStore) {
+    const scopedStore = scopedStoreForActiveFirm(lastStore);
+    renderActiveWorkspaceSelector(lastStore, scopedStore);
+    renderSummary(scopedStore);
+    renderLatestActivity(scopedStore);
+    renderRecordViews(scopedStore);
+  }
 }
 
 async function loadWorkspaceData() {

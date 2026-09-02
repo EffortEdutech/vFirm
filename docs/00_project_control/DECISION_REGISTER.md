@@ -388,3 +388,16 @@ Constraints: This decision does not create a legal company registration, product
 Evidence: `npm run check:onboarding:nhl`; `docs/10_post_freeze_technical_design/NHL_GLOBAL_SOLUTION_ONBOARDING_REHEARSAL_RESULT_v1.0.md`; `scripts/smoke-nhl-global-solution-onboarding.mjs`.
 
 Follow-up: If NHL Global Solution is intended to become a real pilot firm, prepare a controlled pilot setup checklist covering owner confirmation, service package names, document templates, data handling, worker authority envelopes, approval rules, pilot success criteria, export/backup routine, and incident path.
+## ADR-044 - Multi-tenant workspace selector and scoped UI polish completed
+
+Date: 2026-09-02
+
+Decision: The web workspace now supports an explicit active tenant/firm selector and selected-firm scoped rendering for local controlled pilot operation.
+
+Rationale: The local workspace contains more than one firm context, including the Formwork pilot context and NHL Global Solution. Relying on the latest-created firm as the implicit workspace can cause operator confusion and unsafe cross-firm mental models. The active workspace selector makes the operator's tenant/firm context visible and persists the selected firm locally.
+
+Constraints: This polish does not replace backend tenant isolation controls and does not authorize production multi-tenant onboarding, public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, pricing intelligence, autonomous award, autonomous regulated approval, external sending, or live payment movement.
+
+Evidence: `npm run check:web:multitenant`; `npm run check:web:navigation`; `npm run check:onboarding:nhl`; `docs/10_post_freeze_technical_design/MULTI_TENANT_WORKSPACE_POLISH_RESULT_v1.0.md`.
+
+Follow-up: Add backend active-workspace context endpoints, query-parameter scoped summaries, browser regression testing, and firm-type-specific UI labels in the next hardening pass.

@@ -205,3 +205,11 @@ button[disabled] { position: relative; }
   font-weight: 700;
   text-align: center;
 }
+.active-workspace { margin-top: 12px; max-width: 860px; }
+.active-workspace-form { display: grid; grid-template-columns: minmax(260px, 1.1fr) minmax(260px, .9fr); gap: 12px; align-items: end; }
+.active-workspace-form label { margin: 0; }
+.active-workspace-card { border: 1px solid #d4ebe2; border-radius: 16px; background: #f6fbf8; padding: 12px 14px; display: grid; gap: 3px; }
+.active-workspace-card span { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; font-weight: 900; }
+.active-workspace-card strong { color: var(--accent-dark); font-size: 15px; }
+.active-workspace-card small { color: var(--muted); line-height: 1.35; font-weight: 700; }
+@media (max-width: 760px) { .active-workspace-form { grid-template-columns: 1fr; } }
