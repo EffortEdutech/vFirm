@@ -23,15 +23,15 @@ scope: "Controlled local/private pilot hardening"
 
 ## MT-H2 — Backend Active Workspace Summary
 
-- [ ] Add active workspace summary resolver.
-- [ ] Add endpoint for selected tenant/firm summary.
-- [ ] Resolve active subscription package by selected firm.
-- [ ] Resolve service pack/service lines by selected firm.
-- [ ] Resolve module list by selected firm.
-- [ ] Resolve worker list by selected firm.
-- [ ] Remove Formwork-only dashboard health assumption.
-- [ ] Add cross-tenant negative checks.
-- [ ] Add backend smoke test.
+- [x] Add active workspace summary resolver.
+- [x] Add endpoint for selected tenant/firm summary.
+- [x] Resolve active subscription package by selected firm.
+- [x] Resolve service pack/service lines by selected firm.
+- [x] Resolve module list by selected firm.
+- [x] Resolve worker list by selected firm.
+- [x] Remove Formwork-only dashboard health assumption.
+- [x] Add cross-tenant negative checks.
+- [x] Add backend smoke test.
 
 ## MT-H3 — Local Seed and Pilot Workspace Data Repair
 

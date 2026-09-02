@@ -429,3 +429,17 @@ Constraints: MT-H1 is a contract/documentation and smoke-gate sprint only. It do
 Evidence: `docs/10_post_freeze_technical_design/MT_H1_WORKSPACE_PROFILE_AND_SUBSCRIPTION_CONTRACT_LOCK_v1.0.md`; `docs/10_post_freeze_technical_design/MT_H1_WORKSPACE_PROFILE_AND_SUBSCRIPTION_CONTRACT_LOCK_COMPLETION_v1.0.md`; `scripts/smoke-mt-h1-workspace-profile-contract.mjs`; `npm run check:mt:h1`.
 
 Follow-up: Proceed to MT-H2 - Backend Active Workspace Summary.
+
+## ADR-047 - MT-H2 backend active workspace summary completed
+
+Date: 2026-09-02
+
+Decision: MT-H2 is complete. The backend now exposes a selected tenant/firm active workspace summary and dashboard service-pack/subscription health now resolves from the selected firm workspace instead of assuming Formwork for every scoped dashboard.
+
+Rationale: vFirm must run each subscribed firm workspace according to its business type. Formwork, NHL Global Solution, and PD-H2 rehearsal firms require different workspace profiles, service lines, modules, and subscription behavior.
+
+Constraints: MT-H2 remains controlled local/private pilot hardening. It does not authorize public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, pricing intelligence, autonomous award, autonomous regulated approval, or live payment movement.
+
+Evidence: `scripts/smoke-mt-h2-active-workspace-summary.mjs`; `docs/10_post_freeze_technical_design/MT_H2_BACKEND_ACTIVE_WORKSPACE_SUMMARY_COMPLETION_v1.0.md`; `npm run check:mt:h2`.
+
+Follow-up: Proceed to MT-H3 - Local Seed and Pilot Workspace Data Repair.

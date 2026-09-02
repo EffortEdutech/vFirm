@@ -406,6 +406,154 @@ function applyReadFilters(records, url) {
   const limit = Number(url.searchParams.get("limit") ?? 0);
   return Number.isInteger(limit) && limit > 0 ? filtered.slice(-limit) : filtered;
 }
+const workspaceModuleCatalogue = Object.freeze({
+  front_desk: { module_code: "front_desk", module_name: "Front Desk", default_view: "front-desk", worker_template_codes: ["front-desk-coordinator"] },
+  administration: { module_code: "administration", module_name: "Administration", default_view: "administration", worker_template_codes: ["administration-clerk"] },
+  sales_accounts: { module_code: "sales_accounts", module_name: "Sales & Accounts", default_view: "sales-accounts", worker_template_codes: ["marketing-sales-coordinator", "accounts-clerk"] },
+  technical_delivery: { module_code: "technical_delivery", module_name: "Technical Delivery", default_view: "technical-delivery", worker_template_codes: ["technical-drawing-assistant"] },
+  projects: { module_code: "projects", module_name: "Projects", default_view: "projects", worker_template_codes: ["project-coordination-assistant"] },
+  approvals: { module_code: "approvals", module_name: "Approvals", default_view: "approvals", worker_template_codes: [] },
+  invoices: { module_code: "invoices", module_name: "Invoices", default_view: "invoices", worker_template_codes: ["accounts-clerk"] },
+  ai_workforce: { module_code: "ai_workforce", module_name: "AI Workforce", default_view: "ai-workforce", worker_template_codes: [] },
+  network: { module_code: "network", module_name: "Network", default_view: "network", worker_template_codes: [] },
+  ops: { module_code: "ops", module_name: "Ops", default_view: "ops", worker_template_codes: ["project-coordination-assistant"] },
+  audit: { module_code: "audit", module_name: "Audit", default_view: "audit", worker_template_codes: [] }
+});
+
+const workspaceProfiles = Object.freeze({
+  FORMWORK_ENGINEERING: {
+    firm_type: "FORMWORK_ENGINEERING",
+    workspace_title: "Formwork Engineering Virtual Firm Workspace",
+    workspace_description: "Operate controlled formwork engineering intake, proposals, delivery support, QA evidence, approvals, invoicing, and audit.",
+    subscription: { package_code: "VF-FORMWORK-PILOT", package_name: "Formwork Engineering Pilot Workspace", package_status: "ACTIVE", pricing_model: "CONTROLLED_PILOT", commercial_boundary: "NO_LIVE_PAYMENT_CAPTURE", features: ["front desk", "administration", "sales and proposals", "accounts and receivables", "technical drawing and delivery support", "professional approval gates", "audit and export"] },
+    service_lines: [{ service_code: "formwork_preliminary_wall_slab", service_name: "Preliminary Wall/Slab Formwork Support", service_type: "PROFESSIONAL_PRACTICE", status: "ACTIVE", requires_human_approval: true, regulated_work: true, delivery_outputs: ["controlled drawings", "QA evidence bundle", "delivery report"] }],
+    modules: ["front_desk", "administration", "sales_accounts", "technical_delivery", "projects", "approvals", "invoices", "ai_workforce", "ops", "audit"],
+    worker_templates: ["front-desk-coordinator", "administration-clerk", "accounts-clerk", "marketing-sales-coordinator", "technical-drawing-assistant", "project-coordination-assistant"],
+    authority_boundaries: ["AI may prepare drafts and checks only.", "Regulated deliverables require valid human professional approval.", "No silent approval."]
+  },
+  ORGANIZATION_SUPPORT: {
+    firm_type: "ORGANIZATION_SUPPORT",
+    workspace_title: "NHL Global Solution Workspace",
+    workspace_description: "Operate a virtual organization-support firm for project reporting, technical writing, clerical work, and BizKick EDCS documentation/control support.",
+    subscription: { package_code: "VF-ORG-SUPPORT-PILOT", package_name: "Organization Support and EDCS Pilot Workspace", package_status: "ACTIVE", pricing_model: "CONTROLLED_PILOT", commercial_boundary: "NO_LIVE_PAYMENT_CAPTURE", features: ["front desk", "administration and clerical records", "project reporting", "technical writing", "BizKick EDCS document/control support", "sales and proposals", "accounts and receivables", "audit and export"] },
+    service_lines: [
+      { service_code: "project_reporting", service_name: "Project Reporting", service_type: "ORGANIZATION_SUPPORT", status: "ACTIVE", requires_human_approval: true, regulated_work: false, delivery_outputs: ["project report draft", "status summary", "evidence index"] },
+      { service_code: "technical_writing", service_name: "Technical Writing", service_type: "ORGANIZATION_SUPPORT", status: "ACTIVE", requires_human_approval: true, regulated_work: false, delivery_outputs: ["technical writing draft", "review pack"] },
+      { service_code: "clerical_work", service_name: "Clerical Work", service_type: "ADMINISTRATIVE_SUPPORT", status: "ACTIVE", requires_human_approval: true, regulated_work: false, delivery_outputs: ["register", "correspondence draft", "filing index"] },
+      { service_code: "bizkick_edcs", service_name: "BizKick EDCS", service_type: "ORGANIZATION_SUPPORT", status: "ACTIVE", requires_human_approval: true, regulated_work: false, delivery_outputs: ["EDCS control index", "document register", "workflow checklist"] }
+    ],
+    modules: ["front_desk", "administration", "sales_accounts", "projects", "invoices", "ai_workforce", "ops", "audit"],
+    worker_templates: ["front-desk-coordinator", "administration-clerk", "accounts-clerk", "marketing-sales-coordinator", "technical-drawing-assistant", "project-coordination-assistant"],
+    authority_boundaries: ["AI may prepare drafts, registers, reports, and document-control support only.", "Human principal approval is required before external sending or client commitment.", "No autonomous payment action."]
+  },
+  DIRECTORY_REHEARSAL: {
+    firm_type: "DIRECTORY_REHEARSAL",
+    workspace_title: "Private Directory Rehearsal Workspace",
+    workspace_description: "Controlled private-directory rehearsal workspace for governance, enquiry, renewal, and evidence testing.",
+    subscription: { package_code: "VF-DIRECTORY-REHEARSAL", package_name: "Private Directory Rehearsal Workspace", package_status: "ACTIVE", pricing_model: "READINESS_ONLY", commercial_boundary: "NO_LIVE_PAYMENT_CAPTURE", features: ["private directory rehearsal", "governance review", "audit evidence"] },
+    service_lines: [{ service_code: "private_directory_rehearsal", service_name: "Private Directory Rehearsal", service_type: "ORGANIZATION_SUPPORT", status: "ACTIVE", requires_human_approval: true, regulated_work: false, delivery_outputs: ["rehearsal evidence pack"] }],
+    modules: ["front_desk", "network", "ops", "audit"],
+    worker_templates: ["front-desk-coordinator", "project-coordination-assistant"],
+    authority_boundaries: ["Rehearsal/test workspace only.", "No public marketplace widening.", "No autonomous award."]
+  }
+});
+
+function inferFirmType(firm = {}) {
+  const explicit = firm.metadata?.workspace_profile?.firm_type ?? firm.metadata?.firm_type;
+  if (explicit && workspaceProfiles[explicit]) return explicit;
+  const name = String(firm.name ?? "").toLowerCase();
+  const practices = firm.active_practices ?? [];
+  if (name.includes("nhl global solution") || practices.includes("organization_support") || practices.includes("bizkick_edcs")) return "ORGANIZATION_SUPPORT";
+  if (name.includes("pd h2") || name.includes("rehearsal") || firm.metadata?.workspace_classification === "REHEARSAL") return "DIRECTORY_REHEARSAL";
+  return "FORMWORK_ENGINEERING";
+}
+
+function latestActiveSubscriptionForFirm(store, firmId) {
+  const packages = (store.subscription_packages ?? []).filter((item) => item.firm_id === firmId);
+  return packages.findLast?.((item) => item.package_status === "ACTIVE") ?? packages.findLast?.((item) => ["APPROVED", "APPROVED_TEST_MODE"].includes(item.package_status)) ?? packages.at(-1) ?? null;
+}
+
+function workerMatchesTemplate(worker, templateCode) {
+  const normalizedCode = String(templateCode ?? "").replace(/-/g, " ").toLowerCase();
+  const workerName = String(worker?.name ?? "").toLowerCase();
+  const assigned = (worker?.assigned_services ?? []).map((item) => String(item).toLowerCase());
+  return workerName.includes(normalizedCode.split(" ")[0]) || assigned.includes(String(templateCode ?? "").toLowerCase());
+}
+
+function normalizeWorkspaceModule(moduleCode, profile, workers) {
+  const base = workspaceModuleCatalogue[moduleCode] ?? { module_code: moduleCode, module_name: moduleCode, default_view: moduleCode, worker_template_codes: [] };
+  const activeWorkers = workers.filter((worker) => (base.worker_template_codes ?? []).some((code) => workerMatchesTemplate(worker, code)) && worker.runtime_status === "ACTIVE");
+  return { ...base, status: "SUBSCRIBED", description: `${base.module_name} module for ${profile.firm_type.toLowerCase().replace(/_/g, " ")} workspace.`, active_workers: activeWorkers.length, authority_note: (profile.authority_boundaries ?? [])[0] ?? "Assistive only under human authority." };
+}
+
+function workspaceProfileForFirm(store, tenant, firm) {
+  const subscription = latestActiveSubscriptionForFirm(store, firm.id);
+  const firmType = inferFirmType(firm);
+  const base = workspaceProfiles[firmType] ?? workspaceProfiles.FORMWORK_ENGINEERING;
+  const override = subscription?.metadata?.workspace_profile ?? firm.metadata?.workspace_profile ?? {};
+  const principalActor = (store.actors ?? []).find((actor) => actor.firm_id === firm.id && actor.actor_type === "HUMAN") ?? null;
+  const workers = (store.worker_instances ?? []).filter((worker) => worker.tenant_id === tenant.id && worker.firm_id === firm.id);
+  const profile = {
+    ...base,
+    ...override,
+    tenant_id: tenant.id,
+    firm_id: firm.id,
+    workspace_code: override.workspace_code ?? `${firmType.toLowerCase()}-${firm.id}`,
+    workspace_status: override.workspace_status ?? firm.status ?? "ACTIVE",
+    workspace_classification: override.workspace_classification ?? firm.metadata?.workspace_classification ?? (firmType === "DIRECTORY_REHEARSAL" ? "REHEARSAL" : "PILOT"),
+    firm_type: override.firm_type ?? firmType,
+    workspace_title: override.workspace_title ?? (firmType === "ORGANIZATION_SUPPORT" ? `${firm.name} Workspace` : base.workspace_title),
+    principal_display_name: override.principal_display_name ?? principalActor?.display_name ?? "Principal not resolved",
+    subscription: { ...base.subscription, ...(subscription ? { package_code: subscription.package_code, package_name: subscription.package_name, package_status: subscription.package_status, pricing_model: subscription.pricing_model, features: subscription.features ?? base.subscription.features } : {}), ...(override.subscription ?? {}) },
+    service_lines: override.service_lines ?? subscription?.metadata?.service_lines ?? base.service_lines,
+    modules: override.modules ?? subscription?.metadata?.modules ?? base.modules,
+    worker_templates: override.worker_templates ?? subscription?.metadata?.worker_templates ?? base.worker_templates,
+    authority_boundaries: override.authority_boundaries ?? base.authority_boundaries,
+    record_scope: { tenant_scoped: true, firm_scoped: true, cross_tenant_access: false },
+    audit_requirements: { all_material_actions_attributable: true, private_chain_of_thought_excluded: true, evidence_summary_required: true }
+  };
+  return {
+    ...profile,
+    subscription_package_id: subscription?.id ?? null,
+    modules: (profile.modules ?? []).map((moduleCode) => normalizeWorkspaceModule(moduleCode, profile, workers)),
+    worker_bindings: (profile.worker_templates ?? []).map((code) => {
+      const worker = workers.find((item) => workerMatchesTemplate(item, code));
+      return { worker_template_code: code, display_name: worker?.name ?? code, runtime_status: worker?.runtime_status ?? "AVAILABLE", worker_instance_id: worker?.id ?? null, authority_boundary: (profile.authority_boundaries ?? [])[0] ?? "Assistive only.", requires_supervisor: true };
+    }),
+    counts: {
+      workers: workers.length,
+      active_workers: workers.filter((worker) => worker.runtime_status === "ACTIVE").length,
+      service_lines: (profile.service_lines ?? []).length,
+      modules: (profile.modules ?? []).length
+    }
+  };
+}
+
+async function readActiveWorkspaceSummary(req, url) {
+  const tenantId = url.searchParams.get("tenant_id");
+  const firmId = url.searchParams.get("firm_id");
+  requireFields({ tenant_id: tenantId, firm_id: firmId }, ["tenant_id", "firm_id"]);
+  assertActorScope(devActorFromHeaders(req), { tenant_id: tenantId, firm_id: firmId }, "active workspace summary");
+  const store = await readStore();
+  const tenant = (store.tenants ?? []).find((item) => item.id === tenantId);
+  if (!tenant) requireRecord(store, "tenants", tenantId);
+  const firm = (store.firms ?? []).find((item) => item.id === firmId && item.tenant_id === tenantId);
+  if (!firm) {
+    const error = new Error(`firms record not found in selected tenant: ${firmId}`);
+    error.code = "NOT_FOUND";
+    error.status = 404;
+    throw error;
+  }
+  const workspace = workspaceProfileForFirm(store, tenant, firm);
+  return {
+    generated_at: new Date().toISOString(),
+    tenant: { id: tenant.id, name: tenant.name, status: tenant.status },
+    firm: { id: firm.id, name: firm.name, status: firm.status, active_practices: firm.active_practices ?? [], metadata: firm.metadata ?? {} },
+    workspace,
+    service_pack: { status: workspace.subscription?.package_status ?? "MISSING", code: workspace.subscription?.package_code ?? "NO_SUBSCRIPTION", name: workspace.subscription?.package_name ?? "No active subscription package", sku_status: "PROFILE_BOUND", sku_code: workspace.service_lines?.[0]?.service_code ?? "NO_SERVICE_LINE" },
+    boundaries: ["no_public_marketplace", "no_live_matching", "no_ranking", "no_capacity_allocation", "no_vf24_publication", "no_pricing_intelligence", "no_autonomous_award", "no_autonomous_regulated_approval", "no_live_payment_movement"]
+  };
+}
 async function readDashboardSummary(url) {
   const store = await readStore();
   const filtered = Object.fromEntries([...readCollections.values()].map((collection) => [collection, applyReadFilters(Array.isArray(store[collection]) ? store[collection] : [], url)]));
@@ -442,17 +590,22 @@ async function readDashboardSummary(url) {
     subscription_packages: filtered.subscription_packages.length,
     commercial_launch_controls: filtered.commercial_launch_controls.length
   };
+  const tenantId = url.searchParams.get("tenant_id");
+  const firmId = url.searchParams.get("firm_id");
+  const activeWorkspaceSummary = tenantId && firmId ? await readActiveWorkspaceSummary(null, url) : null;
   const formworkPack = filtered.service_packs.find((pack) => pack.code === "VF-SP-001") ?? null;
   const formworkSku = filtered.service_skus.find((sku) => sku.code === "formwork_preliminary_wall_slab") ?? null;
+  const resolvedServicePack = activeWorkspaceSummary?.service_pack ?? { status: formworkPack?.status ?? "MISSING", code: formworkPack?.code ?? "VF-SP-001", name: formworkPack?.name ?? "Formwork Engineering Preliminary Package", sku_status: formworkSku?.status ?? "MISSING", sku_code: formworkSku?.code ?? "formwork_preliminary_wall_slab" };
   return {
     counts,
     latest_activity: filtered.event_log.slice(-6).reverse(),
     health: {
       api: { status: "ONLINE", port_family: "309#", api_port: port, phase: "persistent-mvp-command-loop" },
       persistence: getStoreInfo(),
-      service_pack: { status: formworkPack?.status ?? "MISSING", code: formworkPack?.code ?? "VF-SP-001", name: formworkPack?.name ?? "Formwork Engineering Preliminary Package", sku_status: formworkSku?.status ?? "MISSING", sku_code: formworkSku?.code ?? "formwork_preliminary_wall_slab" },
+      service_pack: resolvedServicePack,
       audit: { status: counts.events > 0 && counts.audit_events > 0 ? "ACTIVE" : "WAITING_FOR_ACTIVITY", events: counts.events, audit_events: counts.audit_events },
-      workflow: { status: workflowReadinessStatus(counts), next_gate: workflowNextGate(counts) }
+      workflow: { status: workflowReadinessStatus(counts), next_gate: workflowNextGate(counts) },
+      active_workspace: activeWorkspaceSummary?.workspace ?? null
     },
     generated_at: new Date().toISOString()
   };
@@ -2467,6 +2620,7 @@ const server = createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/data-protection/export-manifest") return sendJson(req, res, 200, { ok: true, data: await readDataExportManifest(req, url) });
     if (req.method === "GET" && url.pathname === "/data-protection/export-package") return sendJson(req, res, 200, { ok: true, data: await readTenantExportPackage(req, url) });
     if (req.method === "GET" && url.pathname === "/pilot/formwork") return sendJson(req, res, 200, { ok: true, data: readFormworkPilotPackage() });
+    if (req.method === "GET" && url.pathname === "/workspace/active-summary") return sendJson(req, res, 200, { ok: true, data: await readActiveWorkspaceSummary(req, url) });
     if (req.method === "GET" && url.pathname === "/dashboard/summary") return sendJson(req, res, 200, { ok: true, data: await readDashboardSummary(url) });
     if (req.method === "GET" && url.pathname === "/auth/context") return sendJson(req, res, 200, { ok: true, data: await readAuthContext(req) });
     if (req.method === "GET" && url.pathname === "/auth/provider/config") return sendJson(req, res, 200, { ok: true, data: authProviderConfig() });
