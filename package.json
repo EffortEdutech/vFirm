@@ -100,7 +100,8 @@
                     "check:pd:h4":  "node scripts/smoke-pd-h4-controlled-private-directory-pilot-operation.mjs",
                     "check:pd:h5":  "node scripts/smoke-pd-h5-controlled-private-directory-pilot-closeout.mjs",
                     "check:pd:h6":  "node scripts/smoke-pd-h6-private-directory-pilot-learning-backlog.mjs",
-                    "check:onboarding:nhl":  "node scripts/smoke-nhl-global-solutions-onboarding.mjs"
+                    "check:onboarding:nhl":  "node scripts/smoke-nhl-global-solutions-onboarding.mjs",
+                    "seed:nhl":  "node scripts/seed-nhl-global-solutions-local.mjs"
                 },
     "engines":  {
                     "node":  "\u003e=22"
