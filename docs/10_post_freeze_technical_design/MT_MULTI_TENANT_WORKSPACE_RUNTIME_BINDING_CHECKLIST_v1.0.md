@@ -35,16 +35,16 @@ scope: "Controlled local/private pilot hardening"
 
 ## MT-H3 — Local Seed and Pilot Workspace Data Repair
 
-- [ ] Add/repair combined local pilot seed.
-- [ ] Preserve or create Formwork pilot firm.
-- [ ] Preserve or create NHL Global Solution.
-- [ ] Add NHL subscription package.
-- [ ] Add NHL service lines.
-- [ ] Add NHL module profile.
-- [ ] Add NHL worker bindings.
-- [ ] Add Formwork subscription/package profile.
-- [ ] Mark PD-H2 records as rehearsal/test where applicable.
-- [ ] Add seed verification smoke test.
+- [x] Add/repair combined local pilot seed.
+- [x] Preserve or create Formwork pilot firm.
+- [x] Preserve or create NHL Global Solution.
+- [x] Add NHL subscription package.
+- [x] Add NHL service lines.
+- [x] Add NHL module profile.
+- [x] Add NHL worker bindings.
+- [x] Add Formwork subscription/package profile.
+- [x] Mark PD-H2 records as rehearsal/test where applicable.
+- [x] Add seed verification smoke test.
 
 ## MT-H4 — Frontend Workspace Shell Binding
 

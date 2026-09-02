@@ -443,3 +443,17 @@ Constraints: MT-H2 remains controlled local/private pilot hardening. It does not
 Evidence: `scripts/smoke-mt-h2-active-workspace-summary.mjs`; `docs/10_post_freeze_technical_design/MT_H2_BACKEND_ACTIVE_WORKSPACE_SUMMARY_COMPLETION_v1.0.md`; `npm run check:mt:h2`.
 
 Follow-up: Proceed to MT-H3 - Local Seed and Pilot Workspace Data Repair.
+
+## ADR-048 - MT-H3 local pilot workspace seed completed
+
+Date: 2026-09-02
+
+Decision: MT-H3 is complete. The local pilot seed now creates or preserves both the Formwork pilot workspace and NHL Global Solution with workspace subscriptions, service lines, module metadata, and six AI workers each.
+
+Rationale: The local app could previously show only PD-H2 rehearsal firms after rehearsal smoke runs. Controlled pilot operation requires stable access to the intended pilot firms while keeping rehearsal/test workspaces clearly separate.
+
+Constraints: MT-H3 is local/private pilot data repair only. It does not delete existing rehearsal firms and does not authorize public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, pricing intelligence, autonomous award, autonomous regulated approval, or live payment movement.
+
+Evidence: `scripts/seed-multi-tenant-pilot-workspaces-local.mjs`; `scripts/smoke-mt-h3-pilot-workspace-seed.mjs`; `docs/10_post_freeze_technical_design/MT_H3_LOCAL_SEED_AND_PILOT_WORKSPACE_DATA_REPAIR_COMPLETION_v1.0.md`; `npm run check:mt:h3`.
+
+Follow-up: Proceed to MT-H4 - Frontend Workspace Shell Binding.
