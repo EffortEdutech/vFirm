@@ -1,4 +1,4 @@
-﻿import { spawn } from "node:child_process";
+import { spawn } from "node:child_process";
 
 const port = 3098;
 const baseUrl = `http://127.0.0.1:${port}`;
@@ -26,7 +26,7 @@ async function waitForPage() {
 
 try {
   const html = await waitForPage();
-  if (!html.includes("Solopreneur Firm Workspace")) throw new Error("Web shell title not found.");
+  if (!html.includes("workspaceShellTitle")) throw new Error("Dynamic workspace shell title marker not found.");
   const js = await (await fetch(`${baseUrl}/app.js`)).text();
   if (!js.includes("/api")) throw new Error("Web API base is not using same-origin /api proxy.");
   console.log("Web smoke test passed.");

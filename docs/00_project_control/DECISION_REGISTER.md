@@ -457,3 +457,15 @@ Constraints: MT-H3 is local/private pilot data repair only. It does not delete e
 Evidence: `scripts/seed-multi-tenant-pilot-workspaces-local.mjs`; `scripts/smoke-mt-h3-pilot-workspace-seed.mjs`; `docs/10_post_freeze_technical_design/MT_H3_LOCAL_SEED_AND_PILOT_WORKSPACE_DATA_REPAIR_COMPLETION_v1.0.md`; `npm run check:mt:h3`.
 
 Follow-up: Proceed to MT-H4 - Frontend Workspace Shell Binding.
+## ADR-049 - MT-H4 frontend workspace shell binding completed
+Date: 2026-09-02
+
+Decision: The web workspace shell must render from the selected firm's workspace profile and active subscription package, not from the original Formwork-only MVP copy.
+
+Rationale: The platform now supports at least two controlled pilot firms: Amanah Formwork Pilot Firm and NHL Global Solution. A static Formwork shell made the active firm selector misleading because the selected firm changed data scoping without changing visible workspace identity, subscription, or service context.
+
+Implementation: MT-H4 adds a frontend active workspace contract resolver, dynamic shell title/lede, active workspace card with tenant/firm/principal/type/subscription/services, dashboard subscription/service cards, profile-driven My Firm module cards, and a generalized Service Subscription / Delivery Pack page.
+
+Boundary: This decision does not approve public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, pricing intelligence, autonomous award, autonomous regulated approval, or live payment movement.
+
+Follow-up: MT-H5 must deepen module and worker runtime binding so each selected firm's available actions, forms, and worker defaults fully follow its subscription/profile.

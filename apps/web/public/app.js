@@ -254,17 +254,20 @@ function workflowStage(store) {
 
 function nextActionCards(store) {
   const actions = [];
+  const contract = activeWorkspaceContract(store);
+  const firmName = contract.firm?.name ?? "the selected firm";
+  const serviceSummary = workspaceServiceSummary(contract);
   if (!(store.tenants ?? []).length) actions.push(["Start", "Create a tenant from Workflow to establish the workspace boundary.", "workflow"]);
   else if (!(store.firms ?? []).length) actions.push(["Create Firm", "Create the Virtual Firm and principal actor.", "workflow"]);
-  else if (!(store.clients ?? []).length) actions.push(["Add Client", "Open the Clients tab and add the first client relationship.", "clients"]);
-  else if (!(store.intake_sessions ?? []).length) actions.push(["Run Intake", "Capture the Formwork front-door intake.", "intake"]);
+  else if (!(store.clients ?? []).length) actions.push(["Add Client", `Open the Clients tab and add the first client relationship for ${firmName}.`, "clients"]);
+  else if (!(store.intake_sessions ?? []).length) actions.push(["Run Intake", `Capture the first front-door intake for ${serviceSummary}.`, "intake"]);
   else if (!(store.proposals ?? []).length) actions.push(["Create Proposal", "Convert completed intake into a priced proposal.", "proposals"]);
   else if (!(store.proposals ?? []).some((proposal) => proposal.proposal_status === "APPROVED")) actions.push(["Approve Proposal", "Record explicit approval before acceptance.", "proposals"]);
   else if (!(store.projects ?? []).length) actions.push(["Open Project", "Accept the proposal and open delivery.", "proposals"]);
   else if (!(store.evidence_bundles ?? []).length) actions.push(["Capture Evidence", "Create the first evidence bundle from the project screen.", "projects"]);
   else if (!(store.invoices ?? []).length) actions.push(["Create Invoice", "Draft the first invoice against the opened project.", "projects"]);
   else actions.push(["Review Audit", "Review events, approvals, and audit records for traceability.", "audit"]);
-  actions.push(["Service Pack", "Formwork VF-SP-001 is the active MVP delivery pack.", "intake"]);
+  actions.push(["Service Subscription", `${contract.subscription?.package_code ?? "No package"}: ${serviceSummary}.`, "service-pack"]);
   return actions;
 }
 
@@ -280,24 +283,25 @@ function healthTone(status) {
 
 function renderReleaseBanner(store) {
   if (!releaseBanner) return;
+  const contract = activeWorkspaceContract(store);
   const backend = store._dashboard_summary?.health?.persistence?.backend ?? "unknown";
-  const boundary = store.commercial_launch_summary?.boundary ?? "no_live_payment_capture";
-  const firm = store._active_firm ?? latestRecord(store, "firms");
-  const tenant = store._active_tenant ?? (firm ? (store.tenants ?? []).find((item) => item.id === firm.tenant_id) : latestRecord(store, "tenants"));
-  releaseBanner.innerHTML = `<strong>Multi-tenant firm workspace</strong><span>${escapeHtml(firm?.name ?? "No active firm")} | Tenant: ${escapeHtml(tenant?.name ?? "-")} | Persistence: ${escapeHtml(backend)} | Commercial boundary: ${escapeHtml(boundary)}</span>`;
+  const boundary = store.commercial_launch_summary?.boundary ?? contract.subscription?.metadata?.commercial_boundary ?? "no_live_payment_capture";
+  releaseBanner.innerHTML = `<strong>${escapeHtml(contract.profile.workspace_classification ?? "PILOT")} workspace</strong><span>${escapeHtml(contract.firm?.name ?? "No active firm")} | Tenant: ${escapeHtml(contract.tenant?.name ?? "-")} | Subscription: ${escapeHtml(contract.subscription?.package_code ?? "Not bound")} | Persistence: ${escapeHtml(backend)} | Commercial boundary: ${escapeHtml(boundary)}</span>`;
 }
-
 function renderHealthCards(store) {
   if (!healthCards) return;
   const health = store._dashboard_summary?.health ?? {};
+  const contract = activeWorkspaceContract(store);
+  const activeServices = workspaceServiceSummary(contract);
   const cards = [
     ["API", health.api?.status ?? "UNKNOWN", health.api ? `${health.api.phase} on ${health.api.api_port}` : "Waiting for health check"],
     ["Database", health.persistence?.backend === "postgres" ? "ONLINE" : "DEV_FALLBACK", health.persistence?.backend === "postgres" ? "PostgreSQL relational mode" : "Local JSON fallback/dev mode"],
-    ["Service Pack", health.service_pack?.status ?? "UNKNOWN", `${health.service_pack?.code ?? "VF-SP-001"} / ${health.service_pack?.sku_status ?? "SKU unknown"}`],
+    ["Subscription", contract.subscription?.package_status ?? "UNBOUND", `${contract.subscription?.package_code ?? "No package"} / ${contract.subscription?.pricing_model ?? "No pricing model"}`],
+    ["Services", contract.serviceLines.length ? "ACTIVE" : "SETUP_REQUIRED", activeServices],
     ["Audit", health.audit?.status ?? "WAITING_FOR_ACTIVITY", `${health.audit?.events ?? 0} events / ${health.audit?.audit_events ?? 0} audit records`],
     ["Workflow", health.workflow?.status ?? workflowStage(store), `Next gate: ${health.workflow?.next_gate ?? nextActionCards(store)[0]?.[0] ?? "Review"}`]
   ];
-  healthCards.innerHTML = `<div class="section-kicker">Workspace health</div><div class="health-card-grid">${cards.map(([title, status, detail]) => `<article class="health-card ${healthTone(status)}"><span>${escapeHtml(title)}</span><strong>${escapeHtml(humanStatus(status))}</strong><small>${escapeHtml(detail)}</small></article>`).join("")}</div>`;
+  healthCards.innerHTML = `<div class="section-kicker">${escapeHtml(contract.firm?.name ?? "Workspace")} health</div><div class="health-card-grid">${cards.map(([title, status, detail]) => `<article class="health-card ${healthTone(status)}"><span>${escapeHtml(title)}</span><strong>${escapeHtml(humanStatus(status))}</strong><small>${escapeHtml(detail)}</small></article>`).join("")}</div>`;
 }
 function renderNextActions(store) {
   if (!nextActions) return;
@@ -435,6 +439,87 @@ function activePrincipalActor(store) {
   return firm ? latestPrincipalActor(store, firm.id) : null;
 }
 
+const workspaceModuleDefinitions = {
+  front_desk: { module_code: "front_desk", module_name: "Front Desk", default_view: "front-desk", worker_template_code: "front-desk-coordinator", outcome: "Capture and route enquiries without technical or commercial commitment." },
+  administration: { module_code: "administration", module_name: "Administration", default_view: "administration", worker_template_code: "administration-clerk", outcome: "Control records, correspondence, documents, and follow-ups." },
+  sales_accounts: { module_code: "sales_accounts", module_name: "Sales & Accounts", default_view: "sales-accounts", worker_template_code: "marketing-sales-coordinator", outcome: "Qualify leads, draft proposals, and support accounts without autonomous commitment." },
+  accounts: { module_code: "accounts", module_name: "Accounts", default_view: "sales-accounts", worker_template_code: "accounts-clerk", outcome: "Prepare invoices, receivables, and expense records for principal control." },
+  technical_delivery: { module_code: "technical_delivery", module_name: "Technical Delivery", default_view: "technical-delivery", worker_template_code: "technical-drawing-assistant", outcome: "Prepare drawing and delivery support; regulated approvals remain human." },
+  projects: { module_code: "projects", module_name: "Projects", default_view: "projects", worker_template_code: "project-coordination-assistant", outcome: "Coordinate tasks, evidence, and delivery status for the Virtual Principal." },
+  approvals: { module_code: "approvals", module_name: "Approvals", default_view: "approvals", worker_template_code: null, outcome: "Track explicit human approval gates and prevent silent approval." },
+  invoices: { module_code: "invoices", module_name: "Invoices", default_view: "invoices", worker_template_code: "accounts-clerk", outcome: "Prepare and monitor receivables without autonomous payment action." },
+  ai_workforce: { module_code: "ai_workforce", module_name: "AI Workforce", default_view: "ai-workforce", worker_template_code: null, outcome: "Show workers, authority envelopes, tools, and review boundaries." },
+  network: { module_code: "network", module_name: "Network", default_view: "network", worker_template_code: null, outcome: "Private trusted-network controls only; no public marketplace or live matching." },
+  ops: { module_code: "ops", module_name: "Ops", default_view: "ops", worker_template_code: "project-coordination-assistant", outcome: "Monitor daily priorities, exceptions, pilot readiness, and handoff actions." },
+  audit: { module_code: "audit", module_name: "Audit", default_view: "audit", worker_template_code: null, outcome: "Reconstruct material business and AI-worker actions from audit records." }
+};
+
+function activeSubscriptionPackage(store) {
+  const firm = store?._active_firm ?? activeFirmInStore(store);
+  if (!firm) return null;
+  const packages = (store?.subscription_packages ?? []).filter((item) => item.tenant_id === firm.tenant_id && item.firm_id === firm.id);
+  return packages.find((item) => item.package_status === "ACTIVE") ?? packages[packages.length - 1] ?? null;
+}
+
+function inferWorkspaceProfile(firm, subscription) {
+  const practices = firm?.active_practices ?? [];
+  if (practices.includes("organization_support") || practices.includes("bizkick_edcs") || subscription?.package_code === "VF-ORG-SUPPORT-PILOT") {
+    return {
+      firm_type: "ORGANIZATION_SUPPORT",
+      workspace_title: `${firm?.name ?? "Organization Support Firm"} Workspace`,
+      workspace_description: "Operate a virtual organization-support firm for project reporting, technical writing, clerical work, and documentation/control support.",
+      workspace_classification: "PILOT",
+      modules: ["front_desk", "administration", "sales_accounts", "projects", "invoices", "ai_workforce", "ops", "audit"],
+      worker_templates: ["front-desk-coordinator", "administration-clerk", "accounts-clerk", "marketing-sales-coordinator", "technical-drawing-assistant", "project-coordination-assistant"],
+      authority_boundaries: ["AI may prepare drafts, registers, reports, and document-control support only.", "Human principal approval is required before external sending or client commitment.", "No autonomous payment action."]
+    };
+  }
+  return {
+    firm_type: "FORMWORK_ENGINEERING",
+    workspace_title: firm?.name ? `${firm.name} Workspace` : "Formwork Engineering Virtual Firm Workspace",
+    workspace_description: "Operate controlled formwork engineering intake, proposals, delivery support, QA evidence, approvals, invoicing, and audit.",
+    workspace_classification: "PILOT",
+    modules: ["front_desk", "administration", "sales_accounts", "technical_delivery", "projects", "approvals", "invoices", "ai_workforce", "ops", "audit"],
+    worker_templates: ["front-desk-coordinator", "administration-clerk", "accounts-clerk", "marketing-sales-coordinator", "technical-drawing-assistant", "project-coordination-assistant"],
+    authority_boundaries: ["AI may prepare drafts and checks only.", "Regulated deliverables require valid human professional approval.", "No silent approval."]
+  };
+}
+
+function activeWorkspaceContract(store) {
+  const firm = store?._active_firm ?? activeFirmInStore(store);
+  const tenant = store?._active_tenant ?? (firm ? (store?.tenants ?? []).find((item) => item.id === firm.tenant_id) : latestRecord(store, "tenants"));
+  const principal = store?._active_actor ?? (firm ? latestPrincipalActor(store, firm.id) : null);
+  const subscription = activeSubscriptionPackage(store);
+  const profile = {
+    ...inferWorkspaceProfile(firm, subscription),
+    ...(firm?.metadata?.workspace_profile ?? {}),
+    ...(subscription?.metadata?.workspace_profile ?? {})
+  };
+  const serviceLines = subscription?.metadata?.service_lines ?? profile.service_lines ?? [];
+  const modules = (subscription?.metadata?.modules ?? profile.modules ?? []).map((code) => workspaceModuleDefinitions[code] ?? { module_code: code, module_name: humanStatus(code), default_view: "dashboard", worker_template_code: null, outcome: "Workspace module enabled by subscription profile." });
+  return { firm, tenant, principal, subscription, profile, serviceLines, modules };
+}
+
+function serviceLineLabel(line) {
+  return line?.service_name ?? humanStatus(line?.service_code ?? "service");
+}
+
+function renderWorkspaceShell(store) {
+  const shellTitle = document.querySelector("#workspaceShellTitle");
+  const shellLede = document.querySelector("#workspaceShellLede");
+  const contract = activeWorkspaceContract(store);
+  const title = contract.profile.workspace_title ?? (contract.firm ? `${contract.firm.name} Workspace` : "Virtual Firm Workspace");
+  const description = contract.profile.workspace_description ?? "Operate modular Virtual Firm Business Infrastructure for the selected firm.";
+  if (shellTitle) shellTitle.textContent = title;
+  if (shellLede) shellLede.textContent = description;
+  document.title = `${title} | vFirm`;
+}
+
+function workspaceServiceSummary(contract) {
+  const lines = contract.serviceLines.map(serviceLineLabel);
+  return lines.length ? lines.join(", ") : "No service lines bound yet";
+}
+
 function scopedStoreForActiveFirm(store) {
   const firm = ensureActiveFirm(store);
   const tenant = firm ? (store.tenants ?? []).find((item) => item.id === firm.tenant_id) : latestRecord(store, "tenants");
@@ -487,26 +572,26 @@ function renderActiveWorkspaceSelector(rawStore, scopedStore) {
   if (!activeWorkspace) return;
   const firms = rawStore?.firms ?? [];
   const tenants = rawStore?.tenants ?? [];
-  const activeFirm = scopedStore?._active_firm ?? activeFirmInStore(rawStore);
-  const activeTenant = scopedStore?._active_tenant ?? activeTenantInStore(rawStore);
+  const contract = activeWorkspaceContract(scopedStore ?? rawStore);
+  const activeFirm = contract.firm;
+  const activeTenant = contract.tenant;
   if (!firms.length) {
     activeWorkspace.innerHTML = `<div class="active-workspace-card"><span>No firm workspace yet</span><strong>Create a tenant and firm from Workflow.</strong></div>`;
     return;
   }
   const options = firms.map((firm) => {
     const tenant = tenants.find((item) => item.id === firm.tenant_id);
-    return `<option value="${escapeHtml(firm.id)}" ${firm.id === activeFirm?.id ? "selected" : ""}>${escapeHtml(firm.name)} â€” ${escapeHtml(tenant?.name ?? shortId(firm.tenant_id))}</option>`;
+    return `<option value="${escapeHtml(firm.id)}" ${firm.id === activeFirm?.id ? "selected" : ""}>${escapeHtml(firm.name)} — ${escapeHtml(tenant?.name ?? shortId(firm.tenant_id))}</option>`;
   }).join("");
-  activeWorkspace.innerHTML = `<form id="activeFirmForm" class="active-workspace-form"><label>Active firm workspace<select id="activeFirmSelect" name="firm_id">${options}</select></label><div class="active-workspace-card"><span>Tenant boundary</span><strong>${escapeHtml(activeTenant?.name ?? "-")}</strong><small>Firm: ${escapeHtml(activeFirm?.name ?? "-")} Â· Principal: ${escapeHtml(scopedStore?._active_actor?.display_name ?? "Not resolved")}</small></div></form>`;
+  activeWorkspace.innerHTML = `<form id="activeFirmForm" class="active-workspace-form"><label>Active firm workspace<select id="activeFirmSelect" name="firm_id">${options}</select></label><div class="active-workspace-card"><span>Tenant boundary</span><strong>${escapeHtml(activeTenant?.name ?? "-")}</strong><small>Firm: ${escapeHtml(activeFirm?.name ?? "-")} · Principal: ${escapeHtml(contract.principal?.display_name ?? contract.profile.principal_display_name ?? "Not resolved")}</small><small>Type: ${escapeHtml(contract.profile.firm_type ?? "UNCLASSIFIED")} · Subscription: ${escapeHtml(contract.subscription?.package_code ?? "Not bound")}</small><small>Services: ${escapeHtml(workspaceServiceSummary(contract))}</small></div></form>`;
   activeWorkspace.querySelector("#activeFirmSelect")?.addEventListener("change", (event) => {
     activeFirmId = event.currentTarget.value;
     localStorage.setItem(ACTIVE_FIRM_STORAGE_KEY, activeFirmId);
     clearCommandFeedback();
-    setCommandFeedback("success", "Active firm switched", "Workspace views are now scoped to the selected tenant and firm.");
+    setCommandFeedback("success", "Active firm switched", "Workspace shell, dashboard, modules, records, and service summary are now scoped to the selected firm.");
     renderAll();
   });
 }
-
 function renderFrontDeskModule(store) {
   const enquiries = store.front_desk_enquiries ?? [], drafts = store.client_communication_drafts ?? [];
   const tenant = latestRecord(store, "tenants"), firm = latestRecord(store, "firms"), actor = firm ? latestPrincipalActor(store, firm.id) : null;
@@ -747,15 +832,14 @@ function renderAuditModule(store) {
 }
 
 function renderServicePackModule(store) {
+  const contract = activeWorkspaceContract(store);
   const pack = formworkPack(store);
   const sku = formworkSku(store);
-  const requiredInputs = pack?.configuration?.required_inputs ?? [];
-  const requiredEvidence = formworkEvidenceRequirements(store);
-  const latestIntake = latestRecord(store, "intake_sessions");
-  const completeness = latestIntake ? intakeCompleteness(latestIntake) : [];
-  const projects = store.projects ?? [];
-  const evidence = store.evidence_bundles ?? [];
-  document.querySelector("#servicePackView").innerHTML = `<section class="grid two"><section class="panel"><div class="panel-heading"><h2>Formwork Service Pack VF-SP-001</h2><p>The first Practice Pack / Service Delivery Pack for the vFirm MVP.</p></div>${renderHumanDetail(pack?.name ?? "Formwork Engineering Preliminary Package", [["Code", pack?.code ?? "VF-SP-001"], ["Status", pack?.status ?? "Missing"], ["Discipline", pack?.discipline ?? "temporary_works_engineering"], ["SKU", sku?.code ?? "formwork_preliminary_wall_slab"], ["SKU status", sku?.status ?? "Missing"], ["Default price", money(sku?.pricing_model?.default_price ?? 2500, sku?.pricing_model?.currency ?? "MYR")]], { service_pack: pack, service_sku: sku })}</section><section class="panel"><div class="panel-heading"><h2>Required Inputs</h2><p>Information needed before Formwork intake can move safely into commercial/proposal workflow.</p></div><div class="checklist">${requiredInputs.map((item) => `<span>${escapeHtml(item)}</span>`).join("") || `<p class="empty">No required inputs configured.</p>`}</div><hr class="soft-divider" /><div class="panel-heading"><h2>Evidence Requirements</h2><p>Evidence expected for operator review and traceability.</p></div><div class="checklist evidence">${requiredEvidence.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</div></section></section><section class="grid two"><section class="panel"><div class="panel-heading"><h2>Latest Intake Completeness</h2><p>Checklist for the latest Formwork intake record.</p></div>${latestIntake ? `<div class="checklist status">${completeness.map(([key, ok]) => `<span class="${ok ? "ok" : "missing"}">${escapeHtml(key)}: ${ok ? "complete" : "missing"}</span>`).join("")}</div>` : `<p class="empty">No intake yet. Create a client and start Formwork intake.</p>`}</section><section class="panel"><div class="panel-heading"><h2>Delivery Pack Status</h2><p>How many opened projects have evidence bundles.</p></div>${renderRelatedContext("Delivery evidence", [["Projects", projects.length], ["Evidence bundles", evidence.length], ["Projects with evidence", countBy(projects, (project) => evidence.some((bundle) => bundle.project_id === project.id))], ["Projects needing evidence", countBy(projects, (project) => !evidence.some((bundle) => bundle.project_id === project.id))]])}</section></section>`;
+  const serviceRows = contract.serviceLines.length ? `<div class="record-table-wrap"><table class="record-table"><thead><tr><th>Service</th><th>Type</th><th>Status</th><th>Human approval</th><th>Regulated</th></tr></thead><tbody>${contract.serviceLines.map((line) => `<tr><td>${escapeHtml(serviceLineLabel(line))}<br/><small>${escapeHtml(line.service_code ?? "-")}</small></td><td>${escapeHtml(line.service_type ?? "-")}</td><td><span class="pill">${escapeHtml(line.status ?? "UNKNOWN")}</span></td><td>${escapeHtml(line.requires_human_approval ? "Required" : "Not marked")}</td><td>${escapeHtml(line.regulated_work ? "Yes" : "No")}</td></tr>`).join("")}</tbody></table></div>` : `<p class="empty">No service lines are bound to ${escapeHtml(contract.firm?.name ?? "this firm")} yet.</p>`;
+  const moduleList = contract.modules.map((module) => module.module_name);
+  const authority = contract.profile.authority_boundaries ?? ["Workers assist and prepare only.", "Human authority remains explicit."];
+  const formworkDetail = contract.profile.firm_type === "FORMWORK_ENGINEERING" ? `<hr class="soft-divider" /><div class="panel-heading"><h2>Formwork Practice Pack Detail</h2><p>Technical Formwork context remains available for Formwork Engineering workspaces only.</p></div>${renderHumanDetail(pack?.name ?? "Formwork Engineering Preliminary Package", [["Code", pack?.code ?? "VF-SP-001"], ["Status", pack?.status ?? "Missing"], ["Discipline", pack?.discipline ?? "temporary_works_engineering"], ["SKU", sku?.code ?? "formwork_preliminary_wall_slab"], ["SKU status", sku?.status ?? "Missing"], ["Default price", money(sku?.pricing_model?.default_price ?? 2500, sku?.pricing_model?.currency ?? "MYR")]], { service_pack: pack, service_sku: sku })}` : "";
+  document.querySelector("#servicePackView").innerHTML = `<section class="grid two"><section class="panel"><div class="panel-heading"><h2>Service Subscription / Delivery Pack</h2><p>${escapeHtml(contract.profile.workspace_description ?? "Selected firm service subscription.")}</p></div>${renderRelatedContext("Active subscription", [["Firm", contract.firm?.name ?? "No firm selected"], ["Package", contract.subscription?.package_name ?? "Not bound"], ["Code", contract.subscription?.package_code ?? "Not bound"], ["Status", contract.subscription?.package_status ?? "UNBOUND"], ["Pricing model", contract.subscription?.pricing_model ?? "Not configured"], ["Services", workspaceServiceSummary(contract)]])}${formworkDetail}</section><section class="panel"><div class="panel-heading"><h2>Subscribed Modules and Boundaries</h2><p>Modules are enabled by the selected firm's workspace profile; workers do not gain professional authority from capability alone.</p></div><div class="checklist">${moduleList.map((item) => `<span>${escapeHtml(item)}</span>`).join("") || `<span>No modules bound.</span>`}</div><hr class="soft-divider" /><div class="panel-heading"><h2>Authority Boundaries</h2><p>Runtime controls shown to operators before service delivery.</p></div><div class="checklist warning">${authority.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</div></section></section><section class="panel"><div class="panel-heading"><h2>Subscribed Service Lines</h2><p>These are the services currently visible for ${escapeHtml(contract.firm?.name ?? "the active firm")}.</p></div>${serviceRows}</section>`;
 }
 function renderInvoiceModule(store) {
   const invoices = store.invoices ?? [];
@@ -999,32 +1083,28 @@ function renderCommercialLaunchModule(store) {
 function renderMyFirmModule(store) {
   const host = document.querySelector("#myFirmView");
   if (!host) return;
-  const latestFirm = latestRecord(store, "firms");
-  const latestTenant = latestFirm ? store.tenants?.find((tenant) => tenant.id === latestFirm.tenant_id) : latestRecord(store, "tenants");
-  const principalActor = latestFirm ? latestPrincipalActor(store, latestFirm.id) : null;
-  const modules = [
-    ["Front Desk", "front-desk-coordinator", "Capture and route enquiries without technical or commercial commitment.", "clients"],
-    ["Administration", "administration-clerk", "Control records, correspondence, documents, and follow-ups.", "projects"],
-    ["Accounts", "accounts-clerk", "Prepare invoices, receivables, and expense records for principal control.", "sales-accounts"],
-    ["Marketing & Sales", "marketing-sales-coordinator", "Qualify leads and draft proposals without autonomous commitment.", "sales-accounts"],
-    ["Technical Drawing Support", "technical-drawing-assistant", "Check drawing inputs and revisions; professional approval remains human.", "technical-delivery"],
-    ["Project Coordination", "project-coordination-assistant", "Coordinate tasks, evidence, and delivery status for the Virtual Principal.", "projects"]
-  ];
+  const contract = activeWorkspaceContract(store);
+  const latestFirm = contract.firm;
+  const latestTenant = contract.tenant;
+  const principalActor = contract.principal;
   const templates = store.worker_templates ?? [];
   const workers = (store.worker_instances ?? []).filter((worker) => worker.firm_id === latestFirm?.id);
-  const cards = modules.map(([name, code, outcome, view]) => {
-    const template = templates.find((item) => item.code === code);
-    const worker = workers.find((item) => item.worker_template_id === template?.id);
-    const status = worker?.runtime_status ?? (template ? "AVAILABLE" : "NOT_CONFIGURED");
-    return `<article class="detail-card"><span class="pill">${escapeHtml(humanStatus(status))}</span><h3>${escapeHtml(name)}</h3><p>${escapeHtml(outcome)}</p><small>${worker ? escapeHtml(worker.name) : "No worker provisioned"}</small><div class="button-row">${!worker && template && latestFirm ? `<button type="button" data-provision-module="${escapeHtml(code)}">Add worker</button>` : ""}<button type="button" class="secondary" data-action-view="${escapeHtml(view)}">Open work area</button></div></article>`;
+  const modules = contract.modules.length ? contract.modules : Object.values(workspaceModuleDefinitions);
+  const cards = modules.map((module) => {
+    const template = module.worker_template_code ? templates.find((item) => item.code === module.worker_template_code) : null;
+    const worker = template ? workers.find((item) => item.worker_template_id === template.id) : null;
+    const status = worker?.runtime_status ?? (template ? "AVAILABLE" : "ENABLED");
+    return `<article class="detail-card"><span class="pill">${escapeHtml(humanStatus(status))}</span><h3>${escapeHtml(module.module_name)}</h3><p>${escapeHtml(module.outcome)}</p><small>${worker ? escapeHtml(worker.name) : template ? "No worker provisioned" : "Governance/module view"}</small><div class="button-row">${!worker && template && latestFirm ? `<button type="button" data-provision-module="${escapeHtml(template.code)}">Add worker</button>` : ""}<button type="button" class="secondary" data-action-view="${escapeHtml(module.default_view)}">Open work area</button></div></article>`;
   }).join("");
-  const ready = modules.filter(([, code]) => { const template = templates.find((item) => item.code === code); return workers.some((item) => item.worker_template_id === template?.id && item.runtime_status === "ACTIVE"); }).length;
-  host.innerHTML = `<section class="panel"><div class="panel-heading"><h2>${escapeHtml(latestFirm?.name ?? "Your first Virtual Firm")}</h2><p>Solopreneur operating modules supporting the Virtual Principal. Workers assist and prepare; the human principal retains professional and commercial authority.</p></div>${renderRelatedContext("Firm readiness", [["Virtual Principal", principalActor?.display_name ?? "Create firm first"], ["Modules", modules.length], ["Active modules", ready], ["Available worker templates", templates.length], ["Open approvals", countBy(store.approvals, (item) => item.decision === "PENDING")], ["Open projects", countBy(store.projects, (item) => item.project_state !== "CLOSED")]])}</section><section class="panel"><div class="panel-heading"><h2>Modular Virtual Workforce</h2><p>Start small and activate only the support the firm needs.</p></div><div class="action-grid">${cards}</div></section>`;
+  const activeTemplateCodes = new Set(modules.map((module) => module.worker_template_code).filter(Boolean));
+  const ready = workers.filter((worker) => {
+    const template = templates.find((item) => item.id === worker.worker_template_id);
+    return worker.runtime_status === "ACTIVE" && activeTemplateCodes.has(template?.code);
+  }).length;
+  host.innerHTML = `<section class="panel"><div class="panel-heading"><h2>${escapeHtml(latestFirm?.name ?? "Your first Virtual Firm")}</h2><p>${escapeHtml(contract.profile.workspace_description ?? "Selected firm workspace profile.")}</p></div>${renderRelatedContext("Workspace contract", [["Virtual Principal", principalActor?.display_name ?? contract.profile.principal_display_name ?? "Create firm first"], ["Firm type", contract.profile.firm_type ?? "UNCLASSIFIED"], ["Subscription", contract.subscription?.package_code ?? "Not bound"], ["Services", workspaceServiceSummary(contract)], ["Modules", modules.length], ["Active workers", ready], ["Authority", (contract.profile.authority_boundaries ?? ["Human authority remains explicit."]).join(" | ")]])}</section><section class="panel"><div class="panel-heading"><h2>Modular Virtual Workforce</h2><p>Modules and workers are driven by the selected firm's subscription/profile.</p></div><div class="action-grid">${cards}</div></section>`;
   host.querySelectorAll("button[data-action-view]").forEach((button) => button.addEventListener("click", () => switchView(button.dataset.actionView)));
   host.querySelectorAll("button[data-provision-module]").forEach((button) => button.addEventListener("click", async () => { const code = button.dataset.provisionModule; const template = templates.find((item) => item.code === code); await runUiCommand({ label: `Add ${template.name}`, button, success: `${template.name} provisioned`, action: async () => { const data = await request("/worker-instances", { method: "POST", body: JSON.stringify({ tenant_id: latestTenant.id, firm_id: latestFirm.id, worker_template_code: code, name: template.name, actor: principalActor ?? systemActorForBrowser(latestTenant.id, latestFirm.id) }) }); await refresh(); switchView("my-firm"); return data; } }); }));
 }
-
-
 function renderSalesAccountsModule(store){
   const tenant=latestRecord(store,"tenants"),firm=latestRecord(store,"firms"),actor=firm?latestPrincipalActor(store,firm.id):null,auth=actor??systemActorForBrowser(tenant?.id,firm?.id);
   const opportunities=store.sales_pipeline_records??[],proposals=store.proposals??[],expenses=store.expense_records??[],invoices=store.invoices??[],followUps=store.receivable_follow_ups??[],bindings=store.commercial_skill_bindings??[];
@@ -1100,6 +1180,7 @@ function renderAll() {
   renderState();
   if (lastStore) {
     const scopedStore = scopedStoreForActiveFirm(lastStore);
+    renderWorkspaceShell(scopedStore);
     renderActiveWorkspaceSelector(lastStore, scopedStore);
     renderSummary(scopedStore);
     renderLatestActivity(scopedStore);

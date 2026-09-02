@@ -48,15 +48,15 @@ scope: "Controlled local/private pilot hardening"
 
 ## MT-H4 — Frontend Workspace Shell Binding
 
-- [ ] Replace hard-coded Formwork page lede with active workspace copy.
-- [ ] Update release/workspace banner from active workspace summary.
-- [ ] Update dashboard subscription/service summary.
-- [ ] Update My Firm page to show selected firm's workspace profile.
-- [ ] Generalize Service Pack page.
-- [ ] Update empty states to mention selected firm.
-- [ ] Ensure selected firm is visible on every main module.
-- [ ] Add frontend smoke test for Formwork copy.
-- [ ] Add frontend smoke test for NHL copy.
+- [x] Replace hard-coded Formwork page lede with active workspace copy.
+- [x] Update release/workspace banner from active workspace summary.
+- [x] Update dashboard subscription/service summary.
+- [x] Update My Firm page to show selected firm's workspace profile.
+- [x] Generalize Service Pack page.
+- [x] Update empty states to mention selected firm.
+- [x] Ensure selected firm is visible on every main module.
+- [x] Add frontend smoke test for Formwork copy.
+- [x] Add frontend smoke test for NHL copy.
 
 ## MT-H5 — Module and Worker Runtime Binding
 

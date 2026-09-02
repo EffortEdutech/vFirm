@@ -264,3 +264,4 @@ The MT sprint plan and checklist govern the next bounded hardening pass for sele
 | `MT_H2_BACKEND_ACTIVE_WORKSPACE_SUMMARY_COMPLETION_v1.0.md` | Completion evidence for backend selected tenant/firm active workspace summary, subscription/service resolution, rehearsal classification, and cross-tenant denial. |
 
 | `MT_H3_LOCAL_SEED_AND_PILOT_WORKSPACE_DATA_REPAIR_COMPLETION_v1.0.md` | Completion evidence for combined local pilot seed preserving/creating Formwork and NHL workspaces with subscriptions, services, workers, and rehearsal-data classification. |
+| `MT_H4_FRONTEND_WORKSPACE_SHELL_BINDING_COMPLETION_v1.0.md` | Completion evidence for selected-firm workspace shell binding, dynamic title/lede, active subscription/service summary, profile-driven My Firm modules, and generalized Service Subscription / Delivery Pack UI. |

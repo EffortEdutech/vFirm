@@ -1,4 +1,4 @@
-﻿import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
@@ -38,7 +38,7 @@ try {
   const health = await waitForJson(`${webBase}/api/health`);
   if (!health.ok || health.service !== "vfirm-api") throw new Error("Web /api proxy did not return API health.");
   const page = await (await fetch(webBase)).text();
-  if (!page.includes("Solopreneur Firm Workspace")) throw new Error("Web page did not load.");
+  if (!page.includes("workspaceShellTitle")) throw new Error("Web page did not load dynamic workspace shell.");
   if (!page.includes("Guided MVP Workflow")) throw new Error("Guided workflow UI not found.");
   const js = await (await fetch(`${webBase}/app.js`)).text();
   if (!js.includes("const health = await res.json()")) throw new Error("Web health check is not using raw health response.");
