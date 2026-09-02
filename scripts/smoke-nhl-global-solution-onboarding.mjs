@@ -78,15 +78,15 @@ try {
     assert(templateCodes.has(code), `Missing worker template for NHL onboarding: ${code}`);
   }
 
-  const tenant = await post("/tenants", { name: "NHL Global Solutions Controlled Onboarding Tenant" });
+  const tenant = await post("/tenants", { name: "NHL Global Solution Controlled Onboarding Tenant" });
   const firmResult = await post("/firms", {
     tenant_id: tenant.id,
-    name: "NHL Global Solutions",
+    name: "NHL Global Solution",
     principal_name: "Nur Hernieliana"
   });
   const headers = authHeaders(firmResult);
 
-  assert.equal(firmResult.firm.name, "NHL Global Solutions");
+  assert.equal(firmResult.firm.name, "NHL Global Solution");
   assert.equal(firmResult.principal_actor.display_name, "Nur Hernieliana");
 
   const workerPlan = [
@@ -149,7 +149,7 @@ try {
     tenant_id: tenant.id,
     firm_id: firmResult.firm.id,
     enquiry_id: enquiry.id,
-    subject: "NHL Global Solutions enquiry acknowledgement",
+    subject: "NHL Global Solution enquiry acknowledgement",
     message_body: "Thank you for your enquiry. Nur Hernieliana will review the scope before any commitment is made."
   }, headers);
   assert.equal(draft.status, "DRAFT_REVIEW_REQUIRED");
@@ -348,7 +348,7 @@ try {
     firm_id: firmResult.firm.id,
     project_id: accepted.project.id,
     relationship_id: handoff.relationship.id,
-    title: "NHL Global Solutions EDCS onboarding delivery report"
+    title: "NHL Global Solution EDCS onboarding delivery report"
   }, headers);
   const evidenceBundle = await post("/evidence-bundles", {
     tenant_id: tenant.id,
@@ -401,7 +401,7 @@ try {
     relationship_id: handoff.relationship.id,
     engagement_id: accepted.engagement.id,
     project_id: accepted.project.id,
-    line_items: [{ description: "NHL Global Solutions virtual service onboarding package", amount: 3500 }],
+    line_items: [{ description: "NHL Global Solution virtual service onboarding package", amount: 3500 }],
     currency: "MYR",
     actor: firmResult.principal_actor
   }, headers);
@@ -451,7 +451,7 @@ try {
   assert(isolated.response.status >= 400, "Cross-tenant operations read should be denied.");
 
   console.log(JSON.stringify({
-    smoke: "nhl-global-solutions-onboarding",
+    smoke: "nhl-global-solution-onboarding",
     result: "passed",
     firm: firmResult.firm.name,
     owner: firmResult.principal_actor.display_name,

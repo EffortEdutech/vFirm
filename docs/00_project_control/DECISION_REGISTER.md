@@ -375,16 +375,16 @@ Constraints: This decision does not authorize PD-H7 implementation by itself and
 Evidence: `npm run check:pd:h6`; `docs/10_post_freeze_technical_design/PD_H6_PRIVATE_DIRECTORY_PILOT_LEARNING_BACKLOG_AND_NEXT_SCOPE_DECISION_v1.0.md`.
 
 Follow-up: Product owner should choose the next scope option: continue private directory pilot hardening, run a real controlled human pilot day first, hold for named blockers, or prepare a separate marketplace-widening decision gate for discussion only.
-## ADR-043 - NHL Global Solutions controlled onboarding rehearsal completed
+## ADR-043 - NHL Global Solution controlled onboarding rehearsal completed
 
 Date: 2026-09-02
 
-Decision: NHL Global Solutions onboarding rehearsal is completed as controlled local test evidence for a solopreneur virtual-service firm owned by Nur Hernieliana.
+Decision: NHL Global Solution onboarding rehearsal is completed as controlled local test evidence for a solopreneur virtual-service firm owned by Nur Hernieliana.
 
 Rationale: The rehearsal proves the current Virtual Firm Platform can model a non-Formwork virtual-service firm profile covering project reporting, technical writing, clerical work, and BizKick EDCS. It provisions six bounded AI workers, progresses a client enquiry through qualification, intake, proposal approval, dispatch, acceptance, project work, EDCS document control, AI-drafted project reporting output requiring human review, controlled delivery/evidence/review/issue, invoice issue, receivable follow-up draft, operations summary, audit reconstruction, export counts, and tenant-isolation denial.
 
 Constraints: This decision does not create a legal company registration, production tenant activation, external email sending, live payment movement, public marketplace listing, live matching, ranking, capacity allocation, VF-24 observatory publication, pricing intelligence, autonomous award, autonomous regulated approval, or uncontrolled tenant/client data sharing.
 
-Evidence: `npm run check:onboarding:nhl`; `docs/10_post_freeze_technical_design/NHL_GLOBAL_SOLUTIONS_ONBOARDING_REHEARSAL_RESULT_v1.0.md`; `scripts/smoke-nhl-global-solutions-onboarding.mjs`.
+Evidence: `npm run check:onboarding:nhl`; `docs/10_post_freeze_technical_design/NHL_GLOBAL_SOLUTION_ONBOARDING_REHEARSAL_RESULT_v1.0.md`; `scripts/smoke-nhl-global-solution-onboarding.mjs`.
 
-Follow-up: If NHL Global Solutions is intended to become a real pilot firm, prepare a controlled pilot setup checklist covering owner confirmation, service package names, document templates, data handling, worker authority envelopes, approval rules, pilot success criteria, export/backup routine, and incident path.
+Follow-up: If NHL Global Solution is intended to become a real pilot firm, prepare a controlled pilot setup checklist covering owner confirmation, service package names, document templates, data handling, worker authority envelopes, approval rules, pilot success criteria, export/backup routine, and incident path.

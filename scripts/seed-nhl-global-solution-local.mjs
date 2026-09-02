@@ -38,10 +38,10 @@ async function main() {
   if (!health.response.ok || !health.json.ok) throw new Error(`vFirm API is not healthy at ${base}`);
 
   const existingStore = await readStore();
-  const existingFirm = existingStore.firms?.find((firm) => firm.name === "NHL Global Solutions");
+  const existingFirm = existingStore.firms?.find((firm) => firm.name === "NHL Global Solution");
   if (existingFirm) {
     console.log(JSON.stringify({
-      seed: "nhl-global-solutions-local",
+      seed: "nhl-global-solution-local",
       result: "already_present",
       firm: existingFirm.name,
       firm_id: existingFirm.id,
@@ -63,10 +63,10 @@ async function main() {
   const templateCodes = new Set(templates.map((template) => template.code));
   for (const code of requiredTemplateCodes) assert(templateCodes.has(code), `Missing worker template: ${code}`);
 
-  const tenant = await post("/tenants", { name: "NHL Global Solutions Tenant" });
+  const tenant = await post("/tenants", { name: "NHL Global Solution Tenant" });
   const firmResult = await post("/firms", {
     tenant_id: tenant.id,
-    name: "NHL Global Solutions",
+    name: "NHL Global Solution",
     principal_name: "Nur Hernieliana"
   });
   const headers = authHeaders(firmResult);
@@ -134,8 +134,8 @@ async function main() {
     tenant_id: tenant.id,
     firm_id: firmResult.firm.id,
     enquiry_id: enquiry.id,
-    subject: "NHL Global Solutions acknowledgement draft",
-    message_body: "Thank you for your enquiry. NHL Global Solutions can prepare project reporting, technical writing, clerical support, and BizKick EDCS setup drafts for human review.",
+    subject: "NHL Global Solution acknowledgement draft",
+    message_body: "Thank you for your enquiry. NHL Global Solution can prepare project reporting, technical writing, clerical support, and BizKick EDCS setup drafts for human review.",
     actor: firmResult.principal_actor
   }, headers);
 
@@ -178,7 +178,7 @@ async function main() {
     firm_id: firmResult.firm.id,
     relationship_id: handoff.relationship.id,
     intake_session_id: intake.intake.id,
-    scope_summary: "NHL Global Solutions virtual support package: project reporting, technical writing, clerical work, and BizKick EDCS setup.",
+    scope_summary: "NHL Global Solution virtual support package: project reporting, technical writing, clerical work, and BizKick EDCS setup.",
     final_price: 3500,
     currency: "MYR",
     actor: firmResult.principal_actor
@@ -238,7 +238,7 @@ async function main() {
     actor: firmResult.principal_actor
   }, headers);
 
-  const deliverableDraft = await post("/deliverables/draft", { tenant_id: tenant.id, firm_id: firmResult.firm.id, project_id: accepted.project.id, relationship_id: handoff.relationship.id, title: "NHL Global Solutions EDCS local delivery report", actor: firmResult.principal_actor }, headers);
+  const deliverableDraft = await post("/deliverables/draft", { tenant_id: tenant.id, firm_id: firmResult.firm.id, project_id: accepted.project.id, relationship_id: handoff.relationship.id, title: "NHL Global Solution EDCS local delivery report", actor: firmResult.principal_actor }, headers);
   const evidenceBundle = await post("/evidence-bundles", {
     tenant_id: tenant.id,
     firm_id: firmResult.firm.id,
@@ -251,12 +251,12 @@ async function main() {
   const review = await post("/deliverables/review", { tenant_id: tenant.id, firm_id: firmResult.firm.id, project_id: accepted.project.id, document_version_id: deliverableDraft.document_version.id, evidence_bundle_id: evidenceBundle.id, actor: firmResult.principal_actor }, headers);
   await post("/deliverables/issue", { tenant_id: tenant.id, firm_id: firmResult.firm.id, project_id: accepted.project.id, document_version_id: deliverableDraft.document_version.id, evidence_bundle_id: evidenceBundle.id, approval_id: review.approval.id, subject_version_or_hash: deliverableDraft.document_version.hash, actor: firmResult.principal_actor }, headers);
 
-  const invoice = await post("/invoices", { tenant_id: tenant.id, firm_id: firmResult.firm.id, relationship_id: handoff.relationship.id, engagement_id: accepted.engagement.id, project_id: accepted.project.id, line_items: [{ description: "NHL Global Solutions virtual service starter package", amount: 3500 }], currency: "MYR", actor: firmResult.principal_actor }, headers);
+  const invoice = await post("/invoices", { tenant_id: tenant.id, firm_id: firmResult.firm.id, relationship_id: handoff.relationship.id, engagement_id: accepted.engagement.id, project_id: accepted.project.id, line_items: [{ description: "NHL Global Solution virtual service starter package", amount: 3500 }], currency: "MYR", actor: firmResult.principal_actor }, headers);
   await post("/invoices/issue", { tenant_id: tenant.id, firm_id: firmResult.firm.id, invoice_id: invoice.id, actor: firmResult.principal_actor }, headers);
   await post("/accounts/receivable-follow-ups", { tenant_id: tenant.id, firm_id: firmResult.firm.id, invoice_id: invoice.id, subject: "NHL receivable follow-up draft", message_body: "Draft only. Human review required before sending.", actor: firmResult.principal_actor }, headers);
 
   console.log(JSON.stringify({
-    seed: "nhl-global-solutions-local",
+    seed: "nhl-global-solution-local",
     result: "created",
     firm: firmResult.firm.name,
     owner: firmResult.principal_actor.display_name,

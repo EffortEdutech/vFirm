@@ -1,17 +1,17 @@
 ---
 id: NHL-GLOBAL-SOLUTIONS-ONBOARDING-REHEARSAL-RESULT
-title: "NHL Global Solutions Onboarding Rehearsal Result"
+title: "NHL Global Solution Onboarding Rehearsal Result"
 version: "1.0"
 status: "Completed Test Evidence"
 source_status: "CREATED AFTER ARCHITECTURE BASELINE V1.0 FREEZE"
 created: "2026-09-02"
 ---
 
-# NHL Global Solutions Onboarding Rehearsal Result v1.0
+# NHL Global Solution Onboarding Rehearsal Result v1.0
 
 ## 1. Rehearsal purpose
 
-This document records a controlled local onboarding rehearsal for NHL Global Solutions as a Virtual Firm Platform tenant/firm setup.
+This document records a controlled local onboarding rehearsal for NHL Global Solution as a Virtual Firm Platform tenant/firm setup.
 
 The rehearsal does not create a legal company registration, production tenant, external account, public marketplace listing, or live client commitment. It tests whether the current vFirm implementation can model the firm, owner, AI workers, service enquiry, workflow, audit, and export evidence safely.
 
@@ -19,7 +19,7 @@ The rehearsal does not create a legal company registration, production tenant, e
 
 | Field | Value |
 |---|---|
-| Firm name | NHL Global Solutions |
+| Firm name | NHL Global Solution |
 | Owner / Virtual Principal | Nur Hernieliana |
 | Service profile | Virtual services for project reporting, technical writing, clerical work, and BizKick EDCS |
 | Operating mode | Controlled local onboarding rehearsal |
@@ -43,7 +43,7 @@ The rehearsal provisions and activates six AI workers:
 The rehearsal covers:
 
 1. tenant creation;
-2. firm creation for NHL Global Solutions;
+2. firm creation for NHL Global Solution;
 3. owner/principal actor creation for Nur Hernieliana;
 4. six AI worker instances provisioned and activated;
 5. client record creation;
@@ -88,7 +88,7 @@ Result:
 PASSED
 ```
 
-NHL Global Solutions can be represented in the current Virtual Firm Platform as a controlled solopreneur virtual-service firm with AI workers assisting day-to-day operations under human authority. The executable rehearsal also proves the invoice can only progress into receivable monitoring after the controlled delivery/evidence/review/issue path has completed.
+NHL Global Solution can be represented in the current Virtual Firm Platform as a controlled solopreneur virtual-service firm with AI workers assisting day-to-day operations under human authority. The executable rehearsal also proves the invoice can only progress into receivable monitoring after the controlled delivery/evidence/review/issue path has completed.
 
 ## 8. Remaining limitations
 
@@ -110,7 +110,7 @@ This onboarding rehearsal does not authorize:
 
 ## 9. Recommended next step
 
-If NHL Global Solutions is intended to become a real pilot firm, the next step should be a controlled pilot setup checklist with:
+If NHL Global Solution is intended to become a real pilot firm, the next step should be a controlled pilot setup checklist with:
 
 - real owner confirmation;
 - selected services and package names;
