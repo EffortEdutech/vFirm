@@ -250,3 +250,10 @@ After Stage 20, the governing sprint plan is `VFIRM_RELEASE_1_PRODUCT_TARGET_AND
 | `ME_S4_SQL_PERSISTENCE_HARDENING_COMPLETION_v1.0.md` | Completion evidence for ME-S4 SQL persistence hardening of ME-S2/ME-S3 private directory records and Postgres smoke gate. |
 | `NHL_GLOBAL_SOLUTION_ONBOARDING_REHEARSAL_RESULT_v1.0.md` | Controlled local onboarding rehearsal evidence for NHL Global Solution, owned by Nur Hernieliana, covering virtual services, six AI workers, day-to-day workflow, approvals, receivables, auditability, export, and negative controls. |
 | `MULTI_TENANT_WORKSPACE_POLISH_RESULT_v1.0.md` | Completion evidence for active tenant/firm workspace selector, selected-firm scoping, NHL/Formwork coexistence, and multi-tenant UI smoke gate. |
+
+| MT_MULTI_TENANT_WORKSPACE_RUNTIME_BINDING_SPRINT_PLAN_v1.0.md | Governing sprint plan for turning multi-firm selection into true subscribed firm workspace runtime binding across backend, seed data, frontend shell, modules, workers, and evidence. |
+| MT_MULTI_TENANT_WORKSPACE_RUNTIME_BINDING_CHECKLIST_v1.0.md | Execution checklist for MT-H1 through MT-H6 multi-tenant workspace runtime binding hardening. |
+
+## Multi-tenant workspace runtime binding
+
+The MT sprint plan and checklist govern the next bounded hardening pass for selected firm workspaces, subscriptions, services, modules, workers, seed data, and scoped evidence.

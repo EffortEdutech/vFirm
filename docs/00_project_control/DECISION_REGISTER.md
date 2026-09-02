@@ -401,3 +401,17 @@ Constraints: This polish does not replace backend tenant isolation controls and 
 Evidence: `npm run check:web:multitenant`; `npm run check:web:navigation`; `npm run check:onboarding:nhl`; `docs/10_post_freeze_technical_design/MULTI_TENANT_WORKSPACE_POLISH_RESULT_v1.0.md`.
 
 Follow-up: Add backend active-workspace context endpoints, query-parameter scoped summaries, browser regression testing, and firm-type-specific UI labels in the next hardening pass.
+
+## ADR-045 - Multi-tenant workspace runtime binding plan created
+
+Date: 2026-09-02
+
+Decision: The next bounded hardening effort is the MT multi-tenant workspace runtime binding plan, sequenced as MT-H1 through MT-H6.
+
+Rationale: The current UI selector is insufficient because the selected firm must load the correct workspace identity, subscription package, service lines, modules, workers, records, copy, operating boundaries, and audit context. The immediate driver is the coexistence of the Formwork pilot firm, NHL Global Solution, and private-directory rehearsal firms in local controlled pilot development.
+
+Constraints: This plan remains controlled local/private pilot hardening. It does not authorize public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, pricing intelligence, autonomous award, autonomous regulated approval, or live payment movement.
+
+Evidence: docs/10_post_freeze_technical_design/MT_MULTI_TENANT_WORKSPACE_RUNTIME_BINDING_SPRINT_PLAN_v1.0.md; docs/10_post_freeze_technical_design/MT_MULTI_TENANT_WORKSPACE_RUNTIME_BINDING_CHECKLIST_v1.0.md.
+
+Follow-up: Begin MT-H1 only after product-owner acceptance of the full MT sprint plan and checklist.
