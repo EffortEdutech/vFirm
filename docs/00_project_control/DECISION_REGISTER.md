@@ -415,3 +415,17 @@ Constraints: This plan remains controlled local/private pilot hardening. It does
 Evidence: docs/10_post_freeze_technical_design/MT_MULTI_TENANT_WORKSPACE_RUNTIME_BINDING_SPRINT_PLAN_v1.0.md; docs/10_post_freeze_technical_design/MT_MULTI_TENANT_WORKSPACE_RUNTIME_BINDING_CHECKLIST_v1.0.md.
 
 Follow-up: Begin MT-H1 only after product-owner acceptance of the full MT sprint plan and checklist.
+
+## ADR-046 - MT-H1 workspace profile and subscription contract locked
+
+Date: 2026-09-02
+
+Decision: MT-H1 is complete. The Virtual Firm Platform now has a locked contract for resolving a selected firm into its workspace profile, subscription package, service lines, modules, worker bindings, authority boundaries, record scope, and audit requirements.
+
+Rationale: The active firm selector alone is insufficient. Formwork and NHL Global Solution require different workspace identities, subscriptions, services, module behavior, worker defaults, and UI copy. Rehearsal firms also need clear classification so they do not replace pilot firms.
+
+Constraints: MT-H1 is a contract/documentation and smoke-gate sprint only. It does not implement public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, pricing intelligence, autonomous award, autonomous regulated approval, or live payment movement.
+
+Evidence: `docs/10_post_freeze_technical_design/MT_H1_WORKSPACE_PROFILE_AND_SUBSCRIPTION_CONTRACT_LOCK_v1.0.md`; `docs/10_post_freeze_technical_design/MT_H1_WORKSPACE_PROFILE_AND_SUBSCRIPTION_CONTRACT_LOCK_COMPLETION_v1.0.md`; `scripts/smoke-mt-h1-workspace-profile-contract.mjs`; `npm run check:mt:h1`.
+
+Follow-up: Proceed to MT-H2 - Backend Active Workspace Summary.

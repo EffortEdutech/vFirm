@@ -10,16 +10,16 @@ scope: "Controlled local/private pilot hardening"
 
 ## MT-H1 — Workspace Profile and Subscription Contract Lock
 
-- [ ] Define firm workspace profile fields.
-- [ ] Define firm type vocabulary.
-- [ ] Define subscription package to workspace behavior mapping.
-- [ ] Define service-line mapping.
-- [ ] Define module catalogue mapping.
-- [ ] Define worker-template mapping.
-- [ ] Define rehearsal/test workspace classification.
-- [ ] Define selected-firm active workspace summary response.
-- [ ] Add documentation evidence.
-- [ ] Add H1 smoke/static checks.
+- [x] Define firm workspace profile fields.
+- [x] Define firm type vocabulary.
+- [x] Define subscription package to workspace behavior mapping.
+- [x] Define service-line mapping.
+- [x] Define module catalogue mapping.
+- [x] Define worker-template mapping.
+- [x] Define rehearsal/test workspace classification.
+- [x] Define selected-firm active workspace summary response.
+- [x] Add documentation evidence.
+- [x] Add H1 smoke/static checks.
 
 ## MT-H2 — Backend Active Workspace Summary
 
@@ -95,4 +95,3 @@ scope: "Controlled local/private pilot hardening"
 - [ ] No public marketplace widening occurred.
 - [ ] No live payment movement occurred.
 - [ ] No autonomous regulated approval occurred.
-
