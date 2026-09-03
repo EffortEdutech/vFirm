@@ -291,3 +291,4 @@ The OP sprint plan and checklist govern the next bounded hardening pass after MT
 | `NHL_BOQ_QUOTATION_WORKFLOW_SAMPLE_v1.0.md` | Records the controlled NHL Global Solution BOQ-image-to-quotation sample workflow and required vFirm quotation case capability. |
 | `NHL_Q1_BOQ_QUOTATION_INTAKE_AND_ISSUE_WORKFLOW_COMPLETION_v1.0.md` | Records NHL-Q1 controlled BOQ-image quotation case implementation, approval gate, submitted evidence registration, UI binding, and smoke evidence. |
 | `NHL_Q2_QUOTATION_DOCUMENT_CONTROL_AND_BOQ_EXTRACTION_AID_COMPLETION_v1.0.md` | Records NHL-Q2 BOQ extraction aid implementation, human review boundary, UI binding, and smoke evidence. |
+| `NHL_Q3_QUOTATION_DRAFT_ASSEMBLY_AND_CLIENT_CORRESPONDENCE_COMPLETION_v1.0.md` | Records NHL-Q3 quotation draft pack assembly, human review gate, draft-only client correspondence, active workspace seed repair evidence, UI binding, and smoke evidence. |

@@ -8,7 +8,7 @@ import { acceptProposalRecord, approveProposalRecord, createClientRecord, comple
 import { createFrontDeskEnquiryRecord, qualifyFrontDeskEnquiryRecord, createClientCommunicationDraftRecord, handoffFrontDeskEnquiryRecord } from "./store.mjs";
 import { bindAdministrationSkillsRecord, createCorrespondenceRecord, registerDocumentRecord, addDocumentRevisionRecord, createAdministrativeDeadlineRecord, completeAdministrativeDeadlineRecord, createTransmittalDraftRecord } from "./store.mjs";
 import { bindCommercialSkillsRecord, createSalesPipelineRecord, updateSalesPipelineRecord, dispatchProposalRecord, createExpenseRecord, approveExpenseRecord, createReceivableFollowUpRecord, readCashSnapshot } from "./store.mjs";
-import { bindTechnicalSkillsRecord, createDrawingReviewRecord, createCalculationInputSetRecord, createTechnicalQaFindingRecord, resolveTechnicalQaFindingRecord, createDeliveryPackageRecord, readDailyOperationsSummary, createPilotHandoffRecord, createFactoryFirmBlueprintRecord, validateFactoryFirmBlueprintRecord, approveFactoryFirmBlueprintRecord, createFactoryProvisioningRunRecord, runFactoryReadinessTestRecord, acceptFactoryHandoffRecord, certifyFactoryPackBindingRecord, createQuotationCaseRecord, linkQuotationCaseProposalRecord, approveQuotationCaseRecord, issueQuotationCaseRecord, createBoqExtractionAidRecord, reviewBoqExtractionAidRecord } from "./store.mjs";
+import { bindTechnicalSkillsRecord, createDrawingReviewRecord, createCalculationInputSetRecord, createTechnicalQaFindingRecord, resolveTechnicalQaFindingRecord, createDeliveryPackageRecord, readDailyOperationsSummary, createPilotHandoffRecord, createFactoryFirmBlueprintRecord, validateFactoryFirmBlueprintRecord, approveFactoryFirmBlueprintRecord, createFactoryProvisioningRunRecord, runFactoryReadinessTestRecord, acceptFactoryHandoffRecord, certifyFactoryPackBindingRecord, createQuotationCaseRecord, linkQuotationCaseProposalRecord, approveQuotationCaseRecord, issueQuotationCaseRecord, createBoqExtractionAidRecord, reviewBoqExtractionAidRecord, createQuotationDraftPackRecord, reviewQuotationDraftPackRecord, prepareQuotationClientCorrespondenceRecord } from "./store.mjs";
 import { createNetworkProfessionalProfileRecord, createNetworkFirmProfileRecord, createNetworkCapabilityRecord, createNetworkCredentialRecord, createNetworkTrustSignalRecord } from "./store.mjs";
 import { createNetworkConflictCheckRecord, createNetworkQualificationGateRecord, createSpecialistInvitationRecord } from "./store.mjs";
 import { createCollaborationWorkspaceRecord, grantCollaborationWorkspaceParticipantRecord, revokeCollaborationWorkspaceParticipantRecord, addCollaborationWorkspaceEvidenceRecord, createResponsibilityMatrixRecord, createSpecialistAssignmentRecord, transitionSpecialistAssignmentRecord } from "./store.mjs";
@@ -48,6 +48,7 @@ const readCollections = new Map([
   ["pilot-handoff-records", "pilot_handoff_records"],
   ["quotation-cases", "quotation_cases"],
   ["boq-extraction-aids", "boq_extraction_aids"],
+  ["quotation-draft-packs", "quotation_draft_packs"],
   ["leads", "leads"],
   ["intake-sessions", "intake_sessions"],
   ["price-build-ups", "price_build_ups"],
@@ -2507,6 +2508,18 @@ async function reviewBoqExtractionAid(body, req = null) {
   requireFields(body, ["tenant_id", "firm_id", "boq_extraction_aid_id"]);
   return reviewBoqExtractionAidRecord(body, actorFromBody(body, req, body.tenant_id, body.firm_id));
 }
+async function createQuotationDraftPack(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "quotation_case_id", "boq_extraction_aid_id"]);
+  return createQuotationDraftPackRecord(body, actorFromBody(body, req, body.tenant_id, body.firm_id));
+}
+async function reviewQuotationDraftPack(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "quotation_draft_pack_id"]);
+  return reviewQuotationDraftPackRecord(body, actorFromBody(body, req, body.tenant_id, body.firm_id));
+}
+async function prepareQuotationClientCorrespondence(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "quotation_draft_pack_id"]);
+  return prepareQuotationClientCorrespondenceRecord(body, actorFromBody(body, req, body.tenant_id, body.firm_id));
+}
 
 const routes = new Map([
   ["POST /tenants", createTenant],
@@ -2567,6 +2580,9 @@ const routes = new Map([
   ["POST /quotation-cases/issue", issueQuotationCase],
   ["POST /boq-extraction-aids", createBoqExtractionAid],
   ["POST /boq-extraction-aids/review", reviewBoqExtractionAid],
+  ["POST /quotation-draft-packs", createQuotationDraftPack],
+  ["POST /quotation-draft-packs/review", reviewQuotationDraftPack],
+  ["POST /quotation-draft-packs/client-correspondence", prepareQuotationClientCorrespondence],
   ["POST /accounts/expenses", createExpense],
   ["POST /accounts/expenses/approve", approveExpense],
   ["POST /accounts/receivable-follow-ups", createReceivableFollowUp],

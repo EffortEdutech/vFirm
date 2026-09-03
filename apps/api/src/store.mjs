@@ -92,6 +92,7 @@ const initialStore = () => ({
   pilot_handoff_records: [],
   quotation_cases: [],
   boq_extraction_aids: [],
+  quotation_draft_packs: [],
   professional_authorities: [],
   actors: [],
   persons: [],
@@ -1248,6 +1249,117 @@ export async function reviewBoqExtractionAidRecord(body, actor = systemActor(bod
     item.updated_at = item.reviewed_at;
     appendEventAndAudit(store, { event_type: item.extraction_status === "REJECTED" ? "boq_extraction_aid.rejected" : "boq_extraction_aid.human_reviewed", actor, tenant_id: item.tenant_id, firm_id: item.firm_id, aggregate_type: "BoqExtractionAid", aggregate_id: item.id, payload: { extraction_status: item.extraction_status, quotation_case_id: item.quotation_case_id, authoritative: false }, summary: item.extraction_status === "REJECTED" ? "BOQ extraction aid rejected by human principal." : "BOQ extraction aid reviewed by human principal for quotation support; it remains non-authoritative." });
     return item;
+  });
+}
+
+function buildQuotationDraftPack(body, quotationCase, extractionAid, proposal, actor = {}) {
+  const timestamp = now();
+  return {
+    id: storeBackend === "postgres" ? newUuid() : newId("quotation_draft_pack"),
+    tenant_id: body.tenant_id,
+    firm_id: body.firm_id,
+    quotation_case_id: quotationCase.id,
+    boq_extraction_aid_id: extractionAid.id,
+    proposal_id: proposal?.id ?? quotationCase.proposal_id ?? null,
+    draft_number: body.draft_number ?? `${quotationCase.case_number}-DRAFT-01`,
+    draft_status: "DRAFT_REVIEW_REQUIRED",
+    client_correspondence_status: "NOT_PREPARED",
+    correspondence_record_id: null,
+    source_document_ids: extractionAid.source_document_ids ?? quotationCase.document_register_entry_ids ?? [],
+    source_evidence_refs: [...new Set([...(quotationCase.intake_evidence_refs ?? []), ...(extractionAid.source_evidence_refs ?? [])])],
+    line_items: body.line_items ?? extractionAid.extracted_items ?? [],
+    commercial_summary: body.commercial_summary ?? proposal?.scope_summary ?? quotationCase.client_request_summary,
+    amount_summary: body.amount_summary ?? "Pending human commercial confirmation before client-facing issue.",
+    assumptions: body.assumptions ?? extractionAid.assumptions ?? [],
+    exclusions: body.exclusions ?? extractionAid.exclusions ?? [],
+    validity_terms: body.validity_terms ?? "Validity, price, and commercial terms require explicit human principal confirmation before sending.",
+    client_correspondence_subject: body.client_correspondence_subject ?? `Draft quotation for ${quotationCase.case_number}`,
+    client_correspondence_body: body.client_correspondence_body ?? "Draft quotation correspondence prepared for human principal review. No message has been sent.",
+    requires_human_approval: true,
+    client_facing: false,
+    authoritative: false,
+    prepared_by_actor_id: actor.actor_id ?? actor.id ?? null,
+    reviewed_by_actor_id: null,
+    reviewed_at: null,
+    review_notes: null,
+    created_at: timestamp,
+    updated_at: timestamp,
+    metadata: body.metadata ?? {}
+  };
+}
+
+export async function createQuotationDraftPackRecord(body, actor = systemActor(body.tenant_id, body.firm_id)) {
+  return withStore((store) => {
+    store.quotation_draft_packs ??= [];
+    const quotationCase = (store.quotation_cases ?? []).find((record) => record.id === body.quotation_case_id && record.tenant_id === body.tenant_id && record.firm_id === body.firm_id);
+    if (!quotationCase) throwNotFound("quotation_cases", body.quotation_case_id);
+    const extractionAid = (store.boq_extraction_aids ?? []).find((record) => record.id === body.boq_extraction_aid_id && record.tenant_id === body.tenant_id && record.firm_id === body.firm_id);
+    if (!extractionAid) throwNotFound("boq_extraction_aids", body.boq_extraction_aid_id);
+    if (extractionAid.quotation_case_id !== quotationCase.id) invalidState("BOQ extraction aid must belong to the quotation case.");
+    if (extractionAid.extraction_status !== "HUMAN_REVIEWED") invalidState("Quotation draft pack requires a human-reviewed BOQ extraction aid.");
+    const proposalId = body.proposal_id ?? quotationCase.proposal_id ?? null;
+    const proposal = proposalId ? assertScopedReference(store, "proposals", proposalId, body) : null;
+    const duplicate = store.quotation_draft_packs.find((record) => record.quotation_case_id === quotationCase.id && record.draft_status !== "REJECTED");
+    if (duplicate) invalidState("Quotation case already has an active quotation draft pack.");
+    const item = buildQuotationDraftPack(body, quotationCase, extractionAid, proposal, actor);
+    store.quotation_draft_packs.push(item);
+    appendEventAndAudit(store, { event_type: "quotation_draft_pack.prepared", actor, tenant_id: item.tenant_id, firm_id: item.firm_id, aggregate_type: "QuotationDraftPack", aggregate_id: item.id, payload: { quotation_case_id: item.quotation_case_id, boq_extraction_aid_id: item.boq_extraction_aid_id, line_items: item.line_items.length, requires_human_approval: true }, summary: "Quotation draft pack assembled for human review; no client correspondence sent." });
+    return item;
+  });
+}
+
+export async function reviewQuotationDraftPackRecord(body, actor = systemActor(body.tenant_id, body.firm_id)) {
+  requireHumanPrincipalActor(actor, "Quotation draft pack review");
+  return withStore((store) => {
+    store.quotation_draft_packs ??= [];
+    const item = store.quotation_draft_packs.find((record) => record.id === body.quotation_draft_pack_id && record.tenant_id === body.tenant_id && record.firm_id === body.firm_id);
+    if (!item) throwNotFound("quotation_draft_packs", body.quotation_draft_pack_id);
+    if (item.draft_status !== "DRAFT_REVIEW_REQUIRED") invalidState("Only draft quotation packs can be reviewed.");
+    item.draft_status = body.review_decision === "REJECT" ? "REJECTED" : "HUMAN_REVIEWED";
+    item.reviewed_by_actor_id = actor.actor_id;
+    item.reviewed_at = now();
+    item.review_notes = body.review_notes ?? "Human principal reviewed quotation draft pack for controlled client correspondence preparation.";
+    item.updated_at = item.reviewed_at;
+    appendEventAndAudit(store, { event_type: item.draft_status === "REJECTED" ? "quotation_draft_pack.rejected" : "quotation_draft_pack.human_reviewed", actor, tenant_id: item.tenant_id, firm_id: item.firm_id, aggregate_type: "QuotationDraftPack", aggregate_id: item.id, payload: { draft_status: item.draft_status, client_facing: false, authoritative: false }, summary: item.draft_status === "REJECTED" ? "Quotation draft pack rejected by human principal." : "Quotation draft pack reviewed by human principal; client correspondence may be prepared as draft only." });
+    return item;
+  });
+}
+
+export async function prepareQuotationClientCorrespondenceRecord(body, actor = systemActor(body.tenant_id, body.firm_id)) {
+  return withStore((store) => {
+    store.quotation_draft_packs ??= [];
+    const item = store.quotation_draft_packs.find((record) => record.id === body.quotation_draft_pack_id && record.tenant_id === body.tenant_id && record.firm_id === body.firm_id);
+    if (!item) throwNotFound("quotation_draft_packs", body.quotation_draft_pack_id);
+    if (item.draft_status !== "HUMAN_REVIEWED") invalidState("Client correspondence draft requires a human-reviewed quotation draft pack.");
+    if (item.correspondence_record_id) invalidState("Client correspondence draft already prepared for this quotation draft pack.");
+    const quotationCase = assertScopedReference(store, "quotation_cases", item.quotation_case_id, body);
+    const relationship = quotationCase.relationship_id ? assertScopedReference(store, "firm_client_relationships", quotationCase.relationship_id, body) : null;
+    const timestamp = now();
+    const correspondence = {
+      id: sf3Id("correspondence"),
+      tenant_id: body.tenant_id,
+      firm_id: body.firm_id,
+      relationship_id: relationship?.id ?? null,
+      project_id: body.project_id ?? null,
+      direction: "OUTGOING",
+      channel: body.channel ?? "EMAIL",
+      subject: body.subject ?? item.client_correspondence_subject,
+      correspondent: body.correspondent ?? "Client",
+      received_or_drafted_at: timestamp,
+      status: "DRAFT_REVIEW_REQUIRED",
+      owner_actor_id: actor.actor_id,
+      response_due_at: null,
+      source_ref: `quotation_draft_pack://${item.id}`,
+      created_at: timestamp,
+      updated_at: timestamp,
+      metadata: { ...(body.metadata ?? {}), quotation_case_id: item.quotation_case_id, quotation_draft_pack_id: item.id, client_facing_issue_blocked: true }
+    };
+    store.correspondence_records.push(correspondence);
+    item.client_correspondence_status = "DRAFT_PREPARED_REVIEW_REQUIRED";
+    item.correspondence_record_id = correspondence.id;
+    item.updated_at = timestamp;
+    appendEventAndAudit(store, { event_type: "quotation_draft_pack.client_correspondence_prepared", actor, tenant_id: item.tenant_id, firm_id: item.firm_id, aggregate_type: "QuotationDraftPack", aggregate_id: item.id, payload: { correspondence_record_id: correspondence.id, correspondence_status: correspondence.status, no_external_send: true }, summary: "Client quotation correspondence prepared as a draft only; no external message sent." });
+    return { quotation_draft_pack: item, correspondence };
   });
 }
 

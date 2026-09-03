@@ -687,3 +687,17 @@ Evidence:
 - `docs/10_post_freeze_technical_design/NHL_Q2_QUOTATION_DOCUMENT_CONTROL_AND_BOQ_EXTRACTION_AID_COMPLETION_v1.0.md`
 - `scripts/smoke-nhl-q2-boq-extraction-aid.mjs`
 - API routes `/api/boq-extraction-aids` and `/api/boq-extraction-aids/review`
+
+## ADR-066 - NHL-Q3 quotation draft assembly and client correspondence completed
+
+Date: 2026-09-04
+
+Decision: NHL-Q3 adds controlled quotation draft packs assembled from human-reviewed BOQ extraction aids and draft-only client correspondence records. The active local Postgres workspace was repaired by reseeding the approved pilot workspaces so Amanah Formwork Pilot Firm and NHL Global Solution appear alongside PD-H2 in the active workspace selector. Quotation draft packs remain non-authoritative and not client-facing until explicit later human-controlled issue steps.
+
+Evidence:
+- `docs/10_post_freeze_technical_design/NHL_Q3_QUOTATION_DRAFT_ASSEMBLY_AND_CLIENT_CORRESPONDENCE_COMPLETION_v1.0.md`
+- `scripts/smoke-nhl-q3-quotation-draft-correspondence.mjs`
+- API routes `/api/quotation-draft-packs`, `/api/quotation-draft-packs/review`, and `/api/quotation-draft-packs/client-correspondence`
+- Operational repair command: `npm run seed:pilot-workspaces` against local Postgres-backed API on 3091
+
+Boundaries: No autonomous measurement, pricing, approval, regulated certification, client-facing issue, external send, live payment movement, public marketplace, live matching, ranking, capacity allocation, VF-24 publication, pricing intelligence, autonomous award, or autonomous regulated approval is authorized.

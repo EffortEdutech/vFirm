@@ -109,6 +109,18 @@ for (const marker of nhlQ2Markers) {
   assert(app.includes(marker), `NHL-Q2 BOQ extraction aid UI marker missing: ${marker}`);
 }
 
+const nhlQ3Markers = [
+  "Quotation Draft Assembly",
+  "quotationDraftPackForm",
+  "/quotation-draft-packs",
+  "quotationDraftReviewForm",
+  "quotationClientCorrespondenceForm",
+  "quotation_draft_packs"
+];
+for (const marker of nhlQ3Markers) {
+  assert(app.includes(marker), `NHL-Q3 quotation draft UI marker missing: ${marker}`);
+}
+
 console.log(JSON.stringify({
   smoke: "web-navigation-renderers",
   result: "passed",
