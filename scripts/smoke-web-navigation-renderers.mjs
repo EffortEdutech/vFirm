@@ -137,6 +137,20 @@ for (const marker of nhlQ4Markers) {
   assert(app.includes(marker), `NHL-Q4 controlled issue UI marker missing: ${marker}`);
 }
 
+const nhlQ5Markers = [
+  "quotation_operations_summary",
+  "/quotation-operations-summary",
+  "Quotation Operations Today",
+  "NHL-Q5 Quotation Operations",
+  "nhl-q5-quotation-operations",
+  "Exceptions and next actions",
+  "Human review queue",
+  "no_live_payment_movement"
+];
+for (const marker of nhlQ5Markers) {
+  assert(app.includes(marker), `NHL-Q5 quotation operations UI marker missing: ${marker}`);
+}
+
 console.log(JSON.stringify({
   smoke: "web-navigation-renderers",
   result: "passed",

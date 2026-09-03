@@ -714,3 +714,16 @@ Rationale: NHL's real quotation work needs a controlled bridge between reviewed 
 Boundaries: No autonomous quotation issue, external send, autonomous pricing/measurement/certification/approval, live payment movement, payment capture, bank instruction, public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, pricing intelligence, autonomous award, or autonomous regulated approval.
 
 Evidence: `scripts/smoke-nhl-q4-controlled-issue-receivables.mjs`; `npm run check:nhl:q4`; `docs/10_post_freeze_technical_design/NHL_Q4_CONTROLLED_QUOTATION_ISSUE_AND_RECEIVABLES_PREPARATION_COMPLETION_v1.0.md`.
+
+## ADR-068 - NHL-Q5 quotation operations dashboard and exception handling completed
+
+Date: 2026-09-04
+Status: Accepted for controlled local/private pilot readiness
+
+Decision: NHL-Q5 adds a tenant-scoped quotation operations summary endpoint and Dashboard/Sales & Accounts UI panels for NHL Global Solution. The summary surfaces quotation counts, review queues, issue readiness, receivable readiness, exception categories, and boundary reminders from existing NHL-Q1 through NHL-Q4 records.
+
+Rationale: The NHL quotation workflow needed an operator-facing view so a solo business owner can see what requires attention without opening every record. The view is read-only and does not create new authority or autonomous commercial action.
+
+Boundaries: No autonomous measurement, pricing, certification, approval, quotation issue, external send, live payment movement, payment capture, bank instruction, public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, pricing intelligence, autonomous award, or autonomous regulated approval.
+
+Evidence: `scripts/smoke-nhl-q5-quotation-operations-dashboard.mjs`; `npm run check:nhl:q5`; `docs/10_post_freeze_technical_design/NHL_Q5_QUOTATION_OPERATIONS_DASHBOARD_AND_EXCEPTION_HANDLING_COMPLETION_v1.0.md`.

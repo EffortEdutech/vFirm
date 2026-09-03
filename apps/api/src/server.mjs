@@ -1768,6 +1768,88 @@ async function recordPaymentStatus(body, req = null) {
 
 
 
+
+function quotationOperationScope(store, tenantId, firmId) {
+  const scoped = (collection) => (store[collection] ?? []).filter((item) => (!tenantId || item.tenant_id === tenantId) && (!firmId || item.firm_id === firmId));
+  return {
+    cases: scoped("quotation_cases"),
+    aids: scoped("boq_extraction_aids"),
+    drafts: scoped("quotation_draft_packs"),
+    issues: scoped("quotation_issue_records"),
+    receivables: scoped("quotation_receivable_preparations"),
+    correspondence: scoped("correspondence_records"),
+    events: scoped("event_log"),
+    audits: scoped("audit_events")
+  };
+}
+
+function buildQuotationOperationsSummary(store, tenantId, firmId) {
+  const { cases, aids, drafts, issues, receivables, correspondence, events, audits } = quotationOperationScope(store, tenantId, firmId);
+  const issueDraftIds = new Set(issues.map((item) => item.quotation_draft_pack_id));
+  const receivableIssueIds = new Set(receivables.map((item) => item.quotation_issue_record_id));
+  const issueReady = drafts.filter((item) => item.draft_status === "HUMAN_REVIEWED" && item.correspondence_record_id && !issueDraftIds.has(item.id));
+  const missingSourceDocuments = cases.filter((item) => !(item.document_register_entry_ids ?? []).length);
+  const extractionReview = aids.filter((item) => item.extraction_status === "DRAFT_REVIEW_REQUIRED");
+  const draftReview = drafts.filter((item) => item.draft_status === "DRAFT_REVIEW_REQUIRED");
+  const correspondenceReview = correspondence.filter((item) => item.source_ref?.startsWith("quotation_draft_pack://") && item.status === "DRAFT_REVIEW_REQUIRED");
+  const issuedWithoutReceivable = issues.filter((item) => !receivableIssueIds.has(item.id));
+  const receivableReview = receivables.filter((item) => item.receivable_status === "RECEIVABLE_PREPARED_REVIEW_REQUIRED");
+  const quotationEventTypes = new Set(["quotation_case.created", "quotation_case.proposal_linked", "quotation_case.approved", "quotation_case.issued", "boq_extraction_aid.prepared", "boq_extraction_aid.human_reviewed", "quotation_draft_pack.prepared", "quotation_draft_pack.human_reviewed", "quotation_draft_pack.client_correspondence_prepared", "quotation_issue.controlled_issue_recorded", "quotation_receivable.prepared"]);
+  const quotationEvents = events.filter((item) => quotationEventTypes.has(item.event_type));
+  const exceptions = [];
+  if (missingSourceDocuments.length) exceptions.push({ key: "source_documents_missing", severity: "HIGH", count: missingSourceDocuments.length, detail: "Quotation case has no controlled source document records." });
+  if (extractionReview.length) exceptions.push({ key: "boq_extraction_review_pending", severity: "MEDIUM", count: extractionReview.length, detail: "BOQ extraction aid needs human review before quotation support use." });
+  if (draftReview.length) exceptions.push({ key: "quotation_draft_review_pending", severity: "MEDIUM", count: draftReview.length, detail: "Quotation draft pack needs human review before correspondence or issue." });
+  if (issueReady.length) exceptions.push({ key: "quotation_issue_ready", severity: "LOW", count: issueReady.length, detail: "Reviewed draft and correspondence are ready for controlled human issue." });
+  if (issuedWithoutReceivable.length) exceptions.push({ key: "issued_without_receivable_preparation", severity: "MEDIUM", count: issuedWithoutReceivable.length, detail: "Human-issued quotation has no receivable/invoice-readiness record." });
+  if (receivableReview.length) exceptions.push({ key: "receivable_review_required", severity: "LOW", count: receivableReview.length, detail: "Receivable preparation is ready for human review; no payment action exists." });
+  if (cases.length + aids.length + drafts.length + issues.length + receivables.length > 0 && quotationEvents.length === 0) exceptions.push({ key: "quotation_audit_gap", severity: "HIGH", count: 1, detail: "Quotation records exist but quotation audit events were not found." });
+  const approvals = [
+    ...extractionReview.map((item) => ({ type: "boq_extraction_aid_review", id: item.id, status: item.extraction_status })),
+    ...draftReview.map((item) => ({ type: "quotation_draft_pack_review", id: item.id, status: item.draft_status })),
+    ...issueReady.map((item) => ({ type: "controlled_quotation_issue", id: item.id, status: item.draft_status })),
+    ...receivableReview.map((item) => ({ type: "receivable_preparation_review", id: item.id, status: item.receivable_status }))
+  ];
+  return {
+    generated_at: new Date().toISOString(),
+    tenant_id: tenantId,
+    firm_id: firmId,
+    status: exceptions.some((item) => ["CRITICAL", "HIGH"].includes(item.severity)) ? "OPERATOR_ATTENTION_REQUIRED" : exceptions.length ? "REVIEW_QUEUE_ACTIVE" : cases.length ? "QUOTATION_PIPELINE_CLEAR" : "NO_QUOTATION_ACTIVITY",
+    counts: {
+      quotation_cases: cases.length,
+      boq_extraction_aids: aids.length,
+      quotation_draft_packs: drafts.length,
+      quotation_issue_records: issues.length,
+      receivable_preparations: receivables.length,
+      pending_human_reviews: approvals.length,
+      issue_ready: issueReady.length,
+      issued_without_receivable: issuedWithoutReceivable.length,
+      audit_events: audits.length,
+      quotation_events: quotationEvents.length
+    },
+    pipeline: {
+      cases_by_status: Object.fromEntries([...new Set(cases.map((item) => item.status ?? "UNKNOWN"))].map((status) => [status, cases.filter((item) => (item.status ?? "UNKNOWN") === status).length])),
+      aids_by_status: Object.fromEntries([...new Set(aids.map((item) => item.extraction_status ?? "UNKNOWN"))].map((status) => [status, aids.filter((item) => (item.extraction_status ?? "UNKNOWN") === status).length])),
+      drafts_by_status: Object.fromEntries([...new Set(drafts.map((item) => item.draft_status ?? "UNKNOWN"))].map((status) => [status, drafts.filter((item) => (item.draft_status ?? "UNKNOWN") === status).length])),
+      issues_by_status: Object.fromEntries([...new Set(issues.map((item) => item.issue_status ?? "UNKNOWN"))].map((status) => [status, issues.filter((item) => (item.issue_status ?? "UNKNOWN") === status).length])),
+      receivables_by_status: Object.fromEntries([...new Set(receivables.map((item) => item.receivable_status ?? "UNKNOWN"))].map((status) => [status, receivables.filter((item) => (item.receivable_status ?? "UNKNOWN") === status).length]))
+    },
+    approvals,
+    exceptions,
+    next_actions: exceptions.map((item) => ({ key: item.key, severity: item.severity, action: item.detail })),
+    boundaries: ["advisory_boq_extraction_only", "human_controlled_quotation_issue", "no_live_payment_movement", "no_autonomous_measurement_pricing_or_approval", "tenant_scoped_audit_export"]
+  };
+}
+
+async function readQuotationOperationsSummary(req, url) {
+  const actor = devActorFromHeaders(req);
+  const tenantId = url.searchParams.get("tenant_id") ?? actor?.tenant_id ?? null;
+  const firmId = url.searchParams.get("firm_id") ?? actor?.firm_id ?? null;
+  assertActorScope(actor, { tenant_id: tenantId, firm_id: firmId }, "quotation operations summary");
+  const store = await readStore();
+  return buildQuotationOperationsSummary(store, tenantId, firmId);
+}
+
 async function readCommercialLaunchSummary(req, url) {
   assertActorScope(devActorFromHeaders(req), { tenant_id: url.searchParams.get("tenant_id"), firm_id: url.searchParams.get("firm_id") }, "commercial launch summary");
   const store = await readStore();
@@ -2685,6 +2767,7 @@ const server = createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/pilot/formwork") return sendJson(req, res, 200, { ok: true, data: readFormworkPilotPackage() });
     if (req.method === "GET" && url.pathname === "/workspace/active-summary") return sendJson(req, res, 200, { ok: true, data: await readActiveWorkspaceSummary(req, url) });
     if (req.method === "GET" && url.pathname === "/dashboard/summary") return sendJson(req, res, 200, { ok: true, data: await readDashboardSummary(url) });
+    if (req.method === "GET" && url.pathname === "/quotation-operations-summary") return sendJson(req, res, 200, { ok: true, data: await readQuotationOperationsSummary(req, url) });
     if (req.method === "GET" && url.pathname === "/auth/context") return sendJson(req, res, 200, { ok: true, data: await readAuthContext(req) });
     if (req.method === "GET" && url.pathname === "/auth/provider/config") return sendJson(req, res, 200, { ok: true, data: authProviderConfig() });
     if (req.method === "GET" && url.pathname === "/auth/provider-context") return sendJson(req, res, 200, { ok: true, data: await readProviderAuthContext(req) });

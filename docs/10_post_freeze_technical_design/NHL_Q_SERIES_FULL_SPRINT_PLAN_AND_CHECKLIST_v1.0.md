@@ -1,7 +1,7 @@
-# NHL-Q Series Full Sprint Plan and Checklist v1.0
+﻿# NHL-Q Series Full Sprint Plan and Checklist v1.0
 
-Date: 2026-09-04  
-Scope: NHL Global Solution BOQ/image-to-quotation workflow for controlled local/private pilot operation  
+Date: 2026-09-04
+Scope: NHL Global Solution BOQ/image-to-quotation workflow for controlled local/private pilot operation
 Status: Q1-Q3 complete, Q4 active
 
 ## Product target
@@ -47,13 +47,13 @@ The NHL-Q series does not authorize:
 | NHL-Q1 | BOQ Quotation Intake and Issue Workflow | Complete | Register BOQ quotation case, link proposal approval, and record submitted quotation evidence. |
 | NHL-Q2 | Quotation Document Control and BOQ Extraction Aid | Complete | Register source documents and prepare/review non-authoritative BOQ extraction aids. |
 | NHL-Q3 | Quotation Draft Assembly and Client Correspondence | Complete | Assemble human-reviewed quotation draft pack and prepare correspondence as draft-only. |
-| NHL-Q4 | Controlled Quotation Issue and Receivables Preparation | Active | Record human-controlled quotation issue, create issue evidence, and prepare receivable/invoice readiness without payment action. |
-| NHL-Q5 | Quotation Operations Dashboard and Exception Handling | Planned | Show quotation pipeline, blockers, overdue reviews, issue readiness, receivable readiness, and audit gaps for the active NHL workspace. |
-| NHL-Q6 | NHL Quotation Evidence Pack and Acceptance Gate | Planned | Assemble evidence pack, export test, limitations, and product-owner acceptance gate for the NHL-Q workflow. |
+| NHL-Q4 | Controlled Quotation Issue and Receivables Preparation | Complete | Record human-controlled quotation issue, create issue evidence, and prepare receivable/invoice readiness without payment action. |
+| NHL-Q5 | Quotation Operations Dashboard and Exception Handling | Complete | Show quotation pipeline, blockers, overdue reviews, issue readiness, receivable readiness, and audit gaps for the active NHL workspace. |
+| NHL-Q6 | NHL Quotation Evidence Pack and Acceptance Gate | Active next | Assemble evidence pack, export test, limitations, and product-owner acceptance gate for the NHL-Q workflow. |
 
 ## Detailed sprint plan
 
-### NHL-Q1 — BOQ Quotation Intake and Issue Workflow
+### NHL-Q1 â€” BOQ Quotation Intake and Issue Workflow
 
 Objective: represent the client BOQ quotation request as a controlled quotation case.
 
@@ -71,7 +71,7 @@ Evidence:
 npm run check:nhl:q1
 ```
 
-### NHL-Q2 — Quotation Document Control and BOQ Extraction Aid
+### NHL-Q2 â€” Quotation Document Control and BOQ Extraction Aid
 
 Objective: turn raw client BOQ inputs into controlled document/evidence references and a review-only extraction aid.
 
@@ -89,7 +89,7 @@ Evidence:
 npm run check:nhl:q2
 ```
 
-### NHL-Q3 — Quotation Draft Assembly and Client Correspondence
+### NHL-Q3 â€” Quotation Draft Assembly and Client Correspondence
 
 Objective: assemble a quotation draft pack from a reviewed BOQ extraction aid and prepare client correspondence as draft-only.
 
@@ -107,7 +107,7 @@ Evidence:
 npm run check:nhl:q3
 ```
 
-### NHL-Q4 — Controlled Quotation Issue and Receivables Preparation
+### NHL-Q4 â€” Controlled Quotation Issue and Receivables Preparation
 
 Objective: close the controlled issue step after Q3 and prepare receivables readiness without live payment action.
 
@@ -146,7 +146,7 @@ Evidence:
 npm run check:nhl:q4
 ```
 
-### NHL-Q5 — Quotation Operations Dashboard and Exception Handling
+### NHL-Q5 â€” Quotation Operations Dashboard and Exception Handling
 
 Objective: make the NHL quotation workflow operationally visible.
 
@@ -165,7 +165,7 @@ Acceptance checks:
 - Formwork workspace does not inherit NHL quotation records.
 - Dashboard uses deterministic state, not free-text inference.
 
-### NHL-Q6 — NHL Quotation Evidence Pack and Acceptance Gate
+### NHL-Q6 â€” NHL Quotation Evidence Pack and Acceptance Gate
 
 Objective: close the NHL-Q series with evidence and product-owner decision.
 
@@ -237,4 +237,4 @@ Acceptance checks:
 
 Proceed with:
 
-`NHL-Q4 — Controlled Quotation Issue and Receivables Preparation`
+`NHL-Q4 â€” Controlled Quotation Issue and Receivables Preparation`
