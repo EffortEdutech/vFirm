@@ -63,16 +63,16 @@ scope: "Controlled local/private pilot operation for verified active firm worksp
 
 ## OP-H5 - Pilot Evidence, Audit, Export, and Closeout Review
 
-- [ ] Create firm-scoped evidence pack template.
-- [ ] Create pilot-day closeout review template.
-- [ ] Create audit reconstruction checklist.
-- [ ] Create legally permissible export checklist.
-- [ ] Classify unresolved findings.
-- [ ] Add privacy/redaction notes for pilot evidence.
-- [ ] Verify separate evidence records for Formwork and NHL.
-- [ ] Verify export records are tenant/firm scoped.
-- [ ] Add evidence/export smoke test.
-- [ ] Update decision register.
+- [x] Create firm-scoped evidence pack template.
+- [x] Create pilot-day closeout review template.
+- [x] Create audit reconstruction checklist.
+- [x] Create legally permissible export checklist.
+- [x] Classify unresolved findings.
+- [x] Add privacy/redaction notes for pilot evidence.
+- [x] Verify separate evidence records for Formwork and NHL.
+- [x] Verify export records are tenant/firm scoped.
+- [x] Add evidence/export smoke test.
+- [x] Update decision register.
 
 ## OP-H6 - Controlled Multi-Firm Pilot Operations Acceptance Gate
 

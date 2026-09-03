@@ -608,3 +608,18 @@ Boundary: OP-H4 does not approve OP-H5 evidence closeout, OP-H6 acceptance, prod
 Evidence: `docs/10_post_freeze_technical_design/OP_H4_NHL_GLOBAL_SOLUTION_PILOT_DAY_REHEARSAL_COMPLETION_v1.0.md`; `scripts/smoke-op-h4-nhl-global-solution-pilot-day-rehearsal.mjs`; `npm run check:op:h4`.
 
 Follow-up: Proceed to `OP-H5 - Pilot Evidence, Audit, Export, and Closeout Review` after product-owner authorization.
+## ADR-059 - OP-H5 pilot evidence audit export and closeout review completed
+
+Date: 2026-09-03
+
+Decision: OP-H5 is complete. The controlled multi-firm pilot now has a firm-scoped evidence pack template, closeout review template, audit reconstruction checklist, legally permissible export checklist, unresolved finding classification model, and privacy/redaction notes.
+
+Rationale: OP-H3 and OP-H4 proved separate pilot-day rehearsals for Amanah Formwork Pilot Firm and NHL Global Solution. OP-H5 assembles those results into a closeout review structure so OP-H6 can make a product-owner acceptance decision using explicit evidence rather than scattered sprint notes.
+
+Implementation: Added `OP_H5_PILOT_EVIDENCE_AUDIT_EXPORT_CLOSEOUT_REVIEW_v1.0.md` and executable validation in `scripts/smoke-op-h5-pilot-evidence-audit-export-closeout.mjs`. OP-H5 checklist items are marked complete and the full regression chain now includes the OP-H5 smoke.
+
+Boundary: OP-H5 does not approve OP-H6 acceptance by itself, production multi-tenant onboarding, public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, pricing intelligence, autonomous award, autonomous regulated approval, live payment movement, or uncontrolled tenant/client data sharing.
+
+Evidence: `docs/10_post_freeze_technical_design/OP_H5_PILOT_EVIDENCE_AUDIT_EXPORT_CLOSEOUT_REVIEW_v1.0.md`; `scripts/smoke-op-h5-pilot-evidence-audit-export-closeout.mjs`; `npm run check:op:h5`.
+
+Follow-up: Proceed to `OP-H6 - Controlled Multi-Firm Pilot Operations Acceptance Gate` after product-owner authorization.
