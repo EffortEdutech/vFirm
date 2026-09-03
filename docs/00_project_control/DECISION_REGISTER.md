@@ -481,3 +481,19 @@ Implementation: MT-H5 adds view-to-module mapping, subscribed/not-subscribed nav
 Boundary: This decision does not approve public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, pricing intelligence, autonomous award, autonomous regulated approval, or live payment movement.
 
 Follow-up: MT-H6 must rehearse the multi-tenant pilot flow and collect evidence proving Formwork and NHL can be operated from the same local platform without workspace copy, module, worker, or record leakage.
+
+## ADR-051 - MT-H6 multi-tenant pilot rehearsal and evidence pack completed
+
+Date: 2026-09-03
+
+Decision: MT-H6 is complete. The controlled local workspace runtime can rehearse the Formwork pilot firm and NHL Global Solution from the same Virtual Firm Platform while preserving selected-firm identity, subscription display, service lines, module availability, AI worker binding, and tenant-scoped backend access.
+
+Rationale: Multi-tenant readiness requires more than a selector. The platform must prove that switching active firm workspaces changes the runtime behavior and does not leak Formwork-specific copy, workers, technical modules, or tenant-scoped backend data into NHL Global Solution.
+
+Implementation: MT-H6 adds an end-to-end smoke rehearsal that seeds isolated pilot workspaces, validates Formwork and NHL active summaries, verifies module and worker differences, checks frontend runtime binding markers, and confirms a cross-tenant active-summary request is denied.
+
+Boundary: This decision does not approve public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, pricing intelligence, autonomous award, autonomous regulated approval, or live payment movement.
+
+Evidence: `scripts/smoke-mt-h6-multi-tenant-pilot-rehearsal.mjs`; `docs/10_post_freeze_technical_design/MT_H6_MULTI_TENANT_PILOT_REHEARSAL_AND_EVIDENCE_PACK_COMPLETION_v1.0.md`; `docs/10_post_freeze_technical_design/MT_MULTI_TENANT_WORKSPACE_RUNTIME_BINDING_CHECKLIST_v1.0.md`; `npm run check:mt:h6`; `npm run check`.
+
+Follow-up: Present the MT-H1 through MT-H6 multi-tenant workspace runtime binding pass for product-owner acceptance before starting the next scoped development plan.

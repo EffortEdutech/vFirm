@@ -71,27 +71,27 @@ scope: "Controlled local/private pilot hardening"
 
 ## MT-H6 — End-to-End Multi-Firm Rehearsal and Evidence Pack
 
-- [ ] Run Formwork workspace rehearsal.
-- [ ] Run NHL workspace rehearsal.
-- [ ] Switch active workspace between firms.
-- [ ] Verify dashboard, My Firm, Service Subscription, AI Workforce, Front Desk, Sales/Accounts, Projects, Ops, Audit.
-- [ ] Verify no cross-tenant leakage.
-- [ ] Verify legal/commercial boundaries remain visible.
-- [ ] Create completion evidence document.
-- [ ] Update decision register.
-- [ ] Run `npm run check`.
-- [ ] Commit and push to GitHub.
+- [x] Run Formwork workspace rehearsal.
+- [x] Run NHL workspace rehearsal.
+- [x] Switch active workspace between firms.
+- [x] Verify dashboard, My Firm, Service Subscription, AI Workforce, Front Desk, Sales/Accounts, Projects, Ops, Audit.
+- [x] Verify no cross-tenant leakage.
+- [x] Verify legal/commercial boundaries remain visible.
+- [x] Create completion evidence document.
+- [x] Update decision register.
+- [x] Run `npm run check`.
+- [x] Commit and push to GitHub.
 
 ## Final acceptance gate
 
-- [ ] Formwork pilot firm is accessible.
-- [ ] NHL Global Solution is accessible.
-- [ ] Each firm shows correct business identity.
-- [ ] Each firm shows what it subscribes to.
-- [ ] Each firm shows correct service lines.
-- [ ] Each firm shows correct AI workers.
-- [ ] Each firm has scoped records.
-- [ ] Each firm has scoped audit.
-- [ ] No public marketplace widening occurred.
-- [ ] No live payment movement occurred.
-- [ ] No autonomous regulated approval occurred.
+- [x] Formwork pilot firm is accessible.
+- [x] NHL Global Solution is accessible.
+- [x] Each firm shows correct business identity.
+- [x] Each firm shows what it subscribes to.
+- [x] Each firm shows correct service lines.
+- [x] Each firm shows correct AI workers.
+- [x] Each firm has scoped records.
+- [x] Each firm has scoped audit.
+- [x] No public marketplace widening occurred.
+- [x] No live payment movement occurred.
+- [x] No autonomous regulated approval occurred.
