@@ -288,3 +288,4 @@ The OP sprint plan and checklist govern the next bounded hardening pass after MT
 | `OP_EVIDENCE_PACK_COMPLETION_v1.0.md` | Completed OP-H1 through OP-H5 evidence pack for controlled multi-firm pilot operations readiness review. |
 | `OP_H6_CONTROLLED_MULTI_FIRM_PILOT_OPERATIONS_ACCEPTANCE_GATE_v1.0.md` | Product-owner acceptance decision gate for controlled multi-firm pilot operations readiness, with accept/hold/reject/defer options and locked boundaries. |
 | `OP_CONTROLLED_MULTI_FIRM_PILOT_OPERATIONS_ACCEPTANCE_DECISION_v1.0.md` | Product-owner acceptance decision for OP-H1 through OP-H6 controlled local/private pilot operation of Amanah Formwork Pilot Firm and NHL Global Solution as separate active firm workspaces. |
+| `NHL_BOQ_QUOTATION_WORKFLOW_SAMPLE_v1.0.md` | Records the controlled NHL Global Solution BOQ-image-to-quotation sample workflow and required vFirm quotation case capability. |
