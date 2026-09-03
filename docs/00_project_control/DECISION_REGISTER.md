@@ -531,3 +531,19 @@ Boundary: This decision does not approve production multi-tenant onboarding, pub
 Evidence: `docs/10_post_freeze_technical_design/MT_MULTI_TENANT_RUNTIME_BINDING_ACCEPTANCE_DECISION_v1.0.md`; `docs/10_post_freeze_technical_design/MT_MULTI_TENANT_RUNTIME_BINDING_ACCEPTANCE_DECISION_GATE_v1.0.md`; `scripts/smoke-mt-acceptance-decision.mjs`; `npm run check:mt:acceptance:decision`.
 
 Follow-up: Recommended next development scope is `OP-H1 - Controlled Multi-Firm Pilot Operations Foundation`, to be planned before writing implementation code.
+
+## ADR-054 - OP controlled multi-firm pilot operations plan created
+
+Date: 2026-09-03
+
+Decision: The next bounded development scope is OP-H1 through OP-H6, controlled multi-firm pilot operations for the verified active Formwork and NHL Global Solution workspaces.
+
+Rationale: MT acceptance proves selected-firm runtime binding. The next risk is operational: proving a human operator can run day-to-day pilot activity, issue handling, approval capture, evidence collection, audit reconstruction, and closeout separately for each firm without tenant leakage or inappropriate module behavior.
+
+Implementation: Added `OP_H1_TO_H6_CONTROLLED_MULTI_FIRM_PILOT_OPERATIONS_SPRINT_PLAN_v1.0.md`, `OP_H1_TO_H6_CONTROLLED_MULTI_FIRM_PILOT_OPERATIONS_CHECKLIST_v1.0.md`, and executable static validation in `scripts/smoke-op-plan-checklist.mjs`. The full regression chain now includes the OP plan smoke.
+
+Boundary: OP planning does not approve production multi-tenant onboarding, public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, pricing intelligence, autonomous award, autonomous regulated approval, live payment movement, or uncontrolled tenant/client data sharing.
+
+Evidence: `docs/10_post_freeze_technical_design/OP_H1_TO_H6_CONTROLLED_MULTI_FIRM_PILOT_OPERATIONS_SPRINT_PLAN_v1.0.md`; `docs/10_post_freeze_technical_design/OP_H1_TO_H6_CONTROLLED_MULTI_FIRM_PILOT_OPERATIONS_CHECKLIST_v1.0.md`; `scripts/smoke-op-plan-checklist.mjs`; `npm run check:op:plan`.
+
+Follow-up: Product owner may authorize `OP-H1 — Controlled Multi-Firm Pilot Operations Foundation` as the next active sprint.

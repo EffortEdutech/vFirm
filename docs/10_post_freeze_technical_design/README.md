@@ -269,3 +269,12 @@ The MT sprint plan and checklist govern the next bounded hardening pass for sele
 | `MT_H6_MULTI_TENANT_PILOT_REHEARSAL_AND_EVIDENCE_PACK_COMPLETION_v1.0.md` | Completion evidence for end-to-end Formwork and NHL multi-tenant pilot rehearsal, active workspace switching, cross-tenant denial, module/worker/subscription binding, and final MT evidence pack. |
 | `MT_MULTI_TENANT_RUNTIME_BINDING_ACCEPTANCE_DECISION_GATE_v1.0.md` | Product-owner decision gate for accepting, holding, or rejecting MT-H1 through MT-H6 controlled multi-tenant runtime binding readiness. |
 | `MT_MULTI_TENANT_RUNTIME_BINDING_ACCEPTANCE_DECISION_v1.0.md` | Product-owner acceptance decision for MT-H1 through MT-H6 controlled local/private multi-tenant runtime binding of Formwork and NHL active firm workspaces. |
+
+## Controlled multi-firm pilot operations
+
+The OP sprint plan and checklist govern the next bounded hardening pass after MT acceptance. OP work prepares controlled local/private pilot operation for Amanah Formwork Pilot Firm and NHL Global Solution without widening into production onboarding or marketplace capabilities.
+
+| Document | Purpose |
+| --- | --- |
+| `OP_H1_TO_H6_CONTROLLED_MULTI_FIRM_PILOT_OPERATIONS_SPRINT_PLAN_v1.0.md` | Governing sprint plan for OP-H1 through OP-H6 controlled multi-firm pilot operations foundation, dashboard, firm rehearsals, evidence, export, closeout, and acceptance gate. |
+| `OP_H1_TO_H6_CONTROLLED_MULTI_FIRM_PILOT_OPERATIONS_CHECKLIST_v1.0.md` | Execution checklist for OP-H1 through OP-H6 controlled multi-firm pilot operations readiness. |
