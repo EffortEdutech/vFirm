@@ -578,3 +578,18 @@ Boundary: OP-H2 does not approve production multi-tenant onboarding, public mark
 Evidence: `docs/10_post_freeze_technical_design/OP_H2_OPERATOR_DASHBOARD_AND_TODAY_VIEW_COMPLETION_v1.0.md`; `scripts/smoke-op-h2-operator-dashboard-today-view.mjs`; `npm run check:op:h2`.
 
 Follow-up: Proceed to `OP-H3 - Formwork Pilot Day Rehearsal` after product-owner authorization.
+## ADR-057 - OP-H3 Formwork pilot day rehearsal completed
+
+Date: 2026-09-03
+
+Decision: OP-H3 is complete. Amanah Formwork Pilot Firm now has an executable controlled Formwork pilot-day rehearsal.
+
+Rationale: OP-H2 made the selected-firm Today view operational. OP-H3 proves the Formwork workspace can run a realistic pilot-day path through enquiry, proposal, project, drawing review, QA finding, blocked delivery package, human professional review, controlled issue, audit reconstruction, and firm-scoped export.
+
+Implementation: Added `OP_H3_FORMWORK_PILOT_DAY_REHEARSAL_COMPLETION_v1.0.md` and executable validation in `scripts/smoke-op-h3-formwork-pilot-day-rehearsal.mjs`. OP-H3 checklist items are marked complete and the full regression chain now includes the OP-H3 smoke.
+
+Boundary: OP-H3 does not approve OP-H4 NHL rehearsal, OP-H5 evidence closeout, OP-H6 acceptance, production multi-tenant onboarding, public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, pricing intelligence, autonomous award, autonomous regulated approval, live payment movement, or uncontrolled tenant/client data sharing.
+
+Evidence: `docs/10_post_freeze_technical_design/OP_H3_FORMWORK_PILOT_DAY_REHEARSAL_COMPLETION_v1.0.md`; `scripts/smoke-op-h3-formwork-pilot-day-rehearsal.mjs`; `npm run check:op:h3`.
+
+Follow-up: Proceed to `OP-H4 - NHL Global Solution Pilot Day Rehearsal` after product-owner authorization.

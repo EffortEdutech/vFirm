@@ -36,16 +36,16 @@ scope: "Controlled local/private pilot operation for verified active firm worksp
 
 ## OP-H3 - Formwork Pilot Day Rehearsal
 
-- [ ] Create Formwork pilot-day fixture.
-- [ ] Rehearse client enquiry intake.
-- [ ] Rehearse project/drawing/QA activity.
-- [ ] Rehearse technical issue creation.
-- [ ] Block regulated technical issue until valid human professional approval exists.
-- [ ] Capture Formwork evidence trail.
-- [ ] Verify audit reconstruction for Formwork pilot day.
-- [ ] Verify export sample is Formwork tenant/firm scoped.
-- [ ] Add Formwork pilot-day smoke test.
-- [ ] Update evidence and decision register.
+- [x] Create Formwork pilot-day fixture.
+- [x] Rehearse client enquiry intake.
+- [x] Rehearse project/drawing/QA activity.
+- [x] Rehearse technical issue creation.
+- [x] Block regulated technical issue until valid human professional approval exists.
+- [x] Capture Formwork evidence trail.
+- [x] Verify audit reconstruction for Formwork pilot day.
+- [x] Verify export sample is Formwork tenant/firm scoped.
+- [x] Add Formwork pilot-day smoke test.
+- [x] Update evidence and decision register.
 
 ## OP-H4 - NHL Global Solution Pilot Day Rehearsal
 
@@ -72,7 +72,7 @@ scope: "Controlled local/private pilot operation for verified active firm worksp
 - [ ] Verify separate evidence records for Formwork and NHL.
 - [ ] Verify export records are tenant/firm scoped.
 - [ ] Add evidence/export smoke test.
-- [x] Update decision register.
+- [ ] Update decision register.
 
 ## OP-H6 - Controlled Multi-Firm Pilot Operations Acceptance Gate
 
