@@ -513,3 +513,21 @@ Boundary: This decision does not accept MT on behalf of the product owner and do
 Evidence: `docs/10_post_freeze_technical_design/MT_MULTI_TENANT_RUNTIME_BINDING_ACCEPTANCE_DECISION_GATE_v1.0.md`; `scripts/smoke-mt-acceptance-decision-gate.mjs`; `npm run check:mt:acceptance`.
 
 Follow-up: Product owner should choose Option A accept, Option B hold, or Option C reject using the MT acceptance decision gate wording.
+
+## ADR-053 - MT multi-tenant runtime binding accepted
+
+Date: 2026-09-03
+
+Decision: The product owner accepts MT-H1 through MT-H6 multi-tenant runtime binding with the listed limitations and authorizes controlled local/private pilot operation of the Formwork pilot firm and NHL Global Solution as separate active firm workspaces.
+
+Recorded wording: "Bismillah... I accept MT-H1 through MT-H6 multi-tenant runtime binding with the listed limitations. I authorize controlled local/private pilot operation of the Formwork pilot firm and NHL Global Solution as separate active firm workspaces. I do not authorize production multi-tenant onboarding, public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, pricing intelligence, autonomous award, autonomous regulated approval, or live payment movement."
+
+Rationale: MT-H6 evidence proves the selected active firm controls workspace identity, subscription display, service lines, module availability, AI worker binding, and tenant-scoped active workspace access for both verified pilot firms.
+
+Implementation: Added `MT_MULTI_TENANT_RUNTIME_BINDING_ACCEPTANCE_DECISION_v1.0.md` and executable smoke validation in `scripts/smoke-mt-acceptance-decision.mjs`. The full regression chain now includes the acceptance-decision smoke.
+
+Boundary: This decision does not approve production multi-tenant onboarding, public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, pricing intelligence, autonomous award, autonomous regulated approval, or live payment movement.
+
+Evidence: `docs/10_post_freeze_technical_design/MT_MULTI_TENANT_RUNTIME_BINDING_ACCEPTANCE_DECISION_v1.0.md`; `docs/10_post_freeze_technical_design/MT_MULTI_TENANT_RUNTIME_BINDING_ACCEPTANCE_DECISION_GATE_v1.0.md`; `scripts/smoke-mt-acceptance-decision.mjs`; `npm run check:mt:acceptance:decision`.
+
+Follow-up: Recommended next development scope is `OP-H1 - Controlled Multi-Firm Pilot Operations Foundation`, to be planned before writing implementation code.
