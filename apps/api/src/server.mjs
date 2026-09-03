@@ -8,7 +8,7 @@ import { acceptProposalRecord, approveProposalRecord, createClientRecord, comple
 import { createFrontDeskEnquiryRecord, qualifyFrontDeskEnquiryRecord, createClientCommunicationDraftRecord, handoffFrontDeskEnquiryRecord } from "./store.mjs";
 import { bindAdministrationSkillsRecord, createCorrespondenceRecord, registerDocumentRecord, addDocumentRevisionRecord, createAdministrativeDeadlineRecord, completeAdministrativeDeadlineRecord, createTransmittalDraftRecord } from "./store.mjs";
 import { bindCommercialSkillsRecord, createSalesPipelineRecord, updateSalesPipelineRecord, dispatchProposalRecord, createExpenseRecord, approveExpenseRecord, createReceivableFollowUpRecord, readCashSnapshot } from "./store.mjs";
-import { bindTechnicalSkillsRecord, createDrawingReviewRecord, createCalculationInputSetRecord, createTechnicalQaFindingRecord, resolveTechnicalQaFindingRecord, createDeliveryPackageRecord, readDailyOperationsSummary, createPilotHandoffRecord, createFactoryFirmBlueprintRecord, validateFactoryFirmBlueprintRecord, approveFactoryFirmBlueprintRecord, createFactoryProvisioningRunRecord, runFactoryReadinessTestRecord, acceptFactoryHandoffRecord, certifyFactoryPackBindingRecord, createQuotationCaseRecord, linkQuotationCaseProposalRecord, approveQuotationCaseRecord, issueQuotationCaseRecord } from "./store.mjs";
+import { bindTechnicalSkillsRecord, createDrawingReviewRecord, createCalculationInputSetRecord, createTechnicalQaFindingRecord, resolveTechnicalQaFindingRecord, createDeliveryPackageRecord, readDailyOperationsSummary, createPilotHandoffRecord, createFactoryFirmBlueprintRecord, validateFactoryFirmBlueprintRecord, approveFactoryFirmBlueprintRecord, createFactoryProvisioningRunRecord, runFactoryReadinessTestRecord, acceptFactoryHandoffRecord, certifyFactoryPackBindingRecord, createQuotationCaseRecord, linkQuotationCaseProposalRecord, approveQuotationCaseRecord, issueQuotationCaseRecord, createBoqExtractionAidRecord, reviewBoqExtractionAidRecord } from "./store.mjs";
 import { createNetworkProfessionalProfileRecord, createNetworkFirmProfileRecord, createNetworkCapabilityRecord, createNetworkCredentialRecord, createNetworkTrustSignalRecord } from "./store.mjs";
 import { createNetworkConflictCheckRecord, createNetworkQualificationGateRecord, createSpecialistInvitationRecord } from "./store.mjs";
 import { createCollaborationWorkspaceRecord, grantCollaborationWorkspaceParticipantRecord, revokeCollaborationWorkspaceParticipantRecord, addCollaborationWorkspaceEvidenceRecord, createResponsibilityMatrixRecord, createSpecialistAssignmentRecord, transitionSpecialistAssignmentRecord } from "./store.mjs";
@@ -47,6 +47,7 @@ const readCollections = new Map([
   ["delivery-package-records", "delivery_package_records"],
   ["pilot-handoff-records", "pilot_handoff_records"],
   ["quotation-cases", "quotation_cases"],
+  ["boq-extraction-aids", "boq_extraction_aids"],
   ["leads", "leads"],
   ["intake-sessions", "intake_sessions"],
   ["price-build-ups", "price_build_ups"],
@@ -2498,6 +2499,15 @@ async function issueQuotationCase(body, req = null) {
   return issueQuotationCaseRecord(body, actorFromBody(body, req, body.tenant_id, body.firm_id));
 }
 
+async function createBoqExtractionAid(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "quotation_case_id"]);
+  return createBoqExtractionAidRecord(body, actorFromBody(body, req, body.tenant_id, body.firm_id));
+}
+async function reviewBoqExtractionAid(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "boq_extraction_aid_id"]);
+  return reviewBoqExtractionAidRecord(body, actorFromBody(body, req, body.tenant_id, body.firm_id));
+}
+
 const routes = new Map([
   ["POST /tenants", createTenant],
   ["POST /firms", createFirm],
@@ -2555,6 +2565,8 @@ const routes = new Map([
   ["POST /quotation-cases/link-proposal", linkQuotationCaseProposal],
   ["POST /quotation-cases/approve", approveQuotationCase],
   ["POST /quotation-cases/issue", issueQuotationCase],
+  ["POST /boq-extraction-aids", createBoqExtractionAid],
+  ["POST /boq-extraction-aids/review", reviewBoqExtractionAid],
   ["POST /accounts/expenses", createExpense],
   ["POST /accounts/expenses/approve", approveExpense],
   ["POST /accounts/receivable-follow-ups", createReceivableFollowUp],

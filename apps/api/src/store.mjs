@@ -91,6 +91,7 @@ const initialStore = () => ({
   delivery_package_records: [],
   pilot_handoff_records: [],
   quotation_cases: [],
+  boq_extraction_aids: [],
   professional_authorities: [],
   actors: [],
   persons: [],
@@ -1185,6 +1186,67 @@ export async function issueQuotationCaseRecord(body, actor = systemActor(body.te
     item.status = "ISSUED_TO_CLIENT";
     item.updated_at = now();
     appendEventAndAudit(store, { event_type: "quotation_case.issued_to_client", actor, tenant_id: item.tenant_id, firm_id: item.firm_id, aggregate_type: "QuotationCase", aggregate_id: item.id, payload: { issued_document_ref: item.issued_document_ref, submitted_evidence_ref: item.submitted_evidence_ref }, summary: "Approved quotation case issued to client and registered as outgoing evidence." });
+    return item;
+  });
+}
+
+function buildBoqExtractionAid(body, quotationCase, documents, actor = {}) {
+  const timestamp = now();
+  const sourceEvidenceRefs = body.source_evidence_refs ?? quotationCase.intake_evidence_refs ?? [];
+  const extractedItems = body.extracted_items ?? [];
+  return {
+    id: storeBackend === "postgres" ? newUuid() : newId("boq_extraction_aid"),
+    tenant_id: body.tenant_id,
+    firm_id: body.firm_id,
+    quotation_case_id: quotationCase.id,
+    source_document_ids: body.source_document_ids ?? documents.map((document) => document.id),
+    source_evidence_refs: sourceEvidenceRefs,
+    extraction_method: body.extraction_method ?? "HUMAN_ASSISTED_REVIEW_WORKSHEET",
+    extraction_status: "DRAFT_REVIEW_REQUIRED",
+    extracted_items: extractedItems,
+    assumptions: body.assumptions ?? ["Source is client-supplied and must be checked by the human principal before quotation use."],
+    exclusions: body.exclusions ?? ["No autonomous measurement, pricing, technical certification, or client commitment."],
+    confidence_level: body.confidence_level ?? "LOW_UNVERIFIED",
+    requires_human_review: true,
+    authoritative: false,
+    reviewed_by_actor_id: null,
+    reviewed_at: null,
+    review_notes: null,
+    prepared_by_actor_id: actor.actor_id ?? actor.id ?? null,
+    created_at: timestamp,
+    updated_at: timestamp,
+    metadata: body.metadata ?? {}
+  };
+}
+
+export async function createBoqExtractionAidRecord(body, actor = systemActor(body.tenant_id, body.firm_id)) {
+  return withStore((store) => {
+    store.boq_extraction_aids ??= [];
+    const quotationCase = (store.quotation_cases ?? []).find((record) => record.id === body.quotation_case_id && record.tenant_id === body.tenant_id && record.firm_id === body.firm_id);
+    if (!quotationCase) throwNotFound("quotation_cases", body.quotation_case_id);
+    if (!quotationCase.document_register_entry_ids?.length && !(body.source_document_ids ?? []).length) invalidState("BOQ extraction aid requires registered source documents.");
+    const sourceIds = body.source_document_ids?.length ? body.source_document_ids : quotationCase.document_register_entry_ids;
+    const documents = sourceIds.map((id) => assertScopedReference(store, "document_register_entries", id, body));
+    const item = buildBoqExtractionAid(body, quotationCase, documents, actor);
+    store.boq_extraction_aids.push(item);
+    appendEventAndAudit(store, { event_type: "boq_extraction_aid.prepared", actor, tenant_id: item.tenant_id, firm_id: item.firm_id, aggregate_type: "BoqExtractionAid", aggregate_id: item.id, payload: { quotation_case_id: item.quotation_case_id, source_document_ids: item.source_document_ids, extracted_items: item.extracted_items.length, authoritative: false }, summary: "BOQ extraction review aid prepared; human review required before quotation use." });
+    return item;
+  });
+}
+
+export async function reviewBoqExtractionAidRecord(body, actor = systemActor(body.tenant_id, body.firm_id)) {
+  requireHumanPrincipalActor(actor, "BOQ extraction aid review");
+  return withStore((store) => {
+    store.boq_extraction_aids ??= [];
+    const item = (store.boq_extraction_aids ?? []).find((record) => record.id === body.boq_extraction_aid_id && record.tenant_id === body.tenant_id && record.firm_id === body.firm_id);
+    if (!item) throwNotFound("boq_extraction_aids", body.boq_extraction_aid_id);
+    if (item.extraction_status !== "DRAFT_REVIEW_REQUIRED") invalidState("Only draft BOQ extraction aids can be reviewed.");
+    item.extraction_status = body.review_decision === "REJECT" ? "REJECTED" : "HUMAN_REVIEWED";
+    item.reviewed_by_actor_id = actor.actor_id;
+    item.reviewed_at = now();
+    item.review_notes = body.review_notes ?? "Human principal reviewed BOQ extraction aid for quotation support.";
+    item.updated_at = item.reviewed_at;
+    appendEventAndAudit(store, { event_type: item.extraction_status === "REJECTED" ? "boq_extraction_aid.rejected" : "boq_extraction_aid.human_reviewed", actor, tenant_id: item.tenant_id, firm_id: item.firm_id, aggregate_type: "BoqExtractionAid", aggregate_id: item.id, payload: { extraction_status: item.extraction_status, quotation_case_id: item.quotation_case_id, authoritative: false }, summary: item.extraction_status === "REJECTED" ? "BOQ extraction aid rejected by human principal." : "BOQ extraction aid reviewed by human principal for quotation support; it remains non-authoritative." });
     return item;
   });
 }

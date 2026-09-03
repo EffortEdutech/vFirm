@@ -97,6 +97,18 @@ for (const marker of meS5OperatorUiMarkers) {
 assert(!app.includes('id="capacityOfferForm"'), "ME-S5 Network UI must not expose capacity offer creation.");
 assert(!app.includes('id="observatorySnapshotForm"'), "ME-S5 Network UI must not expose observatory snapshot publication.");
 
+const nhlQ2Markers = [
+  "BOQ Extraction Aid",
+  "boqExtractionAidForm",
+  "/boq-extraction-aids",
+  "boqExtractionReviewForm",
+  "Review aid only",
+  "boq_extraction_aids"
+];
+for (const marker of nhlQ2Markers) {
+  assert(app.includes(marker), `NHL-Q2 BOQ extraction aid UI marker missing: ${marker}`);
+}
+
 console.log(JSON.stringify({
   smoke: "web-navigation-renderers",
   result: "passed",

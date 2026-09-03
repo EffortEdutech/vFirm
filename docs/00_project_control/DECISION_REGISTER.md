@@ -676,3 +676,14 @@ Follow-up correction: The menu is hamburger-only rather than a permanent desktop
 Date: 2026-09-03
 
 Decision: NHL Global Solution BOQ-image quotation work is represented as a controlled quotation case linked to intake, document evidence, proposal approval, submitted quotation evidence, audit, and tenant export. Raw client files remain local/private and are not committed. No autonomous approval, pricing intelligence, live payment movement, public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, autonomous award, or autonomous regulated approval is authorized.
+
+## ADR-065 - NHL-Q2 BOQ extraction aid completed
+
+Date: 2026-09-03
+
+Decision: NHL BOQ extraction aids are controlled, non-authoritative, tenant-scoped review worksheets linked to quotation cases and document-control evidence. Human principal review is required before they can support quotation drafting. No autonomous measurement, pricing, approval, regulated certification, client commitment, live payment, public marketplace, live matching, ranking, capacity allocation, VF-24 publication, pricing intelligence, autonomous award, or autonomous regulated approval is authorized.
+
+Evidence:
+- `docs/10_post_freeze_technical_design/NHL_Q2_QUOTATION_DOCUMENT_CONTROL_AND_BOQ_EXTRACTION_AID_COMPLETION_v1.0.md`
+- `scripts/smoke-nhl-q2-boq-extraction-aid.mjs`
+- API routes `/api/boq-extraction-aids` and `/api/boq-extraction-aids/review`
