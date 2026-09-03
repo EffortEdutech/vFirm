@@ -159,7 +159,7 @@ Rationale: R5-S2 adds deterministic gate records for credential verification, ju
 
 Boundaries: Matching and invitation remain qualification-first, not price-first. Denied gate and denied invitation attempts are auditable evidence, not accepted collaboration. This does not authorize public marketplace, VF-24 ecosystem intelligence, autonomous regulated award, autonomous regulated approval, uncontrolled tenant data sharing, or live payment movement.
 
-Executable evidence: 
+Executable evidence:
 npm run check:r5:s2 passes.
 ## ADR-027 - Release 5 accepted and marketplace ecosystem scope decision preparation authorized
 
@@ -701,3 +701,16 @@ Evidence:
 - Operational repair command: `npm run seed:pilot-workspaces` against local Postgres-backed API on 3091
 
 Boundaries: No autonomous measurement, pricing, approval, regulated certification, client-facing issue, external send, live payment movement, public marketplace, live matching, ranking, capacity allocation, VF-24 publication, pricing intelligence, autonomous award, or autonomous regulated approval is authorized.
+
+## ADR-067 - NHL-Q4 controlled quotation issue and receivables preparation completed
+
+Date: 2026-09-04
+Status: Accepted for controlled local/private pilot readiness
+
+Decision: NHL-Q4 adds explicit human-principal controlled quotation issue records and receivable-preparation records for NHL Global Solution's BOQ quotation workflow. The platform records issued document/evidence references, transitions quotation case/draft/correspondence state, and prepares invoice-readiness records without live payment movement.
+
+Rationale: NHL's real quotation work needs a controlled bridge between reviewed draft packages and client/business follow-up. The issue step must remain human-authorized and auditable, while receivables must remain preparation-only until later payment and invoicing scopes are explicitly authorized.
+
+Boundaries: No autonomous quotation issue, external send, autonomous pricing/measurement/certification/approval, live payment movement, payment capture, bank instruction, public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, pricing intelligence, autonomous award, or autonomous regulated approval.
+
+Evidence: `scripts/smoke-nhl-q4-controlled-issue-receivables.mjs`; `npm run check:nhl:q4`; `docs/10_post_freeze_technical_design/NHL_Q4_CONTROLLED_QUOTATION_ISSUE_AND_RECEIVABLES_PREPARATION_COMPLETION_v1.0.md`.

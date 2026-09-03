@@ -8,7 +8,7 @@ import { acceptProposalRecord, approveProposalRecord, createClientRecord, comple
 import { createFrontDeskEnquiryRecord, qualifyFrontDeskEnquiryRecord, createClientCommunicationDraftRecord, handoffFrontDeskEnquiryRecord } from "./store.mjs";
 import { bindAdministrationSkillsRecord, createCorrespondenceRecord, registerDocumentRecord, addDocumentRevisionRecord, createAdministrativeDeadlineRecord, completeAdministrativeDeadlineRecord, createTransmittalDraftRecord } from "./store.mjs";
 import { bindCommercialSkillsRecord, createSalesPipelineRecord, updateSalesPipelineRecord, dispatchProposalRecord, createExpenseRecord, approveExpenseRecord, createReceivableFollowUpRecord, readCashSnapshot } from "./store.mjs";
-import { bindTechnicalSkillsRecord, createDrawingReviewRecord, createCalculationInputSetRecord, createTechnicalQaFindingRecord, resolveTechnicalQaFindingRecord, createDeliveryPackageRecord, readDailyOperationsSummary, createPilotHandoffRecord, createFactoryFirmBlueprintRecord, validateFactoryFirmBlueprintRecord, approveFactoryFirmBlueprintRecord, createFactoryProvisioningRunRecord, runFactoryReadinessTestRecord, acceptFactoryHandoffRecord, certifyFactoryPackBindingRecord, createQuotationCaseRecord, linkQuotationCaseProposalRecord, approveQuotationCaseRecord, issueQuotationCaseRecord, createBoqExtractionAidRecord, reviewBoqExtractionAidRecord, createQuotationDraftPackRecord, reviewQuotationDraftPackRecord, prepareQuotationClientCorrespondenceRecord } from "./store.mjs";
+import { bindTechnicalSkillsRecord, createDrawingReviewRecord, createCalculationInputSetRecord, createTechnicalQaFindingRecord, resolveTechnicalQaFindingRecord, createDeliveryPackageRecord, readDailyOperationsSummary, createPilotHandoffRecord, createFactoryFirmBlueprintRecord, validateFactoryFirmBlueprintRecord, approveFactoryFirmBlueprintRecord, createFactoryProvisioningRunRecord, runFactoryReadinessTestRecord, acceptFactoryHandoffRecord, certifyFactoryPackBindingRecord, createQuotationCaseRecord, linkQuotationCaseProposalRecord, approveQuotationCaseRecord, issueQuotationCaseRecord, createBoqExtractionAidRecord, reviewBoqExtractionAidRecord, createQuotationDraftPackRecord, reviewQuotationDraftPackRecord, prepareQuotationClientCorrespondenceRecord, issueQuotationDraftPackRecord, prepareQuotationReceivableRecord } from "./store.mjs";
 import { createNetworkProfessionalProfileRecord, createNetworkFirmProfileRecord, createNetworkCapabilityRecord, createNetworkCredentialRecord, createNetworkTrustSignalRecord } from "./store.mjs";
 import { createNetworkConflictCheckRecord, createNetworkQualificationGateRecord, createSpecialistInvitationRecord } from "./store.mjs";
 import { createCollaborationWorkspaceRecord, grantCollaborationWorkspaceParticipantRecord, revokeCollaborationWorkspaceParticipantRecord, addCollaborationWorkspaceEvidenceRecord, createResponsibilityMatrixRecord, createSpecialistAssignmentRecord, transitionSpecialistAssignmentRecord } from "./store.mjs";
@@ -49,6 +49,8 @@ const readCollections = new Map([
   ["quotation-cases", "quotation_cases"],
   ["boq-extraction-aids", "boq_extraction_aids"],
   ["quotation-draft-packs", "quotation_draft_packs"],
+  ["quotation-issue-records", "quotation_issue_records"],
+  ["quotation-receivable-preparations", "quotation_receivable_preparations"],
   ["leads", "leads"],
   ["intake-sessions", "intake_sessions"],
   ["price-build-ups", "price_build_ups"],
@@ -710,7 +712,7 @@ const tenantExportCollections = [
   "tenants", "firms", "firm_memberships", "professional_profiles", "professional_authorities", "actors", "persons",
   "clients", "firm_client_relationships", "front_desk_enquiries", "client_communication_drafts", "leads", "intake_sessions",
   "administration_skill_bindings", "correspondence_records", "document_register_entries", "document_revision_records", "administrative_deadlines", "transmittal_drafts",
-  "commercial_skill_bindings", "sales_pipeline_records", "price_build_ups", "proposals", "proposal_dispatch_records", "approvals", "engagements", "projects", "work_packages", "tasks",
+  "commercial_skill_bindings", "sales_pipeline_records", "price_build_ups", "quotation_cases", "boq_extraction_aids", "quotation_draft_packs", "quotation_issue_records", "quotation_receivable_preparations", "proposals", "proposal_dispatch_records", "approvals", "engagements", "projects", "work_packages", "tasks",
   "technical_skill_bindings", "drawing_review_records", "calculation_input_sets", "technical_qa_findings", "delivery_package_records",
   "documents", "document_versions", "evidence_bundles", "invoices", "payment_statuses", "expense_records", "receivable_follow_ups",
   "worker_instances", "task_outputs", "tool_invocations", "pilot_handoff_records", "pilot_users", "support_cases", "pilot_incidents", "pilot_feedback", "pilot_acceptance_reviews", "pilot_improvement_items", "pilot_report_packs", "stakeholder_review_boards", "stakeholder_review_decisions",
@@ -2521,6 +2523,15 @@ async function prepareQuotationClientCorrespondence(body, req = null) {
   return prepareQuotationClientCorrespondenceRecord(body, actorFromBody(body, req, body.tenant_id, body.firm_id));
 }
 
+async function issueQuotationDraftPack(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "quotation_draft_pack_id", "issued_document_ref", "submitted_evidence_ref"]);
+  return issueQuotationDraftPackRecord(body, actorFromBody(body, req, body.tenant_id, body.firm_id));
+}
+async function prepareQuotationReceivable(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "quotation_issue_record_id"]);
+  return prepareQuotationReceivableRecord(body, actorFromBody(body, req, body.tenant_id, body.firm_id));
+}
+
 const routes = new Map([
   ["POST /tenants", createTenant],
   ["POST /firms", createFirm],
@@ -2583,6 +2594,8 @@ const routes = new Map([
   ["POST /quotation-draft-packs", createQuotationDraftPack],
   ["POST /quotation-draft-packs/review", reviewQuotationDraftPack],
   ["POST /quotation-draft-packs/client-correspondence", prepareQuotationClientCorrespondence],
+  ["POST /quotation-draft-packs/issue", issueQuotationDraftPack],
+  ["POST /quotation-receivable-preparations", prepareQuotationReceivable],
   ["POST /accounts/expenses", createExpense],
   ["POST /accounts/expenses/approve", approveExpense],
   ["POST /accounts/receivable-follow-ups", createReceivableFollowUp],
@@ -2711,45 +2724,3 @@ const server = createServer(async (req, res) => {
 });
 
 server.listen(port, () => console.log(`vFirm API listening on http://127.0.0.1:${port}`));
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

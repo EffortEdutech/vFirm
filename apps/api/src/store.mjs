@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+﻿import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { randomUUID } from "node:crypto";
 import pg from "pg";
@@ -93,6 +93,8 @@ const initialStore = () => ({
   quotation_cases: [],
   boq_extraction_aids: [],
   quotation_draft_packs: [],
+  quotation_issue_records: [],
+  quotation_receivable_preparations: [],
   professional_authorities: [],
   actors: [],
   persons: [],
@@ -1363,6 +1365,113 @@ export async function prepareQuotationClientCorrespondenceRecord(body, actor = s
   });
 }
 
+function buildQuotationIssueRecord(body, quotationCase, draftPack, correspondence, actor = {}) {
+  const timestamp = now();
+  return {
+    id: storeBackend === "postgres" ? newUuid() : newId("quotation_issue_record"),
+    tenant_id: body.tenant_id,
+    firm_id: body.firm_id,
+    quotation_case_id: quotationCase.id,
+    quotation_draft_pack_id: draftPack.id,
+    correspondence_record_id: correspondence.id,
+    relationship_id: quotationCase.relationship_id ?? null,
+    issue_status: "ISSUED_TO_CLIENT_BY_HUMAN",
+    issue_channel: body.issue_channel ?? correspondence.channel ?? "EMAIL",
+    issued_to: body.issued_to ?? correspondence.correspondent ?? "Client",
+    issued_document_ref: body.issued_document_ref,
+    submitted_evidence_ref: body.submitted_evidence_ref,
+    line_items: draftPack.line_items ?? [],
+    amount_summary: body.amount_summary ?? draftPack.commercial_summary ?? null,
+    validity_terms: body.validity_terms ?? draftPack.validity_terms ?? null,
+    assumptions: draftPack.assumptions ?? [],
+    exclusions: draftPack.exclusions ?? [],
+    issued_by_actor_id: actor.actor_id,
+    issued_at: timestamp,
+    human_authorized: true,
+    client_facing: true,
+    ai_issued: false,
+    payment_action_taken: false,
+    professional_certification: false,
+    created_at: timestamp,
+    updated_at: timestamp,
+    metadata: body.metadata ?? {}
+  };
+}
+
+export async function issueQuotationDraftPackRecord(body, actor = systemActor(body.tenant_id, body.firm_id)) {
+  requireHumanPrincipalActor(actor, "Controlled quotation issue");
+  return withStore((store) => {
+    store.quotation_issue_records ??= [];
+    store.quotation_draft_packs ??= [];
+    store.correspondence_records ??= [];
+    const draftPack = store.quotation_draft_packs.find((record) => record.id === body.quotation_draft_pack_id && record.tenant_id === body.tenant_id && record.firm_id === body.firm_id);
+    if (!draftPack) throwNotFound("quotation_draft_packs", body.quotation_draft_pack_id);
+    if (draftPack.draft_status !== "HUMAN_REVIEWED") invalidState("Controlled quotation issue requires a human-reviewed quotation draft pack.");
+    if (!draftPack.correspondence_record_id) invalidState("Controlled quotation issue requires prepared client correspondence.");
+    const quotationCase = assertScopedReference(store, "quotation_cases", draftPack.quotation_case_id, body);
+    const correspondence = store.correspondence_records.find((record) => record.id === draftPack.correspondence_record_id && record.tenant_id === body.tenant_id && record.firm_id === body.firm_id);
+    if (!correspondence) throwNotFound("correspondence_records", draftPack.correspondence_record_id);
+    if (correspondence.status !== "DRAFT_REVIEW_REQUIRED") invalidState("Controlled quotation issue requires correspondence in draft review state.");
+    const duplicate = store.quotation_issue_records.find((record) => record.quotation_draft_pack_id === draftPack.id && record.issue_status === "ISSUED_TO_CLIENT_BY_HUMAN");
+    if (duplicate) invalidState("Quotation draft pack has already been issued to the client by a human.");
+    const item = buildQuotationIssueRecord(body, quotationCase, draftPack, correspondence, actor);
+    store.quotation_issue_records.push(item);
+    draftPack.draft_status = "ISSUED_TO_CLIENT_BY_HUMAN";
+    draftPack.client_correspondence_status = "ISSUED_BY_HUMAN";
+    draftPack.client_facing = true;
+    draftPack.issued_document_ref = item.issued_document_ref;
+    draftPack.submitted_evidence_ref = item.submitted_evidence_ref;
+    draftPack.issued_by_actor_id = actor.actor_id;
+    draftPack.issued_at = item.issued_at;
+    draftPack.updated_at = item.updated_at;
+    correspondence.status = "ISSUED_BY_HUMAN";
+    correspondence.metadata = { ...(correspondence.metadata ?? {}), quotation_issue_record_id: item.id, client_facing_issue_blocked: false, issued_document_ref: item.issued_document_ref, submitted_evidence_ref: item.submitted_evidence_ref };
+    correspondence.updated_at = item.updated_at;
+    quotationCase.status = "ISSUED_TO_CLIENT";
+    quotationCase.issued_document_ref = item.issued_document_ref;
+    quotationCase.submitted_evidence_ref = item.submitted_evidence_ref;
+    quotationCase.issued_by_actor_id = actor.actor_id;
+    quotationCase.issued_at = item.issued_at;
+    quotationCase.updated_at = item.updated_at;
+    appendEventAndAudit(store, { event_type: "quotation_issue.controlled_issue_recorded", actor, tenant_id: item.tenant_id, firm_id: item.firm_id, aggregate_type: "QuotationIssueRecord", aggregate_id: item.id, payload: { quotation_case_id: item.quotation_case_id, quotation_draft_pack_id: item.quotation_draft_pack_id, correspondence_record_id: item.correspondence_record_id, human_authorized: true, payment_action_taken: false }, summary: "Quotation issue recorded by human principal with issued document and submitted evidence references." });
+    return { quotation_issue_record: item, quotation_draft_pack: draftPack, quotation_case: quotationCase, correspondence };
+  });
+}
+
+export async function prepareQuotationReceivableRecord(body, actor = systemActor(body.tenant_id, body.firm_id)) {
+  return withStore((store) => {
+    store.quotation_issue_records ??= [];
+    store.quotation_receivable_preparations ??= [];
+    const issue = store.quotation_issue_records.find((record) => record.id === body.quotation_issue_record_id && record.tenant_id === body.tenant_id && record.firm_id === body.firm_id);
+    if (!issue) throwNotFound("quotation_issue_records", body.quotation_issue_record_id);
+    if (issue.issue_status !== "ISSUED_TO_CLIENT_BY_HUMAN") invalidState("Receivable preparation requires a human-issued quotation record.");
+    const duplicate = store.quotation_receivable_preparations.find((record) => record.quotation_issue_record_id === issue.id);
+    if (duplicate) invalidState("Receivable preparation already exists for this quotation issue record.");
+    const timestamp = now();
+    const item = {
+      id: storeBackend === "postgres" ? newUuid() : newId("quotation_receivable_preparation"),
+      tenant_id: body.tenant_id,
+      firm_id: body.firm_id,
+      quotation_issue_record_id: issue.id,
+      quotation_case_id: issue.quotation_case_id,
+      quotation_draft_pack_id: issue.quotation_draft_pack_id,
+      relationship_id: issue.relationship_id ?? null,
+      receivable_status: "RECEIVABLE_PREPARED_REVIEW_REQUIRED",
+      amount_summary: body.amount_summary ?? issue.amount_summary ?? null,
+      invoice_draft_ref: body.invoice_draft_ref ?? null,
+      payment_boundary: "NO_LIVE_PAYMENT_MOVEMENT",
+      payment_action_taken: false,
+      bank_instruction_ref: null,
+      prepared_by_actor_id: actor.actor_id,
+      created_at: timestamp,
+      updated_at: timestamp,
+      metadata: body.metadata ?? {}
+    };
+    store.quotation_receivable_preparations.push(item);
+    appendEventAndAudit(store, { event_type: "quotation_receivable.prepared", actor, tenant_id: item.tenant_id, firm_id: item.firm_id, aggregate_type: "QuotationReceivablePreparation", aggregate_id: item.id, payload: { quotation_issue_record_id: item.quotation_issue_record_id, receivable_status: item.receivable_status, payment_action_taken: false, payment_boundary: item.payment_boundary }, summary: "Quotation receivable preparation recorded for review; no live payment action or bank instruction was created." });
+    return item;
+  });
+}
 export async function approveProposalRecord(body, actor, decision) {
   if (storeBackend !== "postgres") {
     return withStore((store) => {
@@ -4071,58 +4180,3 @@ async function loadLocalEnv(path) {
     if (error?.code !== "ENOENT") throw error;
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

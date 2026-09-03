@@ -121,6 +121,22 @@ for (const marker of nhlQ3Markers) {
   assert(app.includes(marker), `NHL-Q3 quotation draft UI marker missing: ${marker}`);
 }
 
+const nhlQ4Markers = [
+  "Controlled Quotation Issue and Receivables",
+  "quotationIssueForm",
+  "/quotation-draft-packs/issue",
+  "quotationReceivablePreparationForm",
+  "/quotation-receivable-preparations",
+  "Controlled Quotation Issue Register",
+  "Receivables Preparation Register",
+  "quotation_issue_records",
+  "quotation_receivable_preparations",
+  "NO_LIVE_PAYMENT_MOVEMENT"
+];
+for (const marker of nhlQ4Markers) {
+  assert(app.includes(marker), `NHL-Q4 controlled issue UI marker missing: ${marker}`);
+}
+
 console.log(JSON.stringify({
   smoke: "web-navigation-renderers",
   result: "passed",
