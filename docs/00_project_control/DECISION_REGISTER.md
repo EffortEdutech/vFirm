@@ -497,3 +497,19 @@ Boundary: This decision does not approve public marketplace, live matching, rank
 Evidence: `scripts/smoke-mt-h6-multi-tenant-pilot-rehearsal.mjs`; `docs/10_post_freeze_technical_design/MT_H6_MULTI_TENANT_PILOT_REHEARSAL_AND_EVIDENCE_PACK_COMPLETION_v1.0.md`; `docs/10_post_freeze_technical_design/MT_MULTI_TENANT_WORKSPACE_RUNTIME_BINDING_CHECKLIST_v1.0.md`; `npm run check:mt:h6`; `npm run check`.
 
 Follow-up: Present the MT-H1 through MT-H6 multi-tenant workspace runtime binding pass for product-owner acceptance before starting the next scoped development plan.
+
+## ADR-052 - MT multi-tenant runtime binding acceptance gate prepared
+
+Date: 2026-09-03
+
+Decision: The product-owner acceptance decision gate for MT-H1 through MT-H6 has been prepared and remains pending product-owner decision.
+
+Rationale: MT-H6 completed the technical rehearsal, but acceptance must be explicit. The gate separates technical readiness evidence from product-owner authorization and keeps the next scope blocked until the owner chooses accept, hold, or reject.
+
+Implementation: Added `MT_MULTI_TENANT_RUNTIME_BINDING_ACCEPTANCE_DECISION_GATE_v1.0.md` and executable smoke validation in `scripts/smoke-mt-acceptance-decision-gate.mjs`. The full regression chain now includes the acceptance-gate smoke.
+
+Boundary: This decision does not accept MT on behalf of the product owner and does not approve production multi-tenant onboarding, public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, pricing intelligence, autonomous award, autonomous regulated approval, or live payment movement.
+
+Evidence: `docs/10_post_freeze_technical_design/MT_MULTI_TENANT_RUNTIME_BINDING_ACCEPTANCE_DECISION_GATE_v1.0.md`; `scripts/smoke-mt-acceptance-decision-gate.mjs`; `npm run check:mt:acceptance`.
+
+Follow-up: Product owner should choose Option A accept, Option B hold, or Option C reject using the MT acceptance decision gate wording.
