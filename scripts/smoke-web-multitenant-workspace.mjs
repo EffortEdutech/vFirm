@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 
 const html = await readFile("apps/web/public/index.html", "utf8");
 const app = await readFile("apps/web/public/app.js", "utf8");
+const css = await readFile("apps/web/public/styles.css", "utf8");
 const seed = await readFile("scripts/seed-nhl-global-solution-local.mjs", "utf8");
 const onboarding = await readFile("scripts/smoke-nhl-global-solution-onboarding.mjs", "utf8");
 
@@ -11,6 +12,7 @@ function assert(condition, message) {
 
 assert(html.includes('id="activeWorkspace"'), "Active workspace selector container missing from HTML.");
 assert(html.includes('id="workspaceSidebar"') && html.includes('id="sidebarToggle"'), "Corporate hamburger sidebar shell missing from HTML.");
+assert(css.includes(".workspace-command-center {\n  display: contents;"), "Workspace header must be compact and not repeat as a large noticeboard.");
 assert(app.includes('ACTIVE_FIRM_STORAGE_KEY = "vfirm.activeFirmId"'), "Active firm localStorage key missing.");
 assert(/function\s+activeFirmInStore\s*\(/.test(app), "activeFirmInStore helper missing.");
 assert(/function\s+activeTenantInStore\s*\(/.test(app), "activeTenantInStore helper missing.");
@@ -33,6 +35,8 @@ console.log(JSON.stringify({
     "active_firm_persistence",
     "scoped_store_rendering",
     "development_mode_full_feature_visibility",
+    "compact_workspace_header",
+    "hamburger_only_menu",
     "firm_client_relationship_scoping",
     "nhl_singular_name"
   ]

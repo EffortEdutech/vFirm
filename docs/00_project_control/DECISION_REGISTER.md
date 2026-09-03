@@ -668,3 +668,5 @@ Implementation: Updated `apps/web/public/index.html`, `apps/web/public/styles.cs
 Boundary: This polish does not authorize production multi-tenant onboarding, public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, pricing intelligence, autonomous award, autonomous regulated approval, live payment movement, or uncontrolled tenant/client data sharing. Subscription metadata and tenant boundary evidence remain intact.
 
 Evidence: `docs/10_post_freeze_technical_design/UI_CORPORATE_WORKSPACE_SHELL_POLISH_RESULT_v1.0.md`; `npm run check:web:navigation`; `npm run check:web:multitenant`; `npm run check:mt:h5`; `npm run check:mt:h6`; `npm run check`.
+
+Follow-up correction: The menu is hamburger-only rather than a permanent desktop sidebar, and the repeated workspace context is compact so page content appears without a large noticeboard-style header.

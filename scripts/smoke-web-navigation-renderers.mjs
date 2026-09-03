@@ -16,6 +16,10 @@ assert(new Set(sectionViews).size === sectionViews.length, "Duplicate workspace-
 assert(html.indexOf('id="view-my-firm"') > html.indexOf('id="view-workflow"'), "My Firm view must be a top-level sibling after Workflow, not nested inside it.");
 assert(html.includes('class="app-shell"') && html.includes('id="workspaceSidebar"') && html.includes('id="sidebarToggle"'), "Corporate app shell missing.");
 assert(html.includes('class="workspace-command-center"'), "Workspace command center missing from shell.");
+const css = await readFile("apps/web/public/styles.css", "utf8");
+assert(css.includes("/* UI correction: hamburger-only navigation and compact workspace header. */"), "Hamburger-only UI correction CSS missing.");
+assert(css.includes(".workspace-command-center {\n  display: contents;"), "Workspace command center must not consume page height.");
+assert(css.includes(".workspace-sidebar {\n  position: fixed;") && css.includes("transform: translateX(-105%)"), "Sidebar must be hidden until hamburger opens it.");
 
 const requiredRenderers = [
   "renderMyFirmModule",

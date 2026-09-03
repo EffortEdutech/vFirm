@@ -110,3 +110,16 @@ Recommended next UI improvements:
 2. split remaining Formwork-specific form labels from generic organization-support labels;
 3. add a proper design token file before larger component refactoring;
 4. add production-mode role/tenant visibility enforcement only after a separate authorization.
+
+## 8. Compact hamburger correction
+
+A follow-up correction changed the corporate navigation from a permanent desktop sidebar to a hamburger-only overlay menu. The repeated workspace context was compressed so normal page content appears immediately without a large noticeboard-style header on every page.
+
+Correction details:
+
+- the sidebar is hidden by default on all viewport sizes;
+- the hamburger button opens the menu overlay;
+- the workspace command center no longer consumes page height;
+- the active workspace selector remains visible in the compact top area;
+- tenant, principal, firm type, subscription, and services are shown as compact context instead of stacked noticeboard blocks;
+- all feature areas remain visible for development review.

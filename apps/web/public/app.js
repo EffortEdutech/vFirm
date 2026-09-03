@@ -288,7 +288,7 @@ function renderReleaseBanner(store) {
   const contract = activeWorkspaceContract(store);
   const backend = store._dashboard_summary?.health?.persistence?.backend ?? "unknown";
   const boundary = store.commercial_launch_summary?.boundary ?? contract.subscription?.metadata?.commercial_boundary ?? "no_live_payment_capture";
-  releaseBanner.innerHTML = `<strong>${escapeHtml(contract.profile.workspace_classification ?? "PILOT")} workspace</strong><span>${escapeHtml(contract.firm?.name ?? "No active firm")} is running in ${escapeHtml(backend)} mode under ${escapeHtml(contract.subscription?.package_code ?? "no subscription package")}. Commercial boundary: ${escapeHtml(humanStatus(boundary))}.</span>`;
+  releaseBanner.innerHTML = `<strong>${escapeHtml(contract.profile.workspace_classification ?? "PILOT")} workspace</strong><span>${escapeHtml(contract.subscription?.package_code ?? "No package")} · ${escapeHtml(humanStatus(boundary))} · ${escapeHtml(backend)}</span>`;
 }
 function renderHealthCards(store) {
   if (!healthCards) return;
@@ -731,7 +731,7 @@ function renderActiveWorkspaceSelector(rawStore, scopedStore) {
     const tenant = tenants.find((item) => item.id === firm.tenant_id);
     return `<option value="${escapeHtml(firm.id)}" ${firm.id === activeFirm?.id ? "selected" : ""}>${escapeHtml(firm.name)} — ${escapeHtml(tenant?.name ?? shortId(firm.tenant_id))}</option>`;
   }).join("");
-  activeWorkspace.innerHTML = `<form id="activeFirmForm" class="active-workspace-form"><label class="active-workspace-picker"><span>Active firm workspace</span><select id="activeFirmSelect" name="firm_id">${options}</select></label><div class="active-workspace-card"><div class="workspace-meta-grid"><div class="workspace-meta-card"><span>Tenant boundary</span><strong>${escapeHtml(activeTenant?.name ?? "-")}</strong></div><div class="workspace-meta-card"><span>Firm</span><strong>${escapeHtml(activeFirm?.name ?? "-")}</strong></div><div class="workspace-meta-card"><span>Virtual Principal</span><strong>${escapeHtml(contract.principal?.display_name ?? contract.profile.principal_display_name ?? "Not resolved")}</strong></div><div class="workspace-meta-card"><span>Subscription</span><strong>${escapeHtml(contract.subscription?.package_code ?? "Not bound")}</strong></div><div class="workspace-meta-card wide"><span>Services</span><strong>${escapeHtml(workspaceServiceSummary(contract))}</strong></div></div><p class="workspace-dev-note">Development mode: all future work areas are visible for build/review. The active firm subscription still controls business meaning, worker binding, and authority evidence.</p></div></form>`;
+  activeWorkspace.innerHTML = `<form id="activeFirmForm" class="active-workspace-form"><label class="active-workspace-picker"><span>Active workspace</span><select id="activeFirmSelect" name="firm_id">${options}</select></label><div class="active-workspace-card compact-context"><strong>${escapeHtml(activeTenant?.name ?? "-")}</strong><small>${escapeHtml(contract.principal?.display_name ?? contract.profile.principal_display_name ?? "Not resolved")} · ${escapeHtml(contract.profile.firm_type ?? "UNCLASSIFIED")} · ${escapeHtml(contract.subscription?.package_code ?? "Not bound")}</small><small>${escapeHtml(workspaceServiceSummary(contract))}</small></div></form>`;
   activeWorkspace.querySelector("#activeFirmSelect")?.addEventListener("change", (event) => {
     activeFirmId = event.currentTarget.value;
     localStorage.setItem(ACTIVE_FIRM_STORAGE_KEY, activeFirmId);
