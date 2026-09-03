@@ -54,9 +54,10 @@ for (const helper of requiredHelpers) {
   assert(new RegExp(`function\\s+${helper}\\s*\\(`).test(app), `Missing render helper: ${helper}`);
 }
 
-const renderRecordViews = app.match(/function renderRecordViews\(store\) \{(?<body>[\s\S]*?)\n\}\n\nfunction renderAll\(\) \{/);
-assert(renderRecordViews?.groups?.body, "renderRecordViews function body not found.");
-const renderRecordViewsBody = renderRecordViews.groups.body;
+const renderRecordViewsStart = app.indexOf("function renderRecordViews(store) {");
+const renderAllStart = app.indexOf("function renderAll() {", renderRecordViewsStart);
+assert(renderRecordViewsStart >= 0 && renderAllStart > renderRecordViewsStart, "renderRecordViews function body not found.");
+const renderRecordViewsBody = app.slice(renderRecordViewsStart, renderAllStart);
 for (const renderer of requiredRenderers) {
   assert(renderRecordViewsBody.includes(`safeRenderModule(`), "renderRecordViews must use safeRenderModule guards.");
   assert(!renderRecordViewsBody.includes(`${renderer}(store);`), `Unsafe direct renderer call found in renderRecordViews: ${renderer}(store);`);

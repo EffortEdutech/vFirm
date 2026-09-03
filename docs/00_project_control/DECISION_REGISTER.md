@@ -670,3 +670,9 @@ Boundary: This polish does not authorize production multi-tenant onboarding, pub
 Evidence: `docs/10_post_freeze_technical_design/UI_CORPORATE_WORKSPACE_SHELL_POLISH_RESULT_v1.0.md`; `npm run check:web:navigation`; `npm run check:web:multitenant`; `npm run check:mt:h5`; `npm run check:mt:h6`; `npm run check`.
 
 Follow-up correction: The menu is hamburger-only rather than a permanent desktop sidebar, and the repeated workspace context is compact so page content appears without a large noticeboard-style header.
+
+## ADR-064 - NHL-Q1 BOQ quotation intake and issue workflow completed
+
+Date: 2026-09-03
+
+Decision: NHL Global Solution BOQ-image quotation work is represented as a controlled quotation case linked to intake, document evidence, proposal approval, submitted quotation evidence, audit, and tenant export. Raw client files remain local/private and are not committed. No autonomous approval, pricing intelligence, live payment movement, public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, autonomous award, or autonomous regulated approval is authorized.

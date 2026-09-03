@@ -8,7 +8,7 @@ import { acceptProposalRecord, approveProposalRecord, createClientRecord, comple
 import { createFrontDeskEnquiryRecord, qualifyFrontDeskEnquiryRecord, createClientCommunicationDraftRecord, handoffFrontDeskEnquiryRecord } from "./store.mjs";
 import { bindAdministrationSkillsRecord, createCorrespondenceRecord, registerDocumentRecord, addDocumentRevisionRecord, createAdministrativeDeadlineRecord, completeAdministrativeDeadlineRecord, createTransmittalDraftRecord } from "./store.mjs";
 import { bindCommercialSkillsRecord, createSalesPipelineRecord, updateSalesPipelineRecord, dispatchProposalRecord, createExpenseRecord, approveExpenseRecord, createReceivableFollowUpRecord, readCashSnapshot } from "./store.mjs";
-import { bindTechnicalSkillsRecord, createDrawingReviewRecord, createCalculationInputSetRecord, createTechnicalQaFindingRecord, resolveTechnicalQaFindingRecord, createDeliveryPackageRecord, readDailyOperationsSummary, createPilotHandoffRecord, createFactoryFirmBlueprintRecord, validateFactoryFirmBlueprintRecord, approveFactoryFirmBlueprintRecord, createFactoryProvisioningRunRecord, runFactoryReadinessTestRecord, acceptFactoryHandoffRecord, certifyFactoryPackBindingRecord } from "./store.mjs";
+import { bindTechnicalSkillsRecord, createDrawingReviewRecord, createCalculationInputSetRecord, createTechnicalQaFindingRecord, resolveTechnicalQaFindingRecord, createDeliveryPackageRecord, readDailyOperationsSummary, createPilotHandoffRecord, createFactoryFirmBlueprintRecord, validateFactoryFirmBlueprintRecord, approveFactoryFirmBlueprintRecord, createFactoryProvisioningRunRecord, runFactoryReadinessTestRecord, acceptFactoryHandoffRecord, certifyFactoryPackBindingRecord, createQuotationCaseRecord, linkQuotationCaseProposalRecord, approveQuotationCaseRecord, issueQuotationCaseRecord } from "./store.mjs";
 import { createNetworkProfessionalProfileRecord, createNetworkFirmProfileRecord, createNetworkCapabilityRecord, createNetworkCredentialRecord, createNetworkTrustSignalRecord } from "./store.mjs";
 import { createNetworkConflictCheckRecord, createNetworkQualificationGateRecord, createSpecialistInvitationRecord } from "./store.mjs";
 import { createCollaborationWorkspaceRecord, grantCollaborationWorkspaceParticipantRecord, revokeCollaborationWorkspaceParticipantRecord, addCollaborationWorkspaceEvidenceRecord, createResponsibilityMatrixRecord, createSpecialistAssignmentRecord, transitionSpecialistAssignmentRecord } from "./store.mjs";
@@ -46,6 +46,7 @@ const readCollections = new Map([
   ["technical-qa-findings", "technical_qa_findings"],
   ["delivery-package-records", "delivery_package_records"],
   ["pilot-handoff-records", "pilot_handoff_records"],
+  ["quotation-cases", "quotation_cases"],
   ["leads", "leads"],
   ["intake-sessions", "intake_sessions"],
   ["price-build-ups", "price_build_ups"],
@@ -2480,6 +2481,23 @@ async function createDemoLoop(body) {
   return { tenant, ...firmResult, ...clientResult, ...intakeResult, ...proposalResult, approval: approvalResult.approval, ...acceptance, evidence, invoice };
 }
 
+async function createQuotationCase(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "relationship_id", "title", "client_request_summary"]);
+  return createQuotationCaseRecord(body, actorFromBody(body, req, body.tenant_id, body.firm_id));
+}
+async function linkQuotationCaseProposal(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "quotation_case_id", "proposal_id"]);
+  return linkQuotationCaseProposalRecord(body, actorFromBody(body, req, body.tenant_id, body.firm_id));
+}
+async function approveQuotationCase(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "quotation_case_id"]);
+  return approveQuotationCaseRecord(body, actorFromBody(body, req, body.tenant_id, body.firm_id));
+}
+async function issueQuotationCase(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "quotation_case_id", "issued_document_ref", "submitted_evidence_ref"]);
+  return issueQuotationCaseRecord(body, actorFromBody(body, req, body.tenant_id, body.firm_id));
+}
+
 const routes = new Map([
   ["POST /tenants", createTenant],
   ["POST /firms", createFirm],
@@ -2533,6 +2551,10 @@ const routes = new Map([
   ["POST /sales/opportunities", createSalesOpportunity],
   ["POST /sales/opportunities/update", updateSalesOpportunity],
   ["POST /proposals/dispatch", dispatchProposal],
+  ["POST /quotation-cases", createQuotationCase],
+  ["POST /quotation-cases/link-proposal", linkQuotationCaseProposal],
+  ["POST /quotation-cases/approve", approveQuotationCase],
+  ["POST /quotation-cases/issue", issueQuotationCase],
   ["POST /accounts/expenses", createExpense],
   ["POST /accounts/expenses/approve", approveExpense],
   ["POST /accounts/receivable-follow-ups", createReceivableFollowUp],

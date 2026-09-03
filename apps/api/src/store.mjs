@@ -90,6 +90,7 @@ const initialStore = () => ({
   technical_qa_findings: [],
   delivery_package_records: [],
   pilot_handoff_records: [],
+  quotation_cases: [],
   professional_authorities: [],
   actors: [],
   persons: [],
@@ -1077,6 +1078,115 @@ export async function createProposalRecord(body) {
   } finally {
     clientConn.release();
   }
+}
+
+function buildQuotationCase(body, actor = {}) {
+  const timestamp = now();
+  return {
+    id: storeBackend === "postgres" ? newUuid() : newId("quotation_case"),
+    tenant_id: body.tenant_id,
+    firm_id: body.firm_id,
+    relationship_id: body.relationship_id,
+    intake_session_id: body.intake_session_id ?? null,
+    case_number: body.case_number ?? `QT-${timestamp.slice(0, 10).replaceAll("-", "")}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
+    title: body.title,
+    quotation_type: body.quotation_type ?? "BOQ_IMAGE_QUOTATION",
+    service_lines: body.service_lines ?? [],
+    client_request_summary: body.client_request_summary,
+    intake_evidence_refs: body.intake_evidence_refs ?? [],
+    document_register_entry_ids: body.document_register_entry_ids ?? [],
+    proposal_id: body.proposal_id ?? null,
+    approval_id: null,
+    issued_document_ref: null,
+    submitted_evidence_ref: null,
+    status: "INTAKE_REGISTERED",
+    requires_human_approval: true,
+    prepared_by_actor_id: actor.actor_id ?? actor.id ?? null,
+    approved_by_actor_id: null,
+    issued_by_actor_id: null,
+    created_at: timestamp,
+    updated_at: timestamp,
+    metadata: body.metadata ?? {}
+  };
+}
+
+function assertQuotationCaseReferences(store, body) {
+  const relationship = store.firm_client_relationships.find((record) => record.id === body.relationship_id && record.tenant_id === body.tenant_id && record.firm_id === body.firm_id);
+  if (!relationship) throwNotFound("firm_client_relationships", body.relationship_id);
+  if (body.intake_session_id) {
+    const intake = store.intake_sessions.find((record) => record.id === body.intake_session_id && record.tenant_id === body.tenant_id && record.firm_id === body.firm_id);
+    if (!intake) throwNotFound("intake_sessions", body.intake_session_id);
+  }
+  for (const documentId of body.document_register_entry_ids ?? []) {
+    const document = store.document_register_entries.find((record) => record.id === documentId && record.tenant_id === body.tenant_id && record.firm_id === body.firm_id);
+    if (!document) throwNotFound("document_register_entries", documentId);
+  }
+  if (body.proposal_id) {
+    const proposal = store.proposals.find((record) => record.id === body.proposal_id && record.tenant_id === body.tenant_id && record.firm_id === body.firm_id);
+    if (!proposal) throwNotFound("proposals", body.proposal_id);
+  }
+}
+
+export async function createQuotationCaseRecord(body, actor = systemActor(body.tenant_id, body.firm_id)) {
+  return withStore((store) => {
+    store.quotation_cases ??= [];
+    assertQuotationCaseReferences(store, body);
+    const item = buildQuotationCase(body, actor);
+    store.quotation_cases.push(item);
+    appendEventAndAudit(store, { event_type: "quotation_case.intake_registered", actor, tenant_id: item.tenant_id, firm_id: item.firm_id, aggregate_type: "QuotationCase", aggregate_id: item.id, payload: { case_number: item.case_number, intake_evidence_refs: item.intake_evidence_refs, document_register_entry_ids: item.document_register_entry_ids }, summary: "Quotation case created from controlled client intake evidence." });
+    return item;
+  });
+}
+
+export async function linkQuotationCaseProposalRecord(body, actor = systemActor(body.tenant_id, body.firm_id)) {
+  return withStore((store) => {
+    store.quotation_cases ??= [];
+    const item = store.quotation_cases.find((record) => record.id === body.quotation_case_id && record.tenant_id === body.tenant_id && record.firm_id === body.firm_id);
+    if (!item) throwNotFound("quotation_cases", body.quotation_case_id);
+    const proposal = store.proposals.find((record) => record.id === body.proposal_id && record.tenant_id === body.tenant_id && record.firm_id === body.firm_id);
+    if (!proposal) throwNotFound("proposals", body.proposal_id);
+    if (item.proposal_id && item.proposal_id !== proposal.id) invalidState("Quotation case already has a linked proposal.");
+    item.proposal_id = proposal.id;
+    item.status = proposal.proposal_status === "APPROVED" ? "APPROVAL_RECORDED" : "PROPOSAL_DRAFTED";
+    item.updated_at = now();
+    appendEventAndAudit(store, { event_type: "quotation_case.proposal_linked", actor, tenant_id: item.tenant_id, firm_id: item.firm_id, aggregate_type: "QuotationCase", aggregate_id: item.id, payload: { proposal_id: proposal.id, proposal_status: proposal.proposal_status }, summary: "Quotation case linked to proposal draft." });
+    return item;
+  });
+}
+
+export async function approveQuotationCaseRecord(body, actor = systemActor(body.tenant_id, body.firm_id)) {
+  return withStore((store) => {
+    store.quotation_cases ??= [];
+    const item = store.quotation_cases.find((record) => record.id === body.quotation_case_id && record.tenant_id === body.tenant_id && record.firm_id === body.firm_id);
+    if (!item) throwNotFound("quotation_cases", body.quotation_case_id);
+    if (!item.proposal_id) invalidState("Quotation case requires a linked proposal before approval.");
+    const proposal = store.proposals.find((record) => record.id === item.proposal_id && record.tenant_id === body.tenant_id && record.firm_id === body.firm_id);
+    if (!proposal) throwNotFound("proposals", item.proposal_id);
+    if (proposal.proposal_status !== "APPROVED") invalidState("Linked proposal must be approved before quotation case approval is recorded.");
+    item.approval_id = proposal.commercial_approval_id ?? body.approval_id ?? null;
+    item.approved_by_actor_id = actor.actor_id ?? actor.id ?? null;
+    item.status = "APPROVAL_RECORDED";
+    item.updated_at = now();
+    appendEventAndAudit(store, { event_type: "quotation_case.approval_recorded", actor, tenant_id: item.tenant_id, firm_id: item.firm_id, aggregate_type: "QuotationCase", aggregate_id: item.id, payload: { proposal_id: proposal.id, approval_id: item.approval_id }, summary: "Human quotation approval recorded before issue." });
+    return item;
+  });
+}
+
+export async function issueQuotationCaseRecord(body, actor = systemActor(body.tenant_id, body.firm_id)) {
+  return withStore((store) => {
+    store.quotation_cases ??= [];
+    const item = store.quotation_cases.find((record) => record.id === body.quotation_case_id && record.tenant_id === body.tenant_id && record.firm_id === body.firm_id);
+    if (!item) throwNotFound("quotation_cases", body.quotation_case_id);
+    if (item.status !== "APPROVAL_RECORDED" || !item.approval_id) invalidState("Quotation case must have explicit human approval before issue.");
+    requireFields(body, ["issued_document_ref", "submitted_evidence_ref"]);
+    item.issued_document_ref = body.issued_document_ref;
+    item.submitted_evidence_ref = body.submitted_evidence_ref;
+    item.issued_by_actor_id = actor.actor_id ?? actor.id ?? null;
+    item.status = "ISSUED_TO_CLIENT";
+    item.updated_at = now();
+    appendEventAndAudit(store, { event_type: "quotation_case.issued_to_client", actor, tenant_id: item.tenant_id, firm_id: item.firm_id, aggregate_type: "QuotationCase", aggregate_id: item.id, payload: { issued_document_ref: item.issued_document_ref, submitted_evidence_ref: item.submitted_evidence_ref }, summary: "Approved quotation case issued to client and registered as outgoing evidence." });
+    return item;
+  });
 }
 
 export async function approveProposalRecord(body, actor, decision) {
