@@ -49,17 +49,17 @@ scope: "Controlled local/private pilot operation for verified active firm worksp
 
 ## OP-H4 - NHL Global Solution Pilot Day Rehearsal
 
-- [ ] Create NHL pilot-day fixture.
-- [ ] Rehearse project reporting workflow.
-- [ ] Rehearse technical writing workflow.
-- [ ] Rehearse clerical work workflow.
-- [ ] Rehearse BizKick EDCS workflow.
-- [ ] Rehearse proposal/task/document/correspondence flow.
-- [ ] Require human review before client-facing AI output is issued.
-- [ ] Monitor invoice/receivable without live payment movement.
-- [ ] Verify audit reconstruction for NHL pilot day.
-- [ ] Add NHL pilot-day smoke test.
-- [ ] Update evidence and decision register.
+- [x] Create NHL pilot-day fixture.
+- [x] Rehearse project reporting workflow.
+- [x] Rehearse technical writing workflow.
+- [x] Rehearse clerical work workflow.
+- [x] Rehearse BizKick EDCS workflow.
+- [x] Rehearse proposal/task/document/correspondence flow.
+- [x] Require human review before client-facing AI output is issued.
+- [x] Monitor invoice/receivable without live payment movement.
+- [x] Verify audit reconstruction for NHL pilot day.
+- [x] Add NHL pilot-day smoke test.
+- [x] Update evidence and decision register.
 
 ## OP-H5 - Pilot Evidence, Audit, Export, and Closeout Review
 

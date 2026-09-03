@@ -593,3 +593,18 @@ Boundary: OP-H3 does not approve OP-H4 NHL rehearsal, OP-H5 evidence closeout, O
 Evidence: `docs/10_post_freeze_technical_design/OP_H3_FORMWORK_PILOT_DAY_REHEARSAL_COMPLETION_v1.0.md`; `scripts/smoke-op-h3-formwork-pilot-day-rehearsal.mjs`; `npm run check:op:h3`.
 
 Follow-up: Proceed to `OP-H4 - NHL Global Solution Pilot Day Rehearsal` after product-owner authorization.
+## ADR-058 - OP-H4 NHL Global Solution pilot day rehearsal completed
+
+Date: 2026-09-03
+
+Decision: OP-H4 is complete. NHL Global Solution now has an executable controlled organization-support pilot-day rehearsal.
+
+Rationale: OP-H3 proved the Formwork pilot day. OP-H4 proves the second active firm workspace can run a separate day-in-the-life workflow for project reporting, technical writing, clerical work, and BizKick EDCS while preserving its own subscription, records, workers, approvals, evidence, audit, and export boundary.
+
+Implementation: Added `OP_H4_NHL_GLOBAL_SOLUTION_PILOT_DAY_REHEARSAL_COMPLETION_v1.0.md` and executable validation in `scripts/smoke-op-h4-nhl-global-solution-pilot-day-rehearsal.mjs`. OP-H4 checklist items are marked complete and the full regression chain now includes the OP-H4 smoke.
+
+Boundary: OP-H4 does not approve OP-H5 evidence closeout, OP-H6 acceptance, production multi-tenant onboarding, public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, pricing intelligence, autonomous award, autonomous regulated approval, live payment movement, or uncontrolled tenant/client data sharing.
+
+Evidence: `docs/10_post_freeze_technical_design/OP_H4_NHL_GLOBAL_SOLUTION_PILOT_DAY_REHEARSAL_COMPLETION_v1.0.md`; `scripts/smoke-op-h4-nhl-global-solution-pilot-day-rehearsal.mjs`; `npm run check:op:h4`.
+
+Follow-up: Proceed to `OP-H5 - Pilot Evidence, Audit, Export, and Closeout Review` after product-owner authorization.
