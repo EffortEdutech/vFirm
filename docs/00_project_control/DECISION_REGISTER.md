@@ -727,3 +727,20 @@ Rationale: The NHL quotation workflow needed an operator-facing view so a solo b
 Boundaries: No autonomous measurement, pricing, certification, approval, quotation issue, external send, live payment movement, payment capture, bank instruction, public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, pricing intelligence, autonomous award, or autonomous regulated approval.
 
 Evidence: `scripts/smoke-nhl-q5-quotation-operations-dashboard.mjs`; `npm run check:nhl:q5`; `docs/10_post_freeze_technical_design/NHL_Q5_QUOTATION_OPERATIONS_DASHBOARD_AND_EXCEPTION_HANDLING_COMPLETION_v1.0.md`.
+
+## ADR-069 - NHL-Q6 quotation evidence pack and acceptance gate completed
+
+Date: 2026-09-04
+Status: Product-owner acceptance decision required
+
+Decision: NHL-Q6 is complete as a technical evidence and acceptance-gate sprint. The NHL Global Solution quotation workflow now has an evidence pack covering intake, document control, BOQ extraction aid, human extraction review, quotation draft assembly, human draft review, draft-only correspondence, human-controlled issue, receivable preparation without live payment movement, quotation operations visibility, audit reconstruction, and tenant/firm-scoped export.
+
+Rationale: The NHL-Q series represents a realistic solo business quotation path for BOQ/image-based client enquiries. Closing the series requires a formal evidence pack and explicit product-owner decision gate so pilot readiness is not treated as silent acceptance.
+
+Implementation: Added `NHL_Q6_QUOTATION_EVIDENCE_PACK_AND_ACCEPTANCE_GATE_v1.0.md`, `NHL_Q_WORKFLOW_ACCEPTANCE_DECISION_GATE_v1.0.md`, and executable validation in `scripts/smoke-nhl-q6-quotation-evidence-acceptance-gate.mjs`. The full regression chain now includes the NHL-Q6 smoke gate.
+
+Boundaries: This decision does not authorize autonomous measurement, pricing, certification, approval, quotation issue, external send, live payment movement, payment capture, bank instruction, production multi-tenant onboarding, public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, pricing intelligence, autonomous award, or autonomous regulated approval.
+
+Evidence: `docs/10_post_freeze_technical_design/NHL_Q6_QUOTATION_EVIDENCE_PACK_AND_ACCEPTANCE_GATE_v1.0.md`; `docs/10_post_freeze_technical_design/NHL_Q_WORKFLOW_ACCEPTANCE_DECISION_GATE_v1.0.md`; `scripts/smoke-nhl-q6-quotation-evidence-acceptance-gate.mjs`; `npm run check:nhl:q6`.
+
+Follow-up: Product owner must explicitly accept, accept with limitations, hold, or reject the NHL-Q workflow before it is treated as accepted controlled local/private pilot operation scope.

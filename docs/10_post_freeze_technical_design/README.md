@@ -1,4 +1,4 @@
-﻿---
+---
 id: VF-POST-FREEZE-TECHNICAL-DESIGN-INDEX
 title: "Post-Freeze Technical Design Index"
 version: "1.0"
@@ -292,4 +292,7 @@ The OP sprint plan and checklist govern the next bounded hardening pass after MT
 | `NHL_Q1_BOQ_QUOTATION_INTAKE_AND_ISSUE_WORKFLOW_COMPLETION_v1.0.md` | Records NHL-Q1 controlled BOQ-image quotation case implementation, approval gate, submitted evidence registration, UI binding, and smoke evidence. |
 | `NHL_Q2_QUOTATION_DOCUMENT_CONTROL_AND_BOQ_EXTRACTION_AID_COMPLETION_v1.0.md` | Records NHL-Q2 BOQ extraction aid implementation, human review boundary, UI binding, and smoke evidence. |
 | `NHL_Q3_QUOTATION_DRAFT_ASSEMBLY_AND_CLIENT_CORRESPONDENCE_COMPLETION_v1.0.md` | Records NHL-Q3 quotation draft pack assembly, human review gate, draft-only client correspondence, active workspace seed repair evidence, UI binding, and smoke evidence. |
-| `NHL_Q4_CONTROLLED_QUOTATION_ISSUE_AND_RECEIVABLES_PREPARATION_COMPLETION_v1.0.md` | Records NHL-Q4 controlled human quotation issue, receivable preparation without live payment movement, UI binding, export coverage, and smoke evidence. |`r`n| `NHL_Q5_QUOTATION_OPERATIONS_DASHBOARD_AND_EXCEPTION_HANDLING_COMPLETION_v1.0.md` | Records NHL-Q5 quotation operations dashboard/readiness summary, exception categories, UI binding, and smoke evidence. |
+| `NHL_Q4_CONTROLLED_QUOTATION_ISSUE_AND_RECEIVABLES_PREPARATION_COMPLETION_v1.0.md` | Records NHL-Q4 controlled human quotation issue, receivable preparation without live payment movement, UI binding, export coverage, and smoke evidence. |
+| `NHL_Q5_QUOTATION_OPERATIONS_DASHBOARD_AND_EXCEPTION_HANDLING_COMPLETION_v1.0.md` | Records NHL-Q5 quotation operations dashboard/readiness summary, exception categories, UI binding, and smoke evidence. |
+| `NHL_Q6_QUOTATION_EVIDENCE_PACK_AND_ACCEPTANCE_GATE_v1.0.md` | Evidence pack and technical recommendation for NHL-Q1 through NHL-Q6 controlled quotation workflow readiness. |
+| `NHL_Q_WORKFLOW_ACCEPTANCE_DECISION_GATE_v1.0.md` | Product-owner decision gate for accepting, holding, or rejecting the controlled NHL quotation workflow. |

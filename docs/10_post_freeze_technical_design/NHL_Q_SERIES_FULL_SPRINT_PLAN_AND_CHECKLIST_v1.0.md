@@ -1,4 +1,4 @@
-﻿# NHL-Q Series Full Sprint Plan and Checklist v1.0
+# NHL-Q Series Full Sprint Plan and Checklist v1.0
 
 Date: 2026-09-04
 Scope: NHL Global Solution BOQ/image-to-quotation workflow for controlled local/private pilot operation
@@ -49,11 +49,11 @@ The NHL-Q series does not authorize:
 | NHL-Q3 | Quotation Draft Assembly and Client Correspondence | Complete | Assemble human-reviewed quotation draft pack and prepare correspondence as draft-only. |
 | NHL-Q4 | Controlled Quotation Issue and Receivables Preparation | Complete | Record human-controlled quotation issue, create issue evidence, and prepare receivable/invoice readiness without payment action. |
 | NHL-Q5 | Quotation Operations Dashboard and Exception Handling | Complete | Show quotation pipeline, blockers, overdue reviews, issue readiness, receivable readiness, and audit gaps for the active NHL workspace. |
-| NHL-Q6 | NHL Quotation Evidence Pack and Acceptance Gate | Active next | Assemble evidence pack, export test, limitations, and product-owner acceptance gate for the NHL-Q workflow. |
+| NHL-Q6 | NHL Quotation Evidence Pack and Acceptance Gate | Complete - product-owner decision required | Assemble evidence pack, export test, limitations, and product-owner acceptance gate for the NHL-Q workflow. |
 
 ## Detailed sprint plan
 
-### NHL-Q1 â€” BOQ Quotation Intake and Issue Workflow
+### NHL-Q1 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â BOQ Quotation Intake and Issue Workflow
 
 Objective: represent the client BOQ quotation request as a controlled quotation case.
 
@@ -71,7 +71,7 @@ Evidence:
 npm run check:nhl:q1
 ```
 
-### NHL-Q2 â€” Quotation Document Control and BOQ Extraction Aid
+### NHL-Q2 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Quotation Document Control and BOQ Extraction Aid
 
 Objective: turn raw client BOQ inputs into controlled document/evidence references and a review-only extraction aid.
 
@@ -89,7 +89,7 @@ Evidence:
 npm run check:nhl:q2
 ```
 
-### NHL-Q3 â€” Quotation Draft Assembly and Client Correspondence
+### NHL-Q3 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Quotation Draft Assembly and Client Correspondence
 
 Objective: assemble a quotation draft pack from a reviewed BOQ extraction aid and prepare client correspondence as draft-only.
 
@@ -107,7 +107,7 @@ Evidence:
 npm run check:nhl:q3
 ```
 
-### NHL-Q4 â€” Controlled Quotation Issue and Receivables Preparation
+### NHL-Q4 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Controlled Quotation Issue and Receivables Preparation
 
 Objective: close the controlled issue step after Q3 and prepare receivables readiness without live payment action.
 
@@ -146,7 +146,7 @@ Evidence:
 npm run check:nhl:q4
 ```
 
-### NHL-Q5 â€” Quotation Operations Dashboard and Exception Handling
+### NHL-Q5 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Quotation Operations Dashboard and Exception Handling
 
 Objective: make the NHL quotation workflow operationally visible.
 
@@ -165,7 +165,7 @@ Acceptance checks:
 - Formwork workspace does not inherit NHL quotation records.
 - Dashboard uses deterministic state, not free-text inference.
 
-### NHL-Q6 â€” NHL Quotation Evidence Pack and Acceptance Gate
+### NHL-Q6 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â NHL Quotation Evidence Pack and Acceptance Gate
 
 Objective: close the NHL-Q series with evidence and product-owner decision.
 
@@ -191,10 +191,10 @@ Acceptance checks:
 - [x] Keep NHL as Organization Support workspace.
 - [x] Keep raw client files local/private and out of Git.
 - [x] Keep active firm workspace dropdown seeded with Formwork and NHL.
-- [ ] Add Q4 controlled quotation issue records.
-- [ ] Add Q4 receivable preparation records.
-- [ ] Add Q5 operations dashboard visibility.
-- [ ] Add Q6 evidence pack and acceptance gate.
+- [x] Add Q4 controlled quotation issue records.
+- [x] Add Q4 receivable preparation records.
+- [x] Add Q5 operations dashboard visibility.
+- [x] Add Q6 evidence pack and acceptance gate.
 
 ### Data model
 
@@ -228,13 +228,16 @@ Acceptance checks:
 - [x] `npm run check:nhl:q1`
 - [x] `npm run check:nhl:q2`
 - [x] `npm run check:nhl:q3`
-- [ ] `npm run check:nhl:q4`
-- [ ] `npm run check:nhl:q5`
-- [ ] Q6 evidence/acceptance check
-- [ ] Full `npm run check`
+- [x] `npm run check:nhl:q4`
+- [x] `npm run check:nhl:q5`
+- [x] `npm run check:nhl:q6`
+- [x] Q6 evidence/acceptance check
+- [x] Full `npm run check`
 
 ## Current next action
 
-Proceed with:
+Product owner to review NHL_Q_WORKFLOW_ACCEPTANCE_DECISION_GATE_v1.0.md and explicitly accept, accept with limitations, hold, or reject the controlled NHL-Q workflow.
 
-`NHL-Q4 â€” Controlled Quotation Issue and Receivables Preparation`
+## Current handoff
+
+NHL-Q1 through NHL-Q6 are complete for controlled local/private pilot readiness. The NHL-Q workflow acceptance decision is now pending product-owner review; no silent acceptance is recorded by the technical evidence pack.
