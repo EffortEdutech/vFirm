@@ -76,15 +76,15 @@ scope: "Controlled local/private pilot operation for verified active firm worksp
 
 ## OP-H6 - Controlled Multi-Firm Pilot Operations Acceptance Gate
 
-- [ ] Create OP evidence pack completion document.
-- [ ] Create OP acceptance decision gate.
-- [ ] Verify OP-H1 through OP-H5 evidence is complete.
-- [ ] Verify both pilot firms complete controlled pilot-day rehearsal.
-- [ ] Verify no cross-tenant leakage in OP evidence.
-- [ ] Verify locked boundaries remain visible.
-- [ ] Add OP-H6 acceptance-gate smoke test.
-- [ ] Run `npm run check`.
-- [ ] Commit and push to GitHub.
+- [x] Create OP evidence pack completion document.
+- [x] Create OP acceptance decision gate.
+- [x] Verify OP-H1 through OP-H5 evidence is complete.
+- [x] Verify both pilot firms complete controlled pilot-day rehearsal.
+- [x] Verify no cross-tenant leakage in OP evidence.
+- [x] Verify locked boundaries remain visible.
+- [x] Add OP-H6 acceptance-gate smoke test.
+- [x] Run `npm run check`.
+- [x] Commit and push to GitHub.
 
 ## Locked boundaries for all OP work
 

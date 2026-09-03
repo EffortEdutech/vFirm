@@ -623,3 +623,18 @@ Boundary: OP-H5 does not approve OP-H6 acceptance by itself, production multi-te
 Evidence: `docs/10_post_freeze_technical_design/OP_H5_PILOT_EVIDENCE_AUDIT_EXPORT_CLOSEOUT_REVIEW_v1.0.md`; `scripts/smoke-op-h5-pilot-evidence-audit-export-closeout.mjs`; `npm run check:op:h5`.
 
 Follow-up: Proceed to `OP-H6 - Controlled Multi-Firm Pilot Operations Acceptance Gate` after product-owner authorization.
+## ADR-060 - OP-H6 controlled multi-firm pilot operations acceptance gate prepared
+
+Date: 2026-09-03
+
+Decision: OP-H6 acceptance gate is prepared and remains pending product-owner decision. The technical recommendation is `GO_FOR_CONTROLLED_MULTI_FIRM_PILOT_OPERATIONS_ACCEPTANCE`.
+
+Rationale: OP-H1 through OP-H5 now provide evidence for controlled multi-firm pilot operations: foundation, selected-firm Today view, Formwork pilot-day rehearsal, NHL Global Solution pilot-day rehearsal, evidence/audit/export closeout, and zero current blockers. Acceptance must remain explicit because the next decision controls whether this readiness becomes accepted controlled local/private pilot operation scope.
+
+Implementation: Added `OP_EVIDENCE_PACK_COMPLETION_v1.0.md`, `OP_H6_CONTROLLED_MULTI_FIRM_PILOT_OPERATIONS_ACCEPTANCE_GATE_v1.0.md`, and executable validation in `scripts/smoke-op-h6-controlled-multi-firm-pilot-operations-acceptance-gate.mjs`. OP-H6 checklist items are marked complete and the full regression chain now includes the OP-H6 smoke.
+
+Boundary: OP-H6 gate preparation does not itself authorize production multi-tenant onboarding, public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, pricing intelligence, autonomous award, autonomous regulated approval, live payment movement, or uncontrolled tenant/client data sharing.
+
+Evidence: `docs/10_post_freeze_technical_design/OP_EVIDENCE_PACK_COMPLETION_v1.0.md`; `docs/10_post_freeze_technical_design/OP_H6_CONTROLLED_MULTI_FIRM_PILOT_OPERATIONS_ACCEPTANCE_GATE_v1.0.md`; `scripts/smoke-op-h6-controlled-multi-firm-pilot-operations-acceptance-gate.mjs`; `npm run check:op:h6`.
+
+Follow-up: Product owner must accept, hold, reject, or defer OP readiness before any next scope begins.
