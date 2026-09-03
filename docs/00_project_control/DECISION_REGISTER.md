@@ -546,4 +546,20 @@ Boundary: OP planning does not approve production multi-tenant onboarding, publi
 
 Evidence: `docs/10_post_freeze_technical_design/OP_H1_TO_H6_CONTROLLED_MULTI_FIRM_PILOT_OPERATIONS_SPRINT_PLAN_v1.0.md`; `docs/10_post_freeze_technical_design/OP_H1_TO_H6_CONTROLLED_MULTI_FIRM_PILOT_OPERATIONS_CHECKLIST_v1.0.md`; `scripts/smoke-op-plan-checklist.mjs`; `npm run check:op:plan`.
 
-Follow-up: Product owner may authorize `OP-H1 — Controlled Multi-Firm Pilot Operations Foundation` as the next active sprint.
+Follow-up: Product owner may authorize `OP-H1 - Controlled Multi-Firm Pilot Operations Foundation` as the next active sprint.
+
+## ADR-055 - OP-H1 controlled multi-firm pilot operations foundation completed
+
+Date: 2026-09-03
+
+Decision: OP-H1 is complete. The controlled multi-firm pilot operations foundation is locked for the Formwork pilot firm and NHL Global Solution.
+
+Rationale: After MT acceptance, the next implementation risk is not whether a firm can be selected, but whether day-to-day pilot operation can be run with firm-scoped readiness, pilot-day checklists, activity logs, issue/support records, manual approvals, exception categories, evidence summaries, and clear human authority boundaries.
+
+Implementation: Added `OP_H1_CONTROLLED_MULTI_FIRM_PILOT_OPERATIONS_FOUNDATION_v1.0.md`, `OP_H1_CONTROLLED_MULTI_FIRM_PILOT_OPERATIONS_FOUNDATION_COMPLETION_v1.0.md`, and executable validation in `scripts/smoke-op-h1-controlled-multi-firm-pilot-operations-foundation.mjs`. OP-H1 checklist items are marked complete and the full regression chain now includes the OP-H1 smoke.
+
+Boundary: OP-H1 does not approve production multi-tenant onboarding, public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, pricing intelligence, autonomous award, autonomous regulated approval, live payment movement, or uncontrolled tenant/client data sharing.
+
+Evidence: `docs/10_post_freeze_technical_design/OP_H1_CONTROLLED_MULTI_FIRM_PILOT_OPERATIONS_FOUNDATION_v1.0.md`; `docs/10_post_freeze_technical_design/OP_H1_CONTROLLED_MULTI_FIRM_PILOT_OPERATIONS_FOUNDATION_COMPLETION_v1.0.md`; `scripts/smoke-op-h1-controlled-multi-firm-pilot-operations-foundation.mjs`; `npm run check:op:h1`.
+
+Follow-up: Proceed to `OP-H2 - Operator Dashboard and Today View` after product-owner authorization.

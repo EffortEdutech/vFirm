@@ -31,12 +31,12 @@ const readme = await readFile("docs/10_post_freeze_technical_design/README.md", 
 const packageJson = JSON.parse(await readFile("package.json", "utf8"));
 
 const sprintNames = [
-  "OP-H1 — Controlled Multi-Firm Pilot Operations Foundation",
-  "OP-H2 — Operator Dashboard and Today View",
-  "OP-H3 — Formwork Pilot Day Rehearsal",
-  "OP-H4 — NHL Global Solution Pilot Day Rehearsal",
-  "OP-H5 — Pilot Evidence, Audit, Export, and Closeout Review",
-  "OP-H6 — Controlled Multi-Firm Pilot Operations Acceptance Gate"
+  "OP-H1 - Controlled Multi-Firm Pilot Operations Foundation",
+  "OP-H2 - Operator Dashboard and Today View",
+  "OP-H3 - Formwork Pilot Day Rehearsal",
+  "OP-H4 - NHL Global Solution Pilot Day Rehearsal",
+  "OP-H5 - Pilot Evidence, Audit, Export, and Closeout Review",
+  "OP-H6 - Controlled Multi-Firm Pilot Operations Acceptance Gate"
 ];
 
 for (const sprint of sprintNames) {
@@ -53,7 +53,7 @@ const requiredPhrases = [
   "tenant/firm scoped",
   "human professional approval",
   "AI worker actions are attributable",
-  "OP-H1 — Controlled Multi-Firm Pilot Operations Foundation"
+  "OP-H1 - Controlled Multi-Firm Pilot Operations Foundation"
 ];
 
 for (const phrase of requiredPhrases) {
@@ -89,7 +89,7 @@ console.log(JSON.stringify({
   smoke: "op-plan-checklist",
   result: "passed",
   status: "plan_and_checklist_ready",
-  next_active_sprint: "OP-H1 — Controlled Multi-Firm Pilot Operations Foundation",
+  next_active_sprint: "OP-H1 - Controlled Multi-Firm Pilot Operations Foundation",
   docs_checked: requiredDocs.length,
   sprints: sprintNames.length,
   locked_boundaries: lockedBoundaries

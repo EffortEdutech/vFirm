@@ -79,7 +79,7 @@ By the end of OP-H6, the controlled pilot operator should be able to:
 
 ## 6. Sprint sequence
 
-### OP-H1 — Controlled Multi-Firm Pilot Operations Foundation
+### OP-H1 - Controlled Multi-Firm Pilot Operations Foundation
 
 Prepare the operating foundation for a controlled multi-firm pilot day.
 
@@ -101,7 +101,7 @@ Acceptance:
 - pilot-day and activity-log records are explicitly tenant/firm scoped;
 - no autonomous regulated approval or live payment movement is introduced.
 
-### OP-H2 — Operator Dashboard and Today View
+### OP-H2 - Operator Dashboard and Today View
 
 Make the selected firm show a practical pilot operations view.
 
@@ -121,7 +121,7 @@ Acceptance:
 - dashboard data and copy are selected-firm scoped;
 - not-subscribed modules do not appear as active operational work.
 
-### OP-H3 — Formwork Pilot Day Rehearsal
+### OP-H3 - Formwork Pilot Day Rehearsal
 
 Run a controlled Formwork Engineering pilot-day rehearsal.
 
@@ -140,7 +140,7 @@ Acceptance:
 - drawing/QA/evidence records can be reconstructed from audit;
 - no AI worker silently approves regulated work.
 
-### OP-H4 — NHL Global Solution Pilot Day Rehearsal
+### OP-H4 - NHL Global Solution Pilot Day Rehearsal
 
 Run a controlled NHL organization-support pilot-day rehearsal.
 
@@ -160,7 +160,7 @@ Acceptance:
 - client-facing output requires human review before issue;
 - invoice status can be monitored, but payment action remains manual/non-autonomous.
 
-### OP-H5 — Pilot Evidence, Audit, Export, and Closeout Review
+### OP-H5 - Pilot Evidence, Audit, Export, and Closeout Review
 
 Prepare the pilot evidence pack and closeout review mechanism.
 
@@ -180,7 +180,7 @@ Acceptance:
 - exports are scoped to the selected tenant/firm;
 - unresolved findings are classified into backlog, blocker, accepted limitation, or out-of-scope.
 
-### OP-H6 — Controlled Multi-Firm Pilot Operations Acceptance Gate
+### OP-H6 - Controlled Multi-Firm Pilot Operations Acceptance Gate
 
 Prepare the product-owner acceptance gate for OP pilot operations readiness.
 
@@ -202,12 +202,12 @@ Acceptance:
 
 ## 7. Recommended execution order
 
-1. OP-H1 — Controlled Multi-Firm Pilot Operations Foundation.
-2. OP-H2 — Operator Dashboard and Today View.
-3. OP-H3 — Formwork Pilot Day Rehearsal.
-4. OP-H4 — NHL Global Solution Pilot Day Rehearsal.
-5. OP-H5 — Pilot Evidence, Audit, Export, and Closeout Review.
-6. OP-H6 — Controlled Multi-Firm Pilot Operations Acceptance Gate.
+1. OP-H1 - Controlled Multi-Firm Pilot Operations Foundation.
+2. OP-H2 - Operator Dashboard and Today View.
+3. OP-H3 - Formwork Pilot Day Rehearsal.
+4. OP-H4 - NHL Global Solution Pilot Day Rehearsal.
+5. OP-H5 - Pilot Evidence, Audit, Export, and Closeout Review.
+6. OP-H6 - Controlled Multi-Firm Pilot Operations Acceptance Gate.
 
 ## 8. Completion definition
 
@@ -217,4 +217,4 @@ The OP hardening pass is complete when a human operator can run a controlled pil
 
 After product-owner acceptance of this plan and checklist, the next active sprint is:
 
-`OP-H1 — Controlled Multi-Firm Pilot Operations Foundation`
+`OP-H1 - Controlled Multi-Firm Pilot Operations Foundation`

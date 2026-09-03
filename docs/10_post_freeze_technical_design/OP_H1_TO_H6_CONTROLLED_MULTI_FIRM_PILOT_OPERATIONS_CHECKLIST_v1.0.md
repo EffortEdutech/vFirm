@@ -8,20 +8,20 @@ scope: "Controlled local/private pilot operation for verified active firm worksp
 
 # OP-H1 to OP-H6 Controlled Multi-Firm Pilot Operations Checklist v1.0
 
-## OP-H1 — Controlled Multi-Firm Pilot Operations Foundation
+## OP-H1 - Controlled Multi-Firm Pilot Operations Foundation
 
-- [ ] Define pilot operation scope contract.
-- [ ] Define pilot operator roles and responsibilities.
-- [ ] Define active-firm readiness model.
-- [ ] Define pilot-day checklist model.
-- [ ] Define firm-scoped pilot activity log model.
-- [ ] Define issue, incident, and support log model.
-- [ ] Define manual approval and exception categories.
-- [ ] Verify all OP records are tenant/firm scoped.
-- [ ] Add OP-H1 smoke/static validation.
-- [ ] Update decision register.
+- [x] Define pilot operation scope contract.
+- [x] Define pilot operator roles and responsibilities.
+- [x] Define active-firm readiness model.
+- [x] Define pilot-day checklist model.
+- [x] Define firm-scoped pilot activity log model.
+- [x] Define issue, incident, and support log model.
+- [x] Define manual approval and exception categories.
+- [x] Verify all OP records are tenant/firm scoped.
+- [x] Add OP-H1 smoke/static validation.
+- [x] Update decision register.
 
-## OP-H2 — Operator Dashboard and Today View
+## OP-H2 - Operator Dashboard and Today View
 
 - [ ] Add selected-firm readiness card.
 - [ ] Add today priorities view.
@@ -34,7 +34,7 @@ scope: "Controlled local/private pilot operation for verified active firm worksp
 - [ ] Add cross-firm dashboard leakage negative checks.
 - [ ] Update evidence and decision register.
 
-## OP-H3 — Formwork Pilot Day Rehearsal
+## OP-H3 - Formwork Pilot Day Rehearsal
 
 - [ ] Create Formwork pilot-day fixture.
 - [ ] Rehearse client enquiry intake.
@@ -47,7 +47,7 @@ scope: "Controlled local/private pilot operation for verified active firm worksp
 - [ ] Add Formwork pilot-day smoke test.
 - [ ] Update evidence and decision register.
 
-## OP-H4 — NHL Global Solution Pilot Day Rehearsal
+## OP-H4 - NHL Global Solution Pilot Day Rehearsal
 
 - [ ] Create NHL pilot-day fixture.
 - [ ] Rehearse project reporting workflow.
@@ -61,7 +61,7 @@ scope: "Controlled local/private pilot operation for verified active firm worksp
 - [ ] Add NHL pilot-day smoke test.
 - [ ] Update evidence and decision register.
 
-## OP-H5 — Pilot Evidence, Audit, Export, and Closeout Review
+## OP-H5 - Pilot Evidence, Audit, Export, and Closeout Review
 
 - [ ] Create firm-scoped evidence pack template.
 - [ ] Create pilot-day closeout review template.
@@ -72,9 +72,9 @@ scope: "Controlled local/private pilot operation for verified active firm worksp
 - [ ] Verify separate evidence records for Formwork and NHL.
 - [ ] Verify export records are tenant/firm scoped.
 - [ ] Add evidence/export smoke test.
-- [ ] Update decision register.
+- [x] Update decision register.
 
-## OP-H6 — Controlled Multi-Firm Pilot Operations Acceptance Gate
+## OP-H6 - Controlled Multi-Firm Pilot Operations Acceptance Gate
 
 - [ ] Create OP evidence pack completion document.
 - [ ] Create OP acceptance decision gate.
