@@ -654,3 +654,17 @@ Boundary: This acceptance does not authorize production multi-tenant onboarding,
 Evidence: `docs/10_post_freeze_technical_design/OP_CONTROLLED_MULTI_FIRM_PILOT_OPERATIONS_ACCEPTANCE_DECISION_v1.0.md`; `docs/10_post_freeze_technical_design/OP_H6_CONTROLLED_MULTI_FIRM_PILOT_OPERATIONS_ACCEPTANCE_GATE_v1.0.md`; `docs/10_post_freeze_technical_design/OP_EVIDENCE_PACK_COMPLETION_v1.0.md`; `scripts/smoke-op-acceptance-decision.mjs`; `npm run check:op:acceptance:decision`.
 
 Follow-up: Product owner should choose the next bounded development scope before implementation continues beyond controlled local/private pilot operation.
+
+## ADR-062 - Corporate workspace shell polish completed
+
+Date: 2026-09-03
+Status: accepted
+Decision: The web workspace shell is polished into a more corporate future user UI with a left sidebar menu, hamburger sidebar behavior, structured active workspace context, concise workspace banner, and development-mode full feature visibility.
+
+Rationale: The previous page felt like a noticeboard because the hero area carried too much metadata and the top navigation was a long button strip. Controlled pilot development also needs all feature areas visible for review even when a selected firm's subscription does not include a module.
+
+Implementation: Updated `apps/web/public/index.html`, `apps/web/public/styles.css`, and `apps/web/public/app.js`. Updated focused UI smoke contracts to verify corporate sidebar navigation, dynamic workspace shell, development-mode full feature visibility, and continued active-firm/subscription binding.
+
+Boundary: This polish does not authorize production multi-tenant onboarding, public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, pricing intelligence, autonomous award, autonomous regulated approval, live payment movement, or uncontrolled tenant/client data sharing. Subscription metadata and tenant boundary evidence remain intact.
+
+Evidence: `docs/10_post_freeze_technical_design/UI_CORPORATE_WORKSPACE_SHELL_POLISH_RESULT_v1.0.md`; `npm run check:web:navigation`; `npm run check:web:multitenant`; `npm run check:mt:h5`; `npm run check:mt:h6`; `npm run check`.

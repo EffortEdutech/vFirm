@@ -7,47 +7,70 @@
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <main class="shell">
-      <section class="hero">
-        <div>
-          <p class="eyebrow">Virtual Firm Platform</p>
-          <h1 id="workspaceShellTitle">Virtual Firm Workspace</h1>
-          <p id="workspaceShellLede" class="lede">Select or create a firm workspace to operate modular front desk, administration, accounts, sales, project, delivery, and governance support.</p><div id="releaseBanner" class="release-banner"><strong>Workspace initializing</strong><span>Human professional and commercial authority remain explicit.</span></div><div id="operatorStrip" class="operator-strip" aria-live="polite"><span>Firm workspace initializing...</span></div><div id="activeWorkspace" class="active-workspace" aria-live="polite"></div><div id="commandFeedback" class="command-feedback" aria-live="polite"></div>
+    <div class="app-shell">
+      <aside id="workspaceSidebar" class="workspace-sidebar" aria-label="Virtual Firm workspace navigation">
+        <div class="sidebar-brand">
+          <span class="brand-mark">VF</span>
+          <div>
+            <strong>Virtual Firm</strong>
+            <small>Control Plane</small>
+          </div>
         </div>
-        <div class="status-card">
-          <span class="label">API</span>
-          <strong id="apiStatus">Checking...</strong>
-          <small>Web proxies API via /api to http://127.0.0.1:3091</small>
-        </div>
-      </section>
+        <nav class="workspace-nav" aria-label="Workspace menu">
+          <button class="nav-button active" data-view="dashboard">Dashboard</button>
+          <button class="nav-button" data-view="my-firm">My Firm</button>
+          <button class="nav-button" data-view="workflow">Workflow</button>
+          <button class="nav-button" data-view="clients">Clients</button>
+          <button class="nav-button" data-view="front-desk">Front Desk</button>
+          <button class="nav-button" data-view="administration">Administration</button>
+          <button class="nav-button" data-view="sales-accounts">Sales & Accounts</button>
+          <button class="nav-button" data-view="technical-delivery">Technical Delivery</button>
+          <button class="nav-button" data-view="intake">Intake</button>
+          <button class="nav-button" data-view="proposals">Proposals</button>
+          <button class="nav-button" data-view="projects">Projects</button>
+          <button class="nav-button" data-view="approvals">Approvals</button>
+          <button class="nav-button" data-view="invoices">Invoices</button>
+          <button class="nav-button" data-view="ai-workforce">AI Workforce</button>
+          <button class="nav-button" data-view="network">Network</button>
+          <button class="nav-button" data-view="ops">Ops</button>
+          <button class="nav-button" data-view="audit">Audit</button>
+          <button class="nav-button" data-view="service-pack">Service Pack</button>
+          <button class="nav-button" data-view="pilot">Pilot</button>
+          <button class="nav-button" data-view="users">Users</button>
+          <button class="nav-button" data-view="support">Support</button>
+          <button class="nav-button" data-view="review-board">Review Board</button>
+          <button class="nav-button" data-view="expansion">Expansion</button>
+          <button class="nav-button" data-view="usage-billing">Usage/Billing</button>
+          <button class="nav-button" data-view="commercial-launch">Commercial Launch</button>
+        </nav>
+      </aside>
+      <div id="sidebarScrim" class="sidebar-scrim" aria-hidden="true"></div>
 
-      <nav class="workspace-nav" aria-label="MVP workspace navigation">
-        <button class="nav-button active" data-view="dashboard">Dashboard</button>
-        <button class="nav-button" data-view="my-firm">My Firm</button>
-        <button class="nav-button" data-view="workflow">Workflow</button>
-        <button class="nav-button" data-view="clients">Clients</button>
-        <button class="nav-button" data-view="front-desk">Front Desk</button>
-        <button class="nav-button" data-view="administration">Administration</button>
-        <button class="nav-button" data-view="sales-accounts">Sales & Accounts</button>
-        <button class="nav-button" data-view="technical-delivery">Technical Delivery</button>
-        <button class="nav-button" data-view="intake">Intake</button>
-        <button class="nav-button" data-view="proposals">Proposals</button>
-        <button class="nav-button" data-view="projects">Projects</button>
-        <button class="nav-button" data-view="approvals">Approvals</button>
-        <button class="nav-button" data-view="invoices">Invoices</button>
-        <button class="nav-button" data-view="ai-workforce">AI Workforce</button>
-        <button class="nav-button" data-view="network">Network</button>
-        <button class="nav-button" data-view="ops">Ops</button>
-        <button class="nav-button" data-view="audit">Audit</button>
-        <button class="nav-button" data-view="service-pack">Service Pack</button>
-        <button class="nav-button" data-view="pilot">Pilot</button>
-        <button class="nav-button" data-view="users">Users</button>
-        <button class="nav-button" data-view="support">Support</button>
-        <button class="nav-button" data-view="review-board">Review Board</button>
-        <button class="nav-button" data-view="expansion">Expansion</button>
-        <button class="nav-button" data-view="usage-billing">Usage/Billing</button>
-        <button class="nav-button" data-view="commercial-launch">Commercial Launch</button>
-      </nav>
+      <main class="shell">
+        <header class="topbar">
+          <button id="sidebarToggle" class="menu-toggle" type="button" aria-label="Open workspace menu" aria-controls="workspaceSidebar" aria-expanded="false"><span></span><span></span><span></span></button>
+          <div>
+            <p class="eyebrow">Virtual Firm Platform</p>
+            <h1 id="workspaceShellTitle">Virtual Firm Workspace</h1>
+          </div>
+          <div class="status-card compact">
+            <span class="label">API</span>
+            <strong id="apiStatus">Checking...</strong>
+          </div>
+        </header>
+
+        <section class="workspace-command-center">
+          <div class="workspace-intro-card">
+            <p id="workspaceShellLede" class="lede">Select or create a firm workspace to operate modular front desk, administration, accounts, sales, project, delivery, and governance support.</p>
+            <div id="releaseBanner" class="release-banner"><strong>Workspace initializing</strong><span>Human professional and commercial authority remain explicit.</span></div>
+          </div>
+          <div id="activeWorkspace" class="active-workspace" aria-live="polite"></div>
+        </section>
+
+        <section class="workspace-system-row">
+          <div id="operatorStrip" class="operator-strip" aria-live="polite"><span>Firm workspace initializing...</span></div>
+          <div id="commandFeedback" class="command-feedback" aria-live="polite"></div>
+        </section>
 
       <section id="view-dashboard" class="workspace-view active">
         <section class="panel">
@@ -123,7 +146,8 @@
       <section id="view-expansion" class="workspace-view"><div id="expansionView"></div></section>
       <section id="view-usage-billing" class="workspace-view"><div id="usageBillingView"></div></section>
       <section id="view-commercial-launch" class="workspace-view"><div id="commercialLaunchView"></div></section>
-    </main>
+      </main>
+    </div>
     <script type="module" src="/app.js"></script>
   </body>
 </html>

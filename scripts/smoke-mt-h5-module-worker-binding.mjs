@@ -10,12 +10,12 @@ function assert(condition, message) {
 }
 
 assert(app.includes("const viewModuleCodes"), "View-to-module binding map missing.");
-assert(app.includes("function renderWorkspaceNavigation(store)"), "Subscribed/not-subscribed navigation renderer missing.");
-assert(app.includes("classList.toggle(\"not-subscribed\"") || app.includes("classList.toggle(\"not-subscribed\","), "Unsubscribed navigation marker missing from JS contract.");
-assert(css.includes(".nav-button.not-subscribed"), "Unsubscribed navigation CSS missing.");
-assert(app.includes("function renderModuleBoundary"), "Subscription boundary page renderer missing.");
-assert(app.includes("function renderIfSubscribed"), "Module subscription gate helper missing.");
-assert(app.includes("renderIfSubscribed(\"#technicalDeliveryView\", \"Technical Delivery\", \"technical_delivery\""), "Technical Delivery page must be gated by subscription.");
+assert(app.includes("function renderWorkspaceNavigation(store)"), "Workspace navigation renderer missing.");
+assert(app.includes('button.dataset.subscription = subscribed ? "subscribed" : "development-visible"'), "Development-mode navigation visibility marker missing from JS contract.");
+assert(css.includes(".workspace-sidebar") && css.includes(".menu-toggle"), "Corporate sidebar navigation CSS missing.");
+assert(app.includes("function renderModuleBoundary"), "Subscription boundary evidence renderer missing for future enforcement/reference.");
+assert(app.includes("function renderIfSubscribed"), "Development-mode module visibility helper missing.");
+assert(app.includes("renderIfSubscribed(\"#technicalDeliveryView\", \"Technical Delivery\", \"technical_delivery\""), "Technical Delivery page must stay wired through module binding helper.");
 assert(app.includes("workerTemplateCodesForContract(contract)"), "Worker template binding must derive from active contract.");
 assert(app.includes("defaultWorkerNameForTemplate"), "Firm-specific worker default name helper missing.");
 assert(app.includes("defaultServiceHint(contract)"), "Front Desk must use active service-line hint.");
@@ -31,9 +31,9 @@ console.log(JSON.stringify({
   result: "passed",
   checks: [
     "view_to_module_binding",
-    "subscribed_not_subscribed_nav_state",
-    "subscription_boundary_pages",
-    "technical_delivery_gated_for_non_formwork",
+    "development_mode_full_navigation_visibility",
+    "subscription_boundary_reference_retained",
+    "technical_delivery_visible_for_development_review",
     "worker_templates_from_active_contract",
     "firm_specific_worker_defaults",
     "frontdesk_service_hint_from_active_services",

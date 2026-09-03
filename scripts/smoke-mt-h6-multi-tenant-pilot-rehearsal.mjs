@@ -120,8 +120,8 @@ try {
   assert(webHtml.includes('id="activeWorkspace"'), "Active workspace selector missing from web shell.");
   assert(webHtml.includes('id="workspaceShellTitle"'), "Dynamic shell title missing from web shell.");
   assert(app.includes("renderWorkspaceNavigation(scopedStore);"), "Navigation must re-render from selected workspace.");
-  assert(app.includes("renderIfSubscribed"), "Module pages must use subscription gates.");
-  assert(app.includes("renderModuleBoundary"), "Unsubscribed modules must show boundary evidence.");
+  assert(app.includes("renderIfSubscribed"), "Module pages must use the development-mode module visibility helper.");
+  assert(app.includes("development-visible"), "Future modules must remain visible in development mode while preserving subscription metadata.");
   assert(app.includes("defaultServiceHint(contract)"), "Front Desk must bind to selected service lines.");
   assert(app.includes("workerTemplateCodesForContract(contract)"), "AI Workforce must bind worker templates to selected contract.");
   assert(!app.includes('requested_service_hint:"Formwork Engineering support"'), "Formwork service hint must not be hard-coded in Front Desk submit path.");
@@ -156,7 +156,7 @@ try {
       }
     },
     negative_checks: ["cross_tenant_active_summary_denied", "nhl_no_formwork_technical_delivery_subscription"],
-    frontend_evidence: ["dynamic_shell", "active_workspace_selector", "subscribed_navigation", "module_boundary_pages", "worker_template_contract_binding"]
+    frontend_evidence: ["dynamic_shell", "active_workspace_selector", "corporate_sidebar_navigation", "development_mode_full_feature_visibility", "worker_template_contract_binding"]
   }, null, 2));
 } finally {
   for (const child of children) {

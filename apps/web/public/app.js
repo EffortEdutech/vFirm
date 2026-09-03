@@ -17,6 +17,8 @@ const nextActions = document.querySelector("#nextActions");
 const commandFeedback = document.querySelector("#commandFeedback");
 const releaseBanner = document.querySelector("#releaseBanner");
 const activeWorkspace = document.querySelector("#activeWorkspace");
+const sidebarToggle = document.querySelector("#sidebarToggle");
+const sidebarScrim = document.querySelector("#sidebarScrim");
 
 let currentView = "dashboard";
 let lastStore = null;
@@ -286,7 +288,7 @@ function renderReleaseBanner(store) {
   const contract = activeWorkspaceContract(store);
   const backend = store._dashboard_summary?.health?.persistence?.backend ?? "unknown";
   const boundary = store.commercial_launch_summary?.boundary ?? contract.subscription?.metadata?.commercial_boundary ?? "no_live_payment_capture";
-  releaseBanner.innerHTML = `<strong>${escapeHtml(contract.profile.workspace_classification ?? "PILOT")} workspace</strong><span>${escapeHtml(contract.firm?.name ?? "No active firm")} | Tenant: ${escapeHtml(contract.tenant?.name ?? "-")} | Subscription: ${escapeHtml(contract.subscription?.package_code ?? "Not bound")} | Persistence: ${escapeHtml(backend)} | Commercial boundary: ${escapeHtml(boundary)}</span>`;
+  releaseBanner.innerHTML = `<strong>${escapeHtml(contract.profile.workspace_classification ?? "PILOT")} workspace</strong><span>${escapeHtml(contract.firm?.name ?? "No active firm")} is running in ${escapeHtml(backend)} mode under ${escapeHtml(contract.subscription?.package_code ?? "no subscription package")}. Commercial boundary: ${escapeHtml(humanStatus(boundary))}.</span>`;
 }
 function renderHealthCards(store) {
   if (!healthCards) return;
@@ -541,7 +543,7 @@ function inferWorkspaceProfile(firm, subscription) {
     return {
       firm_type: "ORGANIZATION_SUPPORT",
       workspace_title: `${firm?.name ?? "Organization Support Firm"} Workspace`,
-      workspace_description: "Operate a virtual organization-support firm for project reporting, technical writing, clerical work, and documentation/control support.",
+      workspace_description: "Operate a virtual organization-support firm for project reporting, technical writing, clerical work, and BizKick EDCS documentation/control support.",
       workspace_classification: "PILOT",
       modules: ["front_desk", "administration", "sales_accounts", "projects", "invoices", "ai_workforce", "ops", "audit"],
       worker_templates: ["front-desk-coordinator", "administration-clerk", "accounts-clerk", "marketing-sales-coordinator", "technical-drawing-assistant", "project-coordination-assistant"],
@@ -622,9 +624,10 @@ function renderWorkspaceNavigation(store) {
   navButtons.forEach((button) => {
     const moduleCode = viewModuleCodes[button.dataset.view];
     const subscribed = !moduleCode || codes.has(moduleCode);
-    button.classList.toggle("not-subscribed", !subscribed);
-    button.title = subscribed ? "Subscribed workspace area" : "Not included in the selected firm's current subscription/profile";
-    button.setAttribute("aria-disabled", subscribed ? "false" : "true");
+    button.classList.toggle("not-subscribed", false);
+    button.dataset.subscription = subscribed ? "subscribed" : "development-visible";
+    button.title = subscribed ? "Subscribed workspace area" : "Development-mode visible area; this module is not in the selected firm's current subscription profile.";
+    button.setAttribute("aria-disabled", "false");
   });
 }
 
@@ -637,10 +640,6 @@ function renderModuleBoundary(target, title, store, moduleCode) {
 }
 
 function renderIfSubscribed(target, title, moduleCode, renderer, store) {
-  if (!isWorkspaceModuleSubscribed(store, moduleCode)) {
-    renderModuleBoundary(target, title, store, moduleCode);
-    return;
-  }
   renderer(store);
 }
 
@@ -730,9 +729,9 @@ function renderActiveWorkspaceSelector(rawStore, scopedStore) {
   }
   const options = firms.map((firm) => {
     const tenant = tenants.find((item) => item.id === firm.tenant_id);
-    return `<option value="${escapeHtml(firm.id)}" ${firm.id === activeFirm?.id ? "selected" : ""}>${escapeHtml(firm.name)} � ${escapeHtml(tenant?.name ?? shortId(firm.tenant_id))}</option>`;
+    return `<option value="${escapeHtml(firm.id)}" ${firm.id === activeFirm?.id ? "selected" : ""}>${escapeHtml(firm.name)} — ${escapeHtml(tenant?.name ?? shortId(firm.tenant_id))}</option>`;
   }).join("");
-  activeWorkspace.innerHTML = `<form id="activeFirmForm" class="active-workspace-form"><label>Active firm workspace<select id="activeFirmSelect" name="firm_id">${options}</select></label><div class="active-workspace-card"><span>Tenant boundary</span><strong>${escapeHtml(activeTenant?.name ?? "-")}</strong><small>Firm: ${escapeHtml(activeFirm?.name ?? "-")} � Principal: ${escapeHtml(contract.principal?.display_name ?? contract.profile.principal_display_name ?? "Not resolved")}</small><small>Type: ${escapeHtml(contract.profile.firm_type ?? "UNCLASSIFIED")} � Subscription: ${escapeHtml(contract.subscription?.package_code ?? "Not bound")}</small><small>Services: ${escapeHtml(workspaceServiceSummary(contract))}</small></div></form>`;
+  activeWorkspace.innerHTML = `<form id="activeFirmForm" class="active-workspace-form"><label class="active-workspace-picker"><span>Active firm workspace</span><select id="activeFirmSelect" name="firm_id">${options}</select></label><div class="active-workspace-card"><div class="workspace-meta-grid"><div class="workspace-meta-card"><span>Tenant boundary</span><strong>${escapeHtml(activeTenant?.name ?? "-")}</strong></div><div class="workspace-meta-card"><span>Firm</span><strong>${escapeHtml(activeFirm?.name ?? "-")}</strong></div><div class="workspace-meta-card"><span>Virtual Principal</span><strong>${escapeHtml(contract.principal?.display_name ?? contract.profile.principal_display_name ?? "Not resolved")}</strong></div><div class="workspace-meta-card"><span>Subscription</span><strong>${escapeHtml(contract.subscription?.package_code ?? "Not bound")}</strong></div><div class="workspace-meta-card wide"><span>Services</span><strong>${escapeHtml(workspaceServiceSummary(contract))}</strong></div></div><p class="workspace-dev-note">Development mode: all future work areas are visible for build/review. The active firm subscription still controls business meaning, worker binding, and authority evidence.</p></div></form>`;
   activeWorkspace.querySelector("#activeFirmSelect")?.addEventListener("change", (event) => {
     activeFirmId = event.currentTarget.value;
     localStorage.setItem(ACTIVE_FIRM_STORAGE_KEY, activeFirmId);
@@ -748,7 +747,7 @@ function renderFrontDeskModule(store) {
   const serviceOptions = contract.serviceLines.map((line) => `<option value="${escapeHtml(serviceLineLabel(line))}">${escapeHtml(serviceLineLabel(line))}</option>`).join("");
   const defaultSummary = contract.profile.firm_type === "ORGANIZATION_SUPPORT" ? "Needs project reporting, technical writing, clerical, or EDCS support." : "Needs preliminary formwork design support.";
   const defaultOrg = contract.profile.firm_type === "ORGANIZATION_SUPPORT" ? "New Organization Client" : "New Contractor Sdn Bhd";
-  const options = enquiries.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.contact_name)} � ${escapeHtml(item.status)}</option>`).join("");
+  const options = enquiries.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.contact_name)} — ${escapeHtml(item.status)}</option>`).join("");
   const rows = enquiries.length ? `<div class="record-table-wrap"><table class="record-table"><thead><tr><th>Enquiry</th><th>Service</th><th>Consent/conflict</th><th>Status</th></tr></thead><tbody>${enquiries.map((item) => `<tr><td>${escapeHtml(item.contact_name)}<br/><small>${escapeHtml(item.organization_name ?? item.source_channel)}</small></td><td>${escapeHtml(item.requested_service_hint ?? "-")}</td><td>${escapeHtml(item.consent_or_legal_basis_ref ? "Recorded" : "Missing")} / ${escapeHtml(item.conflict_check_status)}</td><td><span class="pill">${escapeHtml(item.status)}</span></td></tr>`).join("")}</tbody></table></div>` : `<p class="empty">No enquiries captured yet for ${escapeHtml(firm?.name ?? "the active firm")}.</p>`;
   document.querySelector("#frontDeskView").innerHTML = `<section class="grid two"><form id="enquiryForm" class="panel compact-form"><div class="panel-heading"><h2>Capture Enquiry</h2><p>Creates a pre-client Front Desk record for ${escapeHtml(firm?.name ?? "the active firm")}; it does not create an engagement.</p></div><label>Contact<input name="contact_name" required value="Demo Contact" /></label><label>Organization<input name="organization_name" value="${escapeHtml(defaultOrg)}" /></label><label>Email<input name="contact_email" type="email" value="client@example.com" /></label><label>Requested service<select name="requested_service_hint">${serviceOptions || `<option>${escapeHtml(defaultServiceHint(contract))}</option>`}</select></label><label>Summary<input name="enquiry_summary" required value="${escapeHtml(defaultSummary)}" /></label><button type="submit" ${tenant && firm ? "" : "disabled"}>Capture Enquiry</button></form><section class="panel compact-form"><div class="panel-heading"><h2>Controlled Progression</h2><p>Qualification requires consent/legal basis and a cleared conflict prompt.</p></div><form id="qualifyEnquiryForm"><label>Enquiry<select name="enquiry_id">${options}</select></label><label>Consent/legal basis ref<input name="consent_or_legal_basis_ref" value="CONSENT-DEMO-001" /></label><label>Conflict check ref<input name="conflict_check_ref" value="CONFLICT-DEMO-001" /></label><button type="submit" ${enquiries.length ? "" : "disabled"}>Qualify</button></form><form id="draftCommunicationForm"><label>Enquiry<select name="enquiry_id">${options}</select></label><label>Draft message<input name="message_body" value="Thank you for your enquiry. We will review the information and respond after the principal's review." /></label><button type="submit" ${enquiries.length ? "" : "disabled"}>Draft Acknowledgement</button></form><form id="handoffEnquiryForm"><label>Qualified enquiry<select name="enquiry_id">${options}</select></label><button type="submit" ${enquiries.some((item)=>item.status==="QUALIFIED") ? "" : "disabled"}>Handoff to Intake</button></form><p class="form-note">Drafts require human review. No external sending is autonomous.</p></section></section><section class="panel"><div class="panel-heading"><h2>Enquiry Inbox</h2><p>${drafts.length} review-only communication draft(s) for ${escapeHtml(firm?.name ?? "the active firm")}.</p></div>${rows}</section>`;
   const act = actor ?? systemActorForBrowser(tenant?.id, firm?.id);
@@ -1374,7 +1373,14 @@ async function checkApi() {
   } catch (error) { apiStatus.textContent = `Offline (${API_BASE}: ${error instanceof Error ? error.message : String(error)})`; apiStatus.style.color = "var(--danger)"; setOperatorMessage("API offline. Start npm run dev from the project root or apps/web folder.", "danger"); }
 }
 
-navButtons.forEach((button) => button.addEventListener("click", () => switchView(button.dataset.view)));
+function setSidebarOpen(open) {
+  document.body.classList.toggle("sidebar-open", open);
+  sidebarToggle?.setAttribute("aria-expanded", open ? "true" : "false");
+}
+
+sidebarToggle?.addEventListener("click", () => setSidebarOpen(!document.body.classList.contains("sidebar-open")));
+sidebarScrim?.addEventListener("click", () => setSidebarOpen(false));
+navButtons.forEach((button) => button.addEventListener("click", () => { switchView(button.dataset.view); setSidebarOpen(false); }));
 workflowSteps.addEventListener("click", async (event) => { const button = event.target.closest("button[data-step]"); if (!button) return; const step = steps.find((item) => item.key === button.dataset.step); if (!step) return; await runUiCommand({ label: step.title, button, success: `${step.title} completed`, action: async () => { const data = await step.run(); step.apply(data); await refresh(); switchView(currentView); return data; } }); });
 demoForm.addEventListener("submit", async (event) => { event.preventDefault(); await runUiCommand({ label: "Run full demo loop", form: demoForm, success: "Full demo loop completed", action: async () => { const formData = new FormData(demoForm); const body = Object.fromEntries(formData.entries()); body.final_price = Number(body.final_price || 0); body.formwork_inputs = formworkInputs(); const data = await request("/mvp/demo-loop", { method: "POST", body: JSON.stringify(body) }); state = { ...state, ...data, finalPrice: body.final_price }; await refresh(); return data; } }); });
 resetWorkflow.addEventListener("click", () => { state = defaultState(); clearCommandFeedback(); setCommandFeedback("success", "Page workflow state reset", "Server data was not changed."); renderAll(); });

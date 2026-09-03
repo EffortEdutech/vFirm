@@ -10,6 +10,7 @@ function assert(condition, message) {
 }
 
 assert(html.includes('id="activeWorkspace"'), "Active workspace selector container missing from HTML.");
+assert(html.includes('id="workspaceSidebar"') && html.includes('id="sidebarToggle"'), "Corporate hamburger sidebar shell missing from HTML.");
 assert(app.includes('ACTIVE_FIRM_STORAGE_KEY = "vfirm.activeFirmId"'), "Active firm localStorage key missing.");
 assert(/function\s+activeFirmInStore\s*\(/.test(app), "activeFirmInStore helper missing.");
 assert(/function\s+activeTenantInStore\s*\(/.test(app), "activeTenantInStore helper missing.");
@@ -31,6 +32,7 @@ console.log(JSON.stringify({
     "active_workspace_selector",
     "active_firm_persistence",
     "scoped_store_rendering",
+    "development_mode_full_feature_visibility",
     "firm_client_relationship_scoping",
     "nhl_singular_name"
   ]

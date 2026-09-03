@@ -14,6 +14,8 @@ for (const view of navViews) {
 }
 assert(new Set(sectionViews).size === sectionViews.length, "Duplicate workspace-view section ids detected.");
 assert(html.indexOf('id="view-my-firm"') > html.indexOf('id="view-workflow"'), "My Firm view must be a top-level sibling after Workflow, not nested inside it.");
+assert(html.includes('class="app-shell"') && html.includes('id="workspaceSidebar"') && html.includes('id="sidebarToggle"'), "Corporate app shell missing.");
+assert(html.includes('class="workspace-command-center"'), "Workspace command center missing from shell.");
 
 const requiredRenderers = [
   "renderMyFirmModule",
