@@ -563,3 +563,18 @@ Boundary: OP-H1 does not approve production multi-tenant onboarding, public mark
 Evidence: `docs/10_post_freeze_technical_design/OP_H1_CONTROLLED_MULTI_FIRM_PILOT_OPERATIONS_FOUNDATION_v1.0.md`; `docs/10_post_freeze_technical_design/OP_H1_CONTROLLED_MULTI_FIRM_PILOT_OPERATIONS_FOUNDATION_COMPLETION_v1.0.md`; `scripts/smoke-op-h1-controlled-multi-firm-pilot-operations-foundation.mjs`; `npm run check:op:h1`.
 
 Follow-up: Proceed to `OP-H2 - Operator Dashboard and Today View` after product-owner authorization.
+## ADR-056 - OP-H2 operator dashboard and today view completed
+
+Date: 2026-09-03
+
+Decision: OP-H2 is complete. The Virtual Firm Platform dashboard now shows a selected-firm Today view for controlled multi-firm pilot operation.
+
+Rationale: MT acceptance proved active workspace binding, and OP-H1 locked the pilot operations foundation. OP-H2 makes the operator's daily starting point practical by showing firm-specific readiness, priorities, approvals, exceptions, deadlines, project/task status, pipeline, receivables, service exposure, and authority boundaries in the active firm workspace.
+
+Implementation: Added `OP_H2_OPERATOR_DASHBOARD_AND_TODAY_VIEW_COMPLETION_v1.0.md`, `renderOperatorTodayView`, deterministic browser-side Today fallback logic, dashboard styling, and executable validation in `scripts/smoke-op-h2-operator-dashboard-today-view.mjs`. OP-H2 checklist items are marked complete and the full regression chain now includes the OP-H2 smoke.
+
+Boundary: OP-H2 does not approve production multi-tenant onboarding, public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, pricing intelligence, autonomous award, autonomous regulated approval, live payment movement, or uncontrolled tenant/client data sharing.
+
+Evidence: `docs/10_post_freeze_technical_design/OP_H2_OPERATOR_DASHBOARD_AND_TODAY_VIEW_COMPLETION_v1.0.md`; `scripts/smoke-op-h2-operator-dashboard-today-view.mjs`; `npm run check:op:h2`.
+
+Follow-up: Proceed to `OP-H3 - Formwork Pilot Day Rehearsal` after product-owner authorization.

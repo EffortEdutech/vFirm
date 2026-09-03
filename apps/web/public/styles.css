@@ -215,3 +215,16 @@ button[disabled] { position: relative; }
 .active-workspace-card strong { color: var(--accent-dark); font-size: 15px; }
 .active-workspace-card small { color: var(--muted); line-height: 1.35; font-weight: 700; }
 @media (max-width: 760px) { .active-workspace-form { grid-template-columns: 1fr; } }
+.op-h2-today-view { grid-column: 1 / -1; display: grid; gap: 14px; background: #fffdf8; }
+.op-h2-today-view p { color: var(--muted); line-height: 1.45; }
+.today-priority-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.today-priority-grid article { border: 1px solid #d4ebe2; border-radius: 14px; padding: 12px; background: #f6fbf8; }
+.today-priority-grid article span { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; font-weight: 900; }
+.today-priority-grid article strong { display: block; margin-top: 4px; font-size: 15px; color: var(--ink); }
+.today-ops-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.today-ops-grid div { border: 1px solid var(--line); border-radius: 14px; padding: 12px; background: white; }
+.today-ops-grid h4 { margin: 0 0 8px; color: var(--accent-dark); }
+.today-ops-grid ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+.today-ops-grid li strong { color: var(--accent-dark); margin-right: 6px; }
+.today-ops-grid li span { color: var(--muted); }
+@media (max-width: 700px) { .today-ops-grid { grid-template-columns: 1fr; } }

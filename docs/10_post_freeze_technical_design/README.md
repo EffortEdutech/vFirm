@@ -280,3 +280,4 @@ The OP sprint plan and checklist govern the next bounded hardening pass after MT
 | `OP_H1_TO_H6_CONTROLLED_MULTI_FIRM_PILOT_OPERATIONS_CHECKLIST_v1.0.md` | Execution checklist for OP-H1 through OP-H6 controlled multi-firm pilot operations readiness. |
 | `OP_H1_CONTROLLED_MULTI_FIRM_PILOT_OPERATIONS_FOUNDATION_v1.0.md` | Locked OP-H1 foundation contract for pilot scope, operator roles, readiness, pilot-day checklist, activity log, issue/support log, approvals, exceptions, and tenant/firm scoping. |
 | `OP_H1_CONTROLLED_MULTI_FIRM_PILOT_OPERATIONS_FOUNDATION_COMPLETION_v1.0.md` | Completion evidence for OP-H1 controlled multi-firm pilot operations foundation and handoff to OP-H2. |
+| `OP_H2_OPERATOR_DASHBOARD_AND_TODAY_VIEW_COMPLETION_v1.0.md` | Completion evidence for selected-firm operator dashboard Today view, readiness, priorities, approvals, exceptions, deadlines, projects, pipeline, receivables, and cross-firm leakage checks. |

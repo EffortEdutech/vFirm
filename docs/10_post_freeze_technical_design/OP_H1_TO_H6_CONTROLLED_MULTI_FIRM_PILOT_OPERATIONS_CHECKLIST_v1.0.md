@@ -23,16 +23,16 @@ scope: "Controlled local/private pilot operation for verified active firm worksp
 
 ## OP-H2 - Operator Dashboard and Today View
 
-- [ ] Add selected-firm readiness card.
-- [ ] Add today priorities view.
-- [ ] Add approvals summary.
-- [ ] Add exceptions summary.
-- [ ] Add deadlines, project status, pipeline, and receivables summary.
-- [ ] Bind dashboard data and copy to selected firm.
-- [ ] Verify Formwork readiness reflects technical delivery exposure.
-- [ ] Verify NHL readiness reflects organization-support service exposure.
-- [ ] Add cross-firm dashboard leakage negative checks.
-- [ ] Update evidence and decision register.
+- [x] Add selected-firm readiness card.
+- [x] Add today priorities view.
+- [x] Add approvals summary.
+- [x] Add exceptions summary.
+- [x] Add deadlines, project status, pipeline, and receivables summary.
+- [x] Bind dashboard data and copy to selected firm.
+- [x] Verify Formwork readiness reflects technical delivery exposure.
+- [x] Verify NHL readiness reflects organization-support service exposure.
+- [x] Add cross-firm dashboard leakage negative checks.
+- [x] Update evidence and decision register.
 
 ## OP-H3 - Formwork Pilot Day Rehearsal
 

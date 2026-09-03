@@ -376,7 +376,81 @@ function renderSummary(store) {
   const cards = [
     ["Clients", store._dashboard_summary?.counts?.clients ?? store.clients?.length], ["Open Intake", store._dashboard_summary?.counts?.open_intake ?? store.intake_sessions?.filter((x) => x.intake_status !== "COMPLETE").length], ["Proposals", store._dashboard_summary?.counts?.proposals ?? store.proposals?.length], ["Projects", store._dashboard_summary?.counts?.projects ?? store.projects?.length], ["Approvals", store._dashboard_summary?.counts?.approvals ?? store.approvals?.length], ["Invoices", store._dashboard_summary?.counts?.invoices ?? store.invoices?.length], ["Events", store._dashboard_summary?.counts?.events ?? store.event_log?.length], ["Audit", store._dashboard_summary?.counts?.audit_events ?? store.audit_events?.length]
   ];
-  storeSummary.innerHTML = cards.map(([name, count]) => `<div class="summary-card"><span>${name}</span><strong>${count ?? 0}</strong></div>`).join("");
+  storeSummary.innerHTML = `${cards.map(([name, count]) => `<div class="summary-card"><span>${name}</span><strong>${count ?? 0}</strong></div>`).join("")}${renderOperatorTodayView(store)}`;
+}
+
+
+function buildClientDailyOperationsFallback(store) {
+  const open = (value) => !["COMPLETE", "COMPLETED", "DONE", "CLOSED", "RESOLVED", "ISSUED", "PAID", "HANDED_OFF", "ACCEPTED"].includes(String(value ?? "").toUpperCase());
+  const invoices = store.invoices ?? [];
+  const payments = store.payment_statuses ?? [];
+  const invoiceTotal = invoices.reduce((sum, invoice) => sum + (invoice.line_items ?? []).reduce((lineSum, item) => lineSum + Number(item.amount ?? 0), 0), 0);
+  const received = payments.filter((item) => ["PAID", "RECEIVED", "CAPTURED"].includes(item.payment_status)).reduce((sum, item) => sum + Number(item.amount_received ?? item.amount ?? 0), 0);
+  const approvals = [
+    ...(store.proposals ?? []).filter((item) => ["DRAFT", "PREPARED", "PENDING_APPROVAL", "APPROVAL_REQUIRED"].includes(item.proposal_status)).map((item) => ({ type: "proposal", id: item.id, status: item.proposal_status })),
+    ...(store.delivery_package_records ?? []).filter((item) => item.package_status === "READY_FOR_PRINCIPAL_REVIEW").map((item) => ({ type: "technical_delivery_package", id: item.id, status: item.package_status })),
+    ...(store.client_communication_drafts ?? []).filter((item) => item.requires_human_review && open(item.status)).map((item) => ({ type: "client_communication_draft", id: item.id, status: item.status })),
+    ...(store.transmittal_drafts ?? []).filter((item) => item.requires_principal_approval && open(item.status)).map((item) => ({ type: "transmittal_draft", id: item.id, status: item.status })),
+    ...(store.receivable_follow_ups ?? []).filter((item) => item.requires_human_review && open(item.status)).map((item) => ({ type: "receivable_follow_up", id: item.id, status: item.status }))
+  ];
+  const blockedPackages = (store.delivery_package_records ?? []).filter((item) => item.package_status === "BLOCKED").length;
+  const exceptions = blockedPackages ? [{ key: "blocked_delivery_packages", severity: "HIGH", detail: `${blockedPackages} delivery package(s) blocked.` }] : [];
+  return {
+    status: exceptions.length ? "OPERATOR_ATTENTION_REQUIRED" : "REHEARSAL_IN_PROGRESS",
+    counts: {
+      open_enquiries: (store.front_desk_enquiries ?? []).filter((item) => open(item.status)).length,
+      open_deadlines: (store.administrative_deadlines ?? []).filter((item) => item.status === "OPEN").length,
+      pending_approvals: approvals.length,
+      open_projects: (store.projects ?? []).filter((item) => open(item.project_state)).length,
+      open_tasks: (store.tasks ?? []).filter((item) => open(item.state)).length,
+      blocked_delivery_packages: blockedPackages,
+      audit_events: store.audit_events?.length ?? 0
+    },
+    deadlines: { overdue: 0, due_soon: 0 },
+    approvals,
+    exceptions,
+    pipeline: {
+      open_opportunities: (store.sales_pipeline_records ?? []).filter((item) => !["WON", "LOST", "CLOSED"].includes(item.stage)).length,
+      proposals_draft: (store.proposals ?? []).filter((item) => ["DRAFT", "PREPARED", "PENDING_APPROVAL", "APPROVAL_REQUIRED"].includes(item.proposal_status)).length
+    },
+    cash: { currency: invoices[0]?.currency ?? "MYR", invoiced: invoiceTotal, received, outstanding: invoiceTotal - received }
+  };
+}
+function renderOperatorTodayView(store) {
+  const contract = activeWorkspaceContract(store);
+  const daily = store.daily_operations ?? buildClientDailyOperationsFallback(store);
+  const counts = daily.counts ?? {};
+  const cash = daily.cash ?? {};
+  const modules = new Set(contract.modules.map((module) => module.module_code));
+  const serviceExposure = contract.profile.firm_type === "ORGANIZATION_SUPPORT"
+    ? "NHL organization-support service exposure: project reporting, technical writing, clerical work, and BizKick EDCS/document-control support."
+    : "Formwork technical approval exposure: drawing, QA, evidence, and delivery packages stay blocked until valid human professional approval exists.";
+  const technicalBoundary = modules.has("technical_delivery")
+    ? "Technical Delivery subscribed; regulated issue remains human-approved only."
+    : "Technical Delivery not subscribed for this workspace; no Formwork technical delivery work is active.";
+  const priorityItems = [
+    ["Front desk", `${counts.open_enquiries ?? 0} open enquiries`],
+    ["Approvals", `${counts.pending_approvals ?? daily.approvals?.length ?? 0} human review item(s)`],
+    ["Exceptions", `${daily.exceptions?.length ?? 0} active exception(s)`],
+    ["Deadlines", `${daily.deadlines?.overdue ?? 0} overdue / ${daily.deadlines?.due_soon ?? 0} due soon`],
+    ["Projects", `${counts.open_projects ?? 0} open projects / ${counts.open_tasks ?? 0} open tasks`],
+    ["Pipeline", `${daily.pipeline?.open_opportunities ?? 0} open opportunities / ${daily.pipeline?.proposals_draft ?? 0} draft proposals`],
+    ["Receivables", `${money(cash.outstanding ?? 0, cash.currency ?? "MYR")} outstanding`]
+  ];
+  const exceptionList = (daily.exceptions ?? []).slice(0, 4).map((item) => `<li><strong>${escapeHtml(item.severity ?? "REVIEW")}</strong><span>${escapeHtml(item.detail ?? item.key)}</span></li>`).join("");
+  const approvalList = (daily.approvals ?? []).slice(0, 4).map((item) => `<li><strong>${escapeHtml(humanStatus(item.type))}</strong><span>${escapeHtml(item.status ?? shortId(item.id))}</span></li>`).join("");
+  return `<section class="summary-card op-h2-today-view selected-firm-today-view">
+    <span>Selected-firm readiness</span>
+    <strong>${escapeHtml(humanStatus(daily.status ?? "rehearsal_in_progress"))}</strong>
+    <p>${escapeHtml(contract.firm?.name ?? "No active firm")} - ${escapeHtml(contract.profile.firm_type ?? "UNCLASSIFIED")} - ${escapeHtml(workspaceServiceSummary(contract))}</p>
+    <div class="today-priority-grid">${priorityItems.map(([label, value]) => `<article><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></article>`).join("")}</div>
+    <div class="today-ops-grid">
+      <div><h4>Today priorities</h4><p>${escapeHtml(serviceExposure)}</p><p>${escapeHtml(technicalBoundary)}</p></div>
+      <div><h4>Approvals</h4>${approvalList ? `<ul>${approvalList}</ul>` : `<p>No pending approval records for the selected firm.</p>`}</div>
+      <div><h4>Exceptions</h4>${exceptionList ? `<ul>${exceptionList}</ul>` : `<p>No active exceptions for the selected firm.</p>`}</div>
+      <div><h4>Locked boundaries</h4><p>No live payment movement. No autonomous regulated approval. No cross-firm dashboard leakage.</p></div>
+    </div>
+  </section>`;
 }
 
 function renderLatestActivity(store) {
@@ -656,9 +730,9 @@ function renderActiveWorkspaceSelector(rawStore, scopedStore) {
   }
   const options = firms.map((firm) => {
     const tenant = tenants.find((item) => item.id === firm.tenant_id);
-    return `<option value="${escapeHtml(firm.id)}" ${firm.id === activeFirm?.id ? "selected" : ""}>${escapeHtml(firm.name)} — ${escapeHtml(tenant?.name ?? shortId(firm.tenant_id))}</option>`;
+    return `<option value="${escapeHtml(firm.id)}" ${firm.id === activeFirm?.id ? "selected" : ""}>${escapeHtml(firm.name)} ï¿½ ${escapeHtml(tenant?.name ?? shortId(firm.tenant_id))}</option>`;
   }).join("");
-  activeWorkspace.innerHTML = `<form id="activeFirmForm" class="active-workspace-form"><label>Active firm workspace<select id="activeFirmSelect" name="firm_id">${options}</select></label><div class="active-workspace-card"><span>Tenant boundary</span><strong>${escapeHtml(activeTenant?.name ?? "-")}</strong><small>Firm: ${escapeHtml(activeFirm?.name ?? "-")} · Principal: ${escapeHtml(contract.principal?.display_name ?? contract.profile.principal_display_name ?? "Not resolved")}</small><small>Type: ${escapeHtml(contract.profile.firm_type ?? "UNCLASSIFIED")} · Subscription: ${escapeHtml(contract.subscription?.package_code ?? "Not bound")}</small><small>Services: ${escapeHtml(workspaceServiceSummary(contract))}</small></div></form>`;
+  activeWorkspace.innerHTML = `<form id="activeFirmForm" class="active-workspace-form"><label>Active firm workspace<select id="activeFirmSelect" name="firm_id">${options}</select></label><div class="active-workspace-card"><span>Tenant boundary</span><strong>${escapeHtml(activeTenant?.name ?? "-")}</strong><small>Firm: ${escapeHtml(activeFirm?.name ?? "-")} ï¿½ Principal: ${escapeHtml(contract.principal?.display_name ?? contract.profile.principal_display_name ?? "Not resolved")}</small><small>Type: ${escapeHtml(contract.profile.firm_type ?? "UNCLASSIFIED")} ï¿½ Subscription: ${escapeHtml(contract.subscription?.package_code ?? "Not bound")}</small><small>Services: ${escapeHtml(workspaceServiceSummary(contract))}</small></div></form>`;
   activeWorkspace.querySelector("#activeFirmSelect")?.addEventListener("change", (event) => {
     activeFirmId = event.currentTarget.value;
     localStorage.setItem(ACTIVE_FIRM_STORAGE_KEY, activeFirmId);
@@ -674,7 +748,7 @@ function renderFrontDeskModule(store) {
   const serviceOptions = contract.serviceLines.map((line) => `<option value="${escapeHtml(serviceLineLabel(line))}">${escapeHtml(serviceLineLabel(line))}</option>`).join("");
   const defaultSummary = contract.profile.firm_type === "ORGANIZATION_SUPPORT" ? "Needs project reporting, technical writing, clerical, or EDCS support." : "Needs preliminary formwork design support.";
   const defaultOrg = contract.profile.firm_type === "ORGANIZATION_SUPPORT" ? "New Organization Client" : "New Contractor Sdn Bhd";
-  const options = enquiries.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.contact_name)} — ${escapeHtml(item.status)}</option>`).join("");
+  const options = enquiries.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.contact_name)} ï¿½ ${escapeHtml(item.status)}</option>`).join("");
   const rows = enquiries.length ? `<div class="record-table-wrap"><table class="record-table"><thead><tr><th>Enquiry</th><th>Service</th><th>Consent/conflict</th><th>Status</th></tr></thead><tbody>${enquiries.map((item) => `<tr><td>${escapeHtml(item.contact_name)}<br/><small>${escapeHtml(item.organization_name ?? item.source_channel)}</small></td><td>${escapeHtml(item.requested_service_hint ?? "-")}</td><td>${escapeHtml(item.consent_or_legal_basis_ref ? "Recorded" : "Missing")} / ${escapeHtml(item.conflict_check_status)}</td><td><span class="pill">${escapeHtml(item.status)}</span></td></tr>`).join("")}</tbody></table></div>` : `<p class="empty">No enquiries captured yet for ${escapeHtml(firm?.name ?? "the active firm")}.</p>`;
   document.querySelector("#frontDeskView").innerHTML = `<section class="grid two"><form id="enquiryForm" class="panel compact-form"><div class="panel-heading"><h2>Capture Enquiry</h2><p>Creates a pre-client Front Desk record for ${escapeHtml(firm?.name ?? "the active firm")}; it does not create an engagement.</p></div><label>Contact<input name="contact_name" required value="Demo Contact" /></label><label>Organization<input name="organization_name" value="${escapeHtml(defaultOrg)}" /></label><label>Email<input name="contact_email" type="email" value="client@example.com" /></label><label>Requested service<select name="requested_service_hint">${serviceOptions || `<option>${escapeHtml(defaultServiceHint(contract))}</option>`}</select></label><label>Summary<input name="enquiry_summary" required value="${escapeHtml(defaultSummary)}" /></label><button type="submit" ${tenant && firm ? "" : "disabled"}>Capture Enquiry</button></form><section class="panel compact-form"><div class="panel-heading"><h2>Controlled Progression</h2><p>Qualification requires consent/legal basis and a cleared conflict prompt.</p></div><form id="qualifyEnquiryForm"><label>Enquiry<select name="enquiry_id">${options}</select></label><label>Consent/legal basis ref<input name="consent_or_legal_basis_ref" value="CONSENT-DEMO-001" /></label><label>Conflict check ref<input name="conflict_check_ref" value="CONFLICT-DEMO-001" /></label><button type="submit" ${enquiries.length ? "" : "disabled"}>Qualify</button></form><form id="draftCommunicationForm"><label>Enquiry<select name="enquiry_id">${options}</select></label><label>Draft message<input name="message_body" value="Thank you for your enquiry. We will review the information and respond after the principal's review." /></label><button type="submit" ${enquiries.length ? "" : "disabled"}>Draft Acknowledgement</button></form><form id="handoffEnquiryForm"><label>Qualified enquiry<select name="enquiry_id">${options}</select></label><button type="submit" ${enquiries.some((item)=>item.status==="QUALIFIED") ? "" : "disabled"}>Handoff to Intake</button></form><p class="form-note">Drafts require human review. No external sending is autonomous.</p></section></section><section class="panel"><div class="panel-heading"><h2>Enquiry Inbox</h2><p>${drafts.length} review-only communication draft(s) for ${escapeHtml(firm?.name ?? "the active firm")}.</p></div>${rows}</section>`;
   const act = actor ?? systemActorForBrowser(tenant?.id, firm?.id);
@@ -1021,7 +1095,7 @@ function renderOpsModule(store) {
   const dataPolicy = store.data_protection_policy ?? {};
   const exportManifest = store.data_export_manifest ?? {};
   const metrics = store.operator_metrics ?? {};
-  const daily = store.daily_operations ?? {};
+  const daily = store.daily_operations ?? buildClientDailyOperationsFallback(store);
   const handoffs = store.pilot_handoff_records ?? [];
   const incidents = store.pilot_incidents ?? [];
   const latestFirm = latestRecord(store, "firms");
