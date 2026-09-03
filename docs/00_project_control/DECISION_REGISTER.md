@@ -638,3 +638,19 @@ Boundary: OP-H6 gate preparation does not itself authorize production multi-tena
 Evidence: `docs/10_post_freeze_technical_design/OP_EVIDENCE_PACK_COMPLETION_v1.0.md`; `docs/10_post_freeze_technical_design/OP_H6_CONTROLLED_MULTI_FIRM_PILOT_OPERATIONS_ACCEPTANCE_GATE_v1.0.md`; `scripts/smoke-op-h6-controlled-multi-firm-pilot-operations-acceptance-gate.mjs`; `npm run check:op:h6`.
 
 Follow-up: Product owner must accept, hold, reject, or defer OP readiness before any next scope begins.
+
+## ADR-061 - OP controlled multi-firm pilot operations accepted
+
+Date: 2026-09-03
+Status: accepted
+Decision: The product owner accepts OP-H1 through OP-H6 controlled multi-firm pilot operations readiness with the listed limitations. Controlled local/private pilot operation is authorized for Amanah Formwork Pilot Firm and NHL Global Solution as separate active firm workspaces.
+
+Rationale: OP-H1 through OP-H6 established controlled multi-firm pilot operations foundation, operator dashboard/Today View, separate Formwork and NHL pilot-day rehearsals, evidence/audit/export closeout, and a formal acceptance gate. Validation confirms zero blockers and preserved tenant, human authority, export, and audit boundaries.
+
+Implementation: Added `OP_CONTROLLED_MULTI_FIRM_PILOT_OPERATIONS_ACCEPTANCE_DECISION_v1.0.md` and executable validation in `scripts/smoke-op-acceptance-decision.mjs`. The full regression chain now includes the OP acceptance-decision smoke.
+
+Boundary: This acceptance does not authorize production multi-tenant onboarding, public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, pricing intelligence, autonomous award, autonomous regulated approval, live payment movement, or uncontrolled tenant/client data sharing.
+
+Evidence: `docs/10_post_freeze_technical_design/OP_CONTROLLED_MULTI_FIRM_PILOT_OPERATIONS_ACCEPTANCE_DECISION_v1.0.md`; `docs/10_post_freeze_technical_design/OP_H6_CONTROLLED_MULTI_FIRM_PILOT_OPERATIONS_ACCEPTANCE_GATE_v1.0.md`; `docs/10_post_freeze_technical_design/OP_EVIDENCE_PACK_COMPLETION_v1.0.md`; `scripts/smoke-op-acceptance-decision.mjs`; `npm run check:op:acceptance:decision`.
+
+Follow-up: Product owner should choose the next bounded development scope before implementation continues beyond controlled local/private pilot operation.
