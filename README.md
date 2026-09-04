@@ -1,4 +1,4 @@
-﻿# vFirm
+# vFirm
 
 vFirm is a Virtual Firm Platform: professional practice infrastructure that lets a qualified human professional launch and operate a client-facing firm with governed AI workers, shared business systems, service packs, finance, documents, audit, and professional approval controls.
 
@@ -12,19 +12,32 @@ Professional Expertise + Virtual Workforce + Shared Business Infrastructure = Vi
 
 Architecture Baseline v1.0 is frozen.
 
-The Stage 1-20 feature-build track is complete. **Release 1 is accepted for controlled local Formwork Engineering Virtual Firm pilot readiness.**
+Current durable state is summarized in `docs/AI_WORKSPACE_CONTEXT.md`.
 
-Release 1 remains accepted for controlled local pilot readiness. The active approved scope expansion is the first solopreneur Formwork Engineering Virtual Firm, governed by `docs/10_post_freeze_technical_design/VFIRM_SOLOPRENEUR_FIRM_PRODUCT_TARGET_AND_SPRINT_PLAN_v1.0.md`.
+As of 2026-09-04:
+
+- Stage 1-20 and Release 1 are complete.
+- Multi-tenant runtime binding is accepted for controlled local/private pilot operation.
+- Controlled multi-firm pilot operations are accepted for Amanah Formwork Pilot Firm and NHL Global Solution.
+- Controlled private directory operation remains bounded to human-governed/private use only.
+- NHL-Q1 through NHL-Q6 are technically complete for NHL Global Solution BOQ/image quotation workflow readiness.
+- NHL-Q workflow acceptance still requires an explicit product-owner decision; no silent acceptance is allowed.
 
 ## Read First
+
+For efficient recovery and low-token work, start here:
+
+1. `AGENTS.md`
+2. `docs/AI_WORKSPACE_CONTEXT.md`
+3. `docs/00_project_control/AI_DEVELOPMENT_WORKSPACE_GRAPHIFY_OBSIDIAN_PROTOCOL_v1.0.md`
+4. `docs/10_post_freeze_technical_design/README.md`
+
+For deeper architecture only when needed:
 
 1. `docs/00_project_control/README_FOR_BUILDERS_v1.0.md`
 2. `docs/08_shared_assets/ARCHITECTURE_BASELINE_V1_DOCUMENTATION_INDEX.md`
 3. `docs/01_foundation/VF_PLATFORM_DOCTRINE_v1.0.md`
 4. `docs/00_project_control/VF_IMPLEMENTATION_BLUEPRINT_v1.0.md`
-5. `docs/10_post_freeze_technical_design/README.md`
-6. `docs/10_post_freeze_technical_design/VFIRM_RELEASE_1_PRODUCT_TARGET_AND_SPRINT_PLAN_v1.0.md`
-7. `AGENTS.md`
 
 ## Project Layout
 
@@ -66,6 +79,3 @@ npm run db:migrate
 - No orphan regulated work.
 - No direct LLM-to-final regulated output.
 - Every material action is tenant-scoped and attributable.
-
-
-

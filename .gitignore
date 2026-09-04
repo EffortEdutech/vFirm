@@ -16,3 +16,7 @@ Thumbs.db
 data/*.json
 !data/.gitkeep
 
+
+# Graphify generated graph output
+graphify-out/
+.graphify-work/

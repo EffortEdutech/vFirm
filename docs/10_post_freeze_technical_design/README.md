@@ -277,6 +277,7 @@ The OP sprint plan and checklist govern the next bounded hardening pass after MT
 
 | Document | Purpose |
 | --- | --- |
+| `../00_project_control/AI_DEVELOPMENT_WORKSPACE_GRAPHIFY_OBSIDIAN_PROTOCOL_v1.0.md` | Repo-local protocol for Graphify-first codebase navigation, Obsidian rationale lookup, compact context recovery, and forced-stop resilience. |
 | `OP_H1_TO_H6_CONTROLLED_MULTI_FIRM_PILOT_OPERATIONS_SPRINT_PLAN_v1.0.md` | Governing sprint plan for OP-H1 through OP-H6 controlled multi-firm pilot operations foundation, dashboard, firm rehearsals, evidence, export, closeout, and acceptance gate. |
 | `OP_H1_TO_H6_CONTROLLED_MULTI_FIRM_PILOT_OPERATIONS_CHECKLIST_v1.0.md` | Execution checklist for OP-H1 through OP-H6 controlled multi-firm pilot operations readiness. |
 | `OP_H1_CONTROLLED_MULTI_FIRM_PILOT_OPERATIONS_FOUNDATION_v1.0.md` | Locked OP-H1 foundation contract for pilot scope, operator roles, readiness, pilot-day checklist, activity log, issue/support log, approvals, exceptions, and tenant/firm scoping. |

@@ -1,4 +1,4 @@
-﻿# AGENTS.md â€” Codex Working Instructions
+# AGENTS.md â€” Codex Working Instructions
 
 ## Mission
 
@@ -107,3 +107,76 @@ Add trusted specialist network before any open global marketplace.
 
 
 
+
+<!-- AI-DEVELOPMENT-WORKSPACE-GRAPHIFY-OBSIDIAN -->
+
+## AI Development Workspace: Graphify + Obsidian
+
+This repository is connected to the Effort Studio AI development workspace.
+
+Central Obsidian vault:
+
+```text
+C:\Users\user\Documents\00 AI agent\AI-Knowledge
+```
+
+If the live vault is outside the current sandbox, read this local fallback bridge instead:
+
+```text
+docs\AI_WORKSPACE_CONTEXT.md
+```
+
+Use Obsidian only for architecture rationale, ADRs, roadmap context, cross-project standards, meeting notes, and research. Do not use Obsidian as a replacement for this repository's docs, tests, source files, schemas, or package scripts.
+
+### Graphify First
+
+When `graphify-out/graph.json` exists, use Graphify before broad manual inspection:
+
+```powershell
+.\scripts\graphify.ps1 query "question" --graph "graphify-out\graph.json"
+.\scripts\graphify.ps1 explain "symbol-or-file" --graph "graphify-out\graph.json"
+.\scripts\graphify.ps1 path "A" "B" --graph "graphify-out\graph.json"
+```
+
+Then inspect the actual source, tests, docs, or schema files directly before editing.
+
+Refresh the configured graph from the central workspace:
+
+```powershell
+& "C:\Users\user\Documents\00 AI agent\setup\build_multi_project_graphs.ps1" -Only virtual-firm
+```
+
+Linux/macOS or Claude sandbox wrapper:
+
+```bash
+./scripts/graphify.sh --version
+```
+
+The `.ps1` wrapper is for Windows. The `.sh` wrapper is for Linux/macOS and Claude sandboxes; it installs the PyPI package `graphifyy` on demand and then runs `graphify`.
+
+### Token and Time Economy
+
+To conserve Codex and Claude usage, start each session by summarizing only the relevant Graphify findings, governing docs, and Obsidian/fallback context. Avoid rereading the whole architecture baseline unless the task is architectural or touches frozen baseline rules.
+
+For new work, classify the request before implementation as one of:
+
+- Release 1 stabilization
+- Release 1 blocker
+- Release 2 candidate
+- Explicit user-approved scope expansion
+
+Keep changes small, use focused checks, and refresh Graphify after meaningful code, schema, or docs structure changes when possible.
+
+## Current Durable State - 2026-09-04
+
+The compact current-state bridge is `docs\AI_WORKSPACE_CONTEXT.md`.
+
+As of this date:
+
+- Multi-tenant runtime binding is accepted for controlled local/private pilot operation.
+- Controlled multi-firm pilot operations are accepted for Amanah Formwork Pilot Firm and NHL Global Solution.
+- Controlled private directory operation is accepted only within its private/human-governed boundary.
+- NHL-Q1 through NHL-Q6 are technically complete for NHL Global Solution BOQ/image quotation workflow readiness.
+- NHL-Q acceptance remains pending explicit product-owner decision; no silent acceptance is allowed.
+
+Use `docs\00_project_control\AI_DEVELOPMENT_WORKSPACE_GRAPHIFY_OBSIDIAN_PROTOCOL_v1.0.md` to reduce repeated context loading and recover after forced stops.
