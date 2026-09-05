@@ -149,22 +149,24 @@ Target stage: 3
 
 ## TD-009 — AWIA Virtual Staff Not Yet Postgres/Staging Ready
 
-Status: OPEN
+Status: CODE COMPLETE, AWAITING LIVE POSTGRES VERIFICATION (Phase B, 2026-09-05)
 
-AWIA virtual staff (provisioning, lifecycle, memory, conversation, seat billing, department dashboards, multi-firm templates) currently only persists correctly under `VFIRM_STORE_BACKEND=json`. Two concrete gaps block staging cutover:
+AWIA virtual staff (provisioning, lifecycle, memory, conversation, seat billing, department dashboards, multi-firm templates) previously only persisted correctly under `VFIRM_STORE_BACKEND=json`. Two concrete gaps blocked staging cutover:
 
-- No `awia_*` table is defined in `infra/database/schema.sql` or `infra/database/migrations/*.sql`.
-- Every AWIA store.mjs function generates record ids via an unconditional `newId(prefix)` (a prefixed non-uuid string), instead of the `isPostgresStore()`-aware id scheme already used elsewhere in the file. These ids would not satisfy uuid-typed Postgres columns even once a schema exists.
+- No `awia_*` table was defined in `infra/database/schema.sql` or `infra/database/migrations/*.sql`.
+- Every AWIA store.mjs function generated record ids via an unconditional `newId(prefix)` (a prefixed non-uuid string), instead of the `isPostgresStore()`-aware id scheme already used elsewhere in the file. These ids did not satisfy uuid-typed Postgres columns even where a schema existed, which was also why AWIA's audit_events/event_log entries were silently dropped (found during the Phase A pilot day, see `AWIA_PILOT_DAY_PHASE_A_AUTHORIZATION_AND_DRY_RUN_RESULT_v1.0.md` v1.1 section 4).
 
-Current mitigation:
+Resolution implemented (Phase B):
 
-- controlled local/private pilot operation is unaffected (JSON store backend only, matching the AWIA_CONTROLLED_LOCAL_PILOT_ACCEPTANCE_LOCK_v1.0.md scope);
-- a live readiness check is available at `GET /awia/virtual-staff/staging-readiness` (see `AWIA_STAGING_PREPARATION_COMPLETION_v1.0.md`) that reports this gap and returns `NOT_READY_FOR_STAGING_BACKEND_MIGRATION_REQUIRED` until it is closed.
+- `infra/database/migrations/0024_awia_virtual_staff_persistence.sql` adds real Postgres tables for all 17 `awia_*` collections (uuid primary key, tenant/firm foreign keys, the full application record kept as `record jsonb` for exact round-tripping) — validated by `npm run db:migrate` (schema-shape check passed, 29 migration files).
+- `apps/api/src/store.mjs`: the 10 AWIA record-id call sites that used an unconditional `newId(prefix)` now follow the existing backend-aware pattern (`storeBackend === "postgres" ? newUuid() : newId(prefix)`).
+- Six provisioning-identity collections (seats, members, role assignments, package bindings, lifecycle events, provisioning runs) keep their deterministic natural-key ids on both backends by design (idempotent re-provisioning depends on it, e.g. `agent-<firm_id>-cfo-001`) — a new `deterministicUuid(seed)` helper gives these a stable Postgres surrogate key and a stable audit/event `aggregate_id`, without changing the natural key the rest of the codebase already reads and writes.
+- `stripRelationalCollections` now strips the 17 `awia_*` collections from the JSONB `app_state` blob (superseding the Phase A stopgap that kept them there), and `savePostgresStore`/`loadPostgresStore` write/read them through the new tables via `persistAwiaVirtualStaffFromStore` / `readAwiaVirtualStaffRelational`.
+- Full `check:awia:*` smoke suite re-run against the JSON backend: 11 of 13 pass; the 2 failures (`check:awia:vs:s2`, `check:awia:vs:s5`) reproduce identically on the pre-Phase-B commit (verified via `git stash`), so they are pre-existing and unrelated to this change, not regressions.
 
-Required resolution:
+Outstanding before this can close:
 
-- add a Postgres migration covering all 16 `awia_*` collections with uuid-typed primary keys and tenant/firm foreign keys matching the existing schema convention;
-- switch every AWIA store.mjs id generation call to the existing backend-aware pattern;
-- re-run `npm run check:db:postgres` and the full `check:awia:*` suite against a live staging Postgres instance before any staging cutover.
+- Live verification against a running Postgres instance (`npm run db:migrate:docker` to apply migration 0024, then re-run `check:awia:*` and a pilot-day-style live UI pass with `VFIRM_STORE_BACKEND` resolved to `postgres`) has not yet been done — the coding agent's sandbox has no network path to the developer's local Postgres container, so this step needs to be run on the developer's machine.
+- Once verified, flip `GET /awia/virtual-staff/staging-readiness` (`AWIA_STAGING_PREPARATION_COMPLETION_v1.0.md`) from `NOT_READY_FOR_STAGING_BACKEND_MIGRATION_REQUIRED` and close this entry.
 
-Target sprint: next AWIA staging cutover sprint (post-bundle-5).
+Target sprint: AWIA staging cutover sprint (Phase B of `VFIRM_AWIA_HIRE_A_VIRTUAL_WORKER_UNIFIED_SPRINT_PLAN_AND_CHECKLIST_v1.0.md`).

@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHash } from "node:crypto";
 import pg from "pg";
 import { validateFactoryBlueprintBundle } from "../../../packages/core-domain/src/factory-blueprints.mjs";
 import { evaluatePackBindingCertification } from "../../../packages/core-domain/src/pack-certification.mjs";
@@ -152,6 +152,20 @@ export function newUuid() {
   return randomUUID();
 }
 
+// Phase B (TD-009): stable, collision-resistant UUID derived from a deterministic natural-key
+// string (e.g. "agent-<firm_id>-cfo-001"). Used only for the Postgres-relational surrogate id and
+// for audit/event aggregate_id values, where the column type is `uuid` -- it never replaces the
+// application-level natural key, which the rest of the codebase (lookups, frontend, smoke tests)
+// continues to use unchanged on both backends.
+export function deterministicUuid(seed) {
+  const hash = createHash("sha256").update(String(seed)).digest("hex");
+  const bytes = hash.slice(0, 32).split("");
+  bytes[12] = "5";
+  bytes[16] = "89ab"[parseInt(bytes[16], 16) % 4];
+  const hex = bytes.join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+}
+
 export function now() {
   return new Date().toISOString();
 }
@@ -205,7 +219,8 @@ async function loadPostgresStore() {
     const appStateResult = await client.query("select data from app_state where id = $1", ["mvp-store"]);
     const store = appStateResult.rowCount === 0 ? initialStore() : normalizeStore(appStateResult.rows[0].data);
     const relational = await readRelationalStore(client);
-    return { ...store, ...relational };
+    const awiaRelational = await readAwiaVirtualStaffRelational(client);
+    return { ...store, ...relational, ...awiaRelational };
   } finally {
     client.release();
   }
@@ -216,6 +231,7 @@ async function savePostgresStore(store) {
   try {
     await ensureAppStateTable(client);
     await persistLedgerFromStore(client, store);
+    await persistAwiaVirtualStaffFromStore(client, store);
     await persistFrontDeskFromStore(client, store);
     await persistAdministrationFromStore(client, store);
     await persistCommercialOperationsFromStore(client, store);
@@ -255,6 +271,71 @@ async function ensureSystemActor(client) {
      on conflict (id) do nothing`,
     ["00000000-0000-0000-0000-000000000000"]
   );
+}
+
+// Phase B (TD-009): the 17 awia_* collections now have real Postgres tables (migration
+// 0024_awia_virtual_staff_persistence.sql). All 17 share one shape (id uuid pk, natural_key text,
+// tenant_id uuid, firm_id uuid, record jsonb, created_at/updated_at) so one generic persist/read
+// pair covers every table instead of 17 bespoke column-by-column statements. The `record` column
+// holds the exact JS object the rest of the codebase already reads and writes (including its own
+// `id`/`agent_id`/`staff_seat_id`/... natural key, unchanged) -- reading it back is therefore exact,
+// with zero field-mapping risk. Six of the seventeen collections (provisioning runs, seats, members,
+// role assignments, package bindings, lifecycle events) carry deterministic natural-key ids such as
+// `agent-<firm_id>-cfo-001` by design (see packages/core-domain/src/awia-virtual-staff-provisioning.mjs)
+// so that re-provisioning the same firm/staff_code stays idempotent -- those ids are never converted
+// to random UUIDs, on either backend. Since the Postgres `id` column is `uuid`, such rows get a
+// stable surrogate key derived from their natural key with deterministicUuid(); the eleven runtime
+// collections (workdesk items, output drafts/reviews, client delivery drafts, memory entries,
+// conversation threads/messages, seat billing events, task-readiness/authority-decision records) use
+// genuinely random ids that are already backend-aware (storeBackend === "postgres" ? newUuid() : ...,
+// wired in above), so for those the surrogate key and the natural key are simply the same value.
+const AWIA_RELATIONAL_TABLES = [
+  "awia_virtual_staff_provisioning_runs",
+  "awia_virtual_staff_seats",
+  "awia_virtual_staff_members",
+  "awia_staff_role_assignments",
+  "awia_staff_package_bindings",
+  "awia_staff_lifecycle_events",
+  "awia_staff_authority_decisions",
+  "awia_staff_evidence_packs",
+  "awia_staff_task_readiness_records",
+  "awia_staff_workdesk_items",
+  "awia_staff_output_drafts",
+  "awia_staff_output_reviews",
+  "awia_client_delivery_drafts",
+  "awia_staff_memory_entries",
+  "awia_staff_conversation_threads",
+  "awia_staff_conversation_messages",
+  "awia_staff_seat_billing_events"
+];
+
+async function persistAwiaVirtualStaffFromStore(client, store) {
+  for (const collection of AWIA_RELATIONAL_TABLES) {
+    for (const record of store[collection] ?? []) {
+      const naturalKey = record?.id;
+      const tenantIdRaw = record?.tenant_id ?? record?.organization_id;
+      const firmIdRaw = record?.firm_id;
+      const tenantId = uuidOrNull(tenantIdRaw);
+      const firmId = uuidOrNull(firmIdRaw);
+      if (!naturalKey || !tenantId || !firmId) continue;
+      const pgId = uuidOrNull(naturalKey) ?? deterministicUuid(naturalKey);
+      await client.query(
+        `insert into ${collection} (id, natural_key, tenant_id, firm_id, record, created_at, updated_at)
+         values ($1, $2, $3, $4, $5::jsonb, coalesce($6, now()), now())
+         on conflict (id) do update set record = excluded.record, updated_at = now()`,
+        [pgId, String(naturalKey), tenantId, firmId, JSON.stringify(record), record?.created_at ?? null]
+      );
+    }
+  }
+}
+
+async function readAwiaVirtualStaffRelational(client) {
+  const result = {};
+  for (const collection of AWIA_RELATIONAL_TABLES) {
+    const { rows } = await client.query(`select record from ${collection} order by created_at, id`);
+    result[collection] = rows.map((row) => row.record);
+  }
+  return result;
 }
 
 async function persistAdministrationFromStore(client, store) {
@@ -3538,7 +3619,7 @@ export async function provisionAwiaVirtualStaffPilotRecord(body, actor) {
     for (const event of run.lifecycle_events) upsertById(store.awia_staff_lifecycle_events, awiaRecord(event, "lifecycle_event_id"));
     const evidencePack = buildAwiaVirtualStaffEvidencePack({ registry: awiaVirtualStaffPackageRegistry, provisioningRun: run });
     upsertById(store.awia_staff_evidence_packs, { id: evidencePack.evidence_pack_id, ...evidencePack, tenant_id: body.tenant_id, firm_id: body.firm_id, created_at: now() });
-    appendEventAndAudit(store, { event_type: "awia.virtual_staff.provisioned", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaVirtualStaffProvisioningRun", aggregate_id: run.provisioning_run_id, payload: { staff_count: run.members.length, boundary: run.boundary, runtime_execution_enabled: run.runtime_execution_enabled }, summary: "AWIA virtual staff pilot roster provisioned as controlled records." });
+    appendEventAndAudit(store, { event_type: "awia.virtual_staff.provisioned", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaVirtualStaffProvisioningRun", aggregate_id: storeBackend === "postgres" ? deterministicUuid(run.provisioning_run_id) : run.provisioning_run_id, payload: { staff_count: run.members.length, boundary: run.boundary, runtime_execution_enabled: run.runtime_execution_enabled }, summary: "AWIA virtual staff pilot roster provisioned as controlled records." });
     return { provisioning_run: run, evidence_pack: evidencePack };
   });
 }
@@ -3566,7 +3647,7 @@ export async function updateAwiaVirtualStaffLifecycleRecord(body, actor) {
       created_at: now()
     };
     store.awia_staff_lifecycle_events.push(event);
-    appendEventAndAudit(store, { event_type: "awia.virtual_staff.lifecycle_updated", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaVirtualStaffMember", aggregate_id: member.id, payload: { staff_code: body.staff_code, from_state: fromState, to_state: body.to_state }, summary: "AWIA virtual staff lifecycle updated by a human operator." });
+    appendEventAndAudit(store, { event_type: "awia.virtual_staff.lifecycle_updated", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaVirtualStaffMember", aggregate_id: storeBackend === "postgres" ? deterministicUuid(member.id) : member.id, payload: { staff_code: body.staff_code, from_state: fromState, to_state: body.to_state }, summary: "AWIA virtual staff lifecycle updated by a human operator." });
     return { member, lifecycle_event: event };
   });
 }
@@ -3576,7 +3657,7 @@ export async function evaluateAwiaVirtualStaffTaskReadinessRecord(body, actor) {
     const run = awiaRunFromStore(store, body.tenant_id, body.firm_id);
     if (!run.members.length) throwNotFound("awia_virtual_staff_members", body.staff_code);
     const request = createRuntimeActionRequest({
-      request_id: body.request_id ?? newId("awia_runtime_request"),
+      request_id: body.request_id ?? (storeBackend === "postgres" ? newUuid() : newId("awia_runtime_request")),
       tenant_id: body.tenant_id,
       firm_id: body.firm_id,
       staff_code: body.staff_code,
@@ -3627,7 +3708,7 @@ export async function assignAwiaVirtualStaffTaskRecord(body, actor) {
       provisioningRun: awiaRunFromStore(store, body.tenant_id, body.firm_id),
       registry: awiaVirtualStaffPackageRegistry,
       request: createRuntimeActionRequest({
-        request_id: body.readiness_request_id ?? newId("awia_runtime_request"),
+        request_id: body.readiness_request_id ?? (storeBackend === "postgres" ? newUuid() : newId("awia_runtime_request")),
         tenant_id: body.tenant_id,
         firm_id: body.firm_id,
         staff_code: body.staff_code,
@@ -3662,7 +3743,7 @@ export async function assignAwiaVirtualStaffTaskRecord(body, actor) {
     upsertById(store.awia_staff_authority_decisions, { id: readiness.request.request_id, tenant_id: body.tenant_id, firm_id: body.firm_id, ...readiness, created_at: now() });
     if (readiness.decision !== "ALLOW") invalidState(`AWIA staff task assignment denied: ${readiness.findings.map((finding) => finding.code).join(", ")}`);
     const item = {
-      id: body.workdesk_item_id ?? newId("awia_workdesk"),
+      id: body.workdesk_item_id ?? (storeBackend === "postgres" ? newUuid() : newId("awia_workdesk")),
       tenant_id: body.tenant_id,
       firm_id: body.firm_id,
       staff_code: body.staff_code,
@@ -3699,7 +3780,7 @@ export async function produceAwiaStaffOutputDraftRecord(body, actor) {
     const member = store.awia_virtual_staff_members.find((record) => record.id === item.staff_member_id && record.lifecycle_status === "ACTIVE");
     if (!member) throwNotFound("active awia_virtual_staff_members", item.staff_code);
     const output = {
-      id: body.output_draft_id ?? newId("awia_output_draft"),
+      id: body.output_draft_id ?? (storeBackend === "postgres" ? newUuid() : newId("awia_output_draft")),
       tenant_id: body.tenant_id,
       firm_id: body.firm_id,
       workdesk_item_id: item.id,
@@ -3741,7 +3822,7 @@ export async function reviewAwiaStaffOutputDraftRecord(body, actor) {
     const allowed = new Set(["APPROVED_FOR_CLIENT_DRAFT", "REVISION_REQUIRED", "REJECTED"]);
     if (!allowed.has(body.review_decision)) invalidState(`Unsupported AWIA output review decision: ${body.review_decision}`);
     const review = {
-      id: body.review_id ?? newId("awia_output_review"),
+      id: body.review_id ?? (storeBackend === "postgres" ? newUuid() : newId("awia_output_review")),
       tenant_id: body.tenant_id,
       firm_id: body.firm_id,
       output_draft_id: output.id,
@@ -3776,7 +3857,7 @@ export async function prepareAwiaClientDeliveryDraftRecord(body, actor) {
     const review = [...store.awia_staff_output_reviews].reverse().find((record) => record.output_draft_id === output.id && record.review_decision === "APPROVED_FOR_CLIENT_DRAFT");
     if (!review) invalidState("Client delivery draft requires human review decision APPROVED_FOR_CLIENT_DRAFT.");
     const draft = {
-      id: body.client_delivery_draft_id ?? newId("awia_client_delivery_draft"),
+      id: body.client_delivery_draft_id ?? (storeBackend === "postgres" ? newUuid() : newId("awia_client_delivery_draft")),
       tenant_id: body.tenant_id,
       firm_id: body.firm_id,
       output_draft_id: output.id,
@@ -3815,7 +3896,7 @@ export async function appendAwiaStaffMemoryEntryRecord(body, actor) {
     if (!member) throwNotFound("awia_virtual_staff_members", body.staff_code);
     const built = buildStaffMemoryEntry({
       ...body,
-      memory_entry_id: body.memory_entry_id ?? newId("awia_staff_memory_entry"),
+      memory_entry_id: body.memory_entry_id ?? (storeBackend === "postgres" ? newUuid() : newId("awia_staff_memory_entry")),
       tenant_id: body.tenant_id,
       firm_id: body.firm_id,
       staff_code: body.staff_code,
@@ -3839,7 +3920,7 @@ export async function openAwiaStaffConversationThreadRecord(body, actor) {
     const member = store.awia_virtual_staff_members.find((record) => record.organization_id === body.tenant_id && record.firm_id === body.firm_id && record.agent_code === body.staff_code);
     if (!member) throwNotFound("awia_virtual_staff_members", body.staff_code);
     const thread = buildConversationThread({
-      thread_id: body.thread_id ?? newId("awia_staff_conversation_thread"),
+      thread_id: body.thread_id ?? (storeBackend === "postgres" ? newUuid() : newId("awia_staff_conversation_thread")),
       tenant_id: body.tenant_id,
       firm_id: body.firm_id,
       staff_code: body.staff_code,
@@ -3860,7 +3941,7 @@ export async function postAwiaStaffConversationMessageRecord(body, actor) {
     if (!thread) throwNotFound("awia_staff_conversation_threads", body.thread_id);
     const built = buildConversationMessage({
       ...body,
-      message_id: body.message_id ?? newId("awia_staff_conversation_message"),
+      message_id: body.message_id ?? (storeBackend === "postgres" ? newUuid() : newId("awia_staff_conversation_message")),
       thread_id: thread.id,
       tenant_id: body.tenant_id,
       firm_id: body.firm_id,
@@ -3888,7 +3969,7 @@ export async function updateAwiaStaffSeatBillingStatusRecord(body, actor) {
     seat.billing_status = body.to_status;
     seat.billing_status_updated_at = now();
     const event = {
-      id: newId("awia_seat_billing_event"),
+      id: storeBackend === "postgres" ? newUuid() : newId("awia_seat_billing_event"),
       tenant_id: body.tenant_id,
       firm_id: body.firm_id,
       staff_code: body.staff_code,
@@ -3900,7 +3981,7 @@ export async function updateAwiaStaffSeatBillingStatusRecord(body, actor) {
       boundary: "billing_bookkeeping_only_no_live_payment_release"
     };
     store.awia_staff_seat_billing_events.push(event);
-    appendEventAndAudit(store, { event_type: "awia.virtual_staff.seat_billing_status_updated", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaVirtualStaffSeat", aggregate_id: seat.staff_seat_id, payload: { staff_code: body.staff_code, from_status: fromStatus, to_status: body.to_status }, summary: "AWIA virtual staff seat billing status updated as bookkeeping only; no live payment released." });
+    appendEventAndAudit(store, { event_type: "awia.virtual_staff.seat_billing_status_updated", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaVirtualStaffSeat", aggregate_id: storeBackend === "postgres" ? deterministicUuid(seat.staff_seat_id) : seat.staff_seat_id, payload: { staff_code: body.staff_code, from_status: fromStatus, to_status: body.to_status }, summary: "AWIA virtual staff seat billing status updated as bookkeeping only; no live payment released." });
     return { seat, billing_event: event };
   });
 }
@@ -3929,7 +4010,7 @@ export async function provisionAwiaVirtualStaffFromTemplateRecord(body, actor) {
     for (const event of run.lifecycle_events) upsertById(store.awia_staff_lifecycle_events, awiaRecord(event, "lifecycle_event_id"));
     const evidencePack = buildAwiaVirtualStaffEvidencePack({ registry: awiaVirtualStaffPackageRegistry, provisioningRun: run });
     upsertById(store.awia_staff_evidence_packs, { id: evidencePack.evidence_pack_id, ...evidencePack, tenant_id: body.tenant_id, firm_id: body.firm_id, template_id: resolved.template.template_id, created_at: now() });
-    appendEventAndAudit(store, { event_type: "awia.virtual_staff.provisioned_from_template", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaVirtualStaffProvisioningRun", aggregate_id: run.provisioning_run_id, payload: { staff_count: run.members.length, template_id: resolved.template.template_id, boundary: run.boundary, runtime_execution_enabled: run.runtime_execution_enabled }, summary: "AWIA virtual staff roster provisioned for this firm from a named reusable template." });
+    appendEventAndAudit(store, { event_type: "awia.virtual_staff.provisioned_from_template", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaVirtualStaffProvisioningRun", aggregate_id: storeBackend === "postgres" ? deterministicUuid(run.provisioning_run_id) : run.provisioning_run_id, payload: { staff_count: run.members.length, template_id: resolved.template.template_id, boundary: run.boundary, runtime_execution_enabled: run.runtime_execution_enabled }, summary: "AWIA virtual staff roster provisioned for this firm from a named reusable template." });
     return { provisioning_run: { ...run, template_id: resolved.template.template_id, template_name: resolved.template.name }, evidence_pack: evidencePack };
   });
 }
@@ -4538,14 +4619,29 @@ function stripRelationalCollections(store) {
   service_skus: [],
   worker_templates: [],
   worker_instances: [],
-  // NOTE (Phase A pilot-day fix, TD-009 partial mitigation): the awia_* collections have no real
-  // Postgres relational tables yet (see readRelationalStore -- none of them are queried there), so
-  // stripping them here before every save silently discarded all AWIA virtual-staff data on the
-  // Postgres backend: a provision/assign/etc call would succeed and return the right payload for
-  // that one response, but the very next read came back empty because the data was never actually
-  // persisted anywhere. Until the real AWIA Postgres schema lands (TD-009, Phase B), these
-  // collections must round-trip through the JSONB app_state blob like any other non-relational
-  // collection, so they are intentionally NOT stripped here.
+  // NOTE (Phase B, TD-009 -- closes the Phase A pilot-day workaround above): the awia_* collections
+  // now have real Postgres relational tables (migration 0024_awia_virtual_staff_persistence.sql,
+  // written and read via AWIA_RELATIONAL_TABLES / persistAwiaVirtualStaffFromStore /
+  // readAwiaVirtualStaffRelational below), so they are stripped from the JSONB app_state blob here
+  // exactly like every other relational collection -- keeping them in both places would let the two
+  // copies drift.
+  awia_virtual_staff_provisioning_runs: [],
+  awia_virtual_staff_seats: [],
+  awia_virtual_staff_members: [],
+  awia_staff_role_assignments: [],
+  awia_staff_package_bindings: [],
+  awia_staff_lifecycle_events: [],
+  awia_staff_authority_decisions: [],
+  awia_staff_evidence_packs: [],
+  awia_staff_task_readiness_records: [],
+  awia_staff_workdesk_items: [],
+  awia_staff_output_drafts: [],
+  awia_staff_output_reviews: [],
+  awia_client_delivery_drafts: [],
+  awia_staff_memory_entries: [],
+  awia_staff_conversation_threads: [],
+  awia_staff_conversation_messages: [],
+  awia_staff_seat_billing_events: [],
   task_outputs: [],
   tool_invocations: [],
   marketplace_listings: [],
