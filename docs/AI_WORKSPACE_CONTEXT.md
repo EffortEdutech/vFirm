@@ -38,6 +38,7 @@ Current AWIA virtual staff state:
 Repository hygiene note:
 
 - The working tree currently shows widespread modified-file status across nearly the whole repo. This is CRLF/LF line-ending churn only (confirmed via `git diff --stat` on sampled files, no content change) mixed with genuinely new, uncommitted AWIA source/doc files. Diff before assuming any given "M" file has real content changes.
+- Unified roadmap to a real paying client hiring an AWIA virtual worker is recorded in `VFIRM_AWIA_HIRE_A_VIRTUAL_WORKER_UNIFIED_SPRINT_PLAN_AND_CHECKLIST_v1.0.md` (Phase A through Phase G). Phase A (AWIA pilot-day client walkthrough) completed live 2026-09-05: GO_FOR_AWIA_CONTROLLED_LOCAL_PILOT_ACCEPTANCE_LOCK, three real frontend/backend defects found and fixed in-session (commit `6909dd8`: lost AFCC click handlers, Postgres save stripping all awia_* collections, Assign/Prepare-Client-Draft forms sending wrong fields), one finding carried into Phase B (AWIA audit_events/event_log entries are silently dropped on Postgres because AWIA aggregate ids are not backend-aware UUIDs yet - see `AWIA_PILOT_DAY_PHASE_A_AUTHORIZATION_AND_DRY_RUN_RESULT_v1.0.md` v1.1). Phase B (close TD-009: Postgres schema + backend-aware id generation) is next and requires its own authorization.
 
 Locked boundaries still in force:
 

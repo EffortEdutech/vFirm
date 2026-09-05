@@ -3691,6 +3691,10 @@ function bindAfccStaffControls(store, latestTenant, latestFirm, principalActor) 
         button: prepareBtn,
         success: "AWIA client delivery draft prepared",
         action: async () => {
+          // NOTE: prepareAwiaClientDeliveryDraftRecord (apps/api/src/store.mjs) looks the output
+          // draft up by output_draft_id and derives the matching APPROVED_FOR_CLIENT_DRAFT review
+          // itself server-side -- it does not accept output_review_id at all. Sending the review id
+          // here (as this used to) always failed with "Missing required fields: output_draft_id".
           const data = await request(
             "/awia/virtual-staff/client-delivery-draft",
             {
@@ -3698,7 +3702,7 @@ function bindAfccStaffControls(store, latestTenant, latestFirm, principalActor) 
               body: JSON.stringify({
                 tenant_id: ctx.tenant.id,
                 firm_id: ctx.firm.id,
-                output_review_id: review?.id,
+                output_draft_id: review?.output_draft_id,
                 client_id: ctx.latestClient?.id ?? "controlled-pilot-client",
                 actor: ctx.actor,
               }),
