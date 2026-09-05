@@ -1,9 +1,16 @@
-﻿import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { randomUUID } from "node:crypto";
 import pg from "pg";
 import { validateFactoryBlueprintBundle } from "../../../packages/core-domain/src/factory-blueprints.mjs";
 import { evaluatePackBindingCertification } from "../../../packages/core-domain/src/pack-certification.mjs";
+import { awiaVirtualStaffPackageRegistry } from "../../../packages/core-domain/src/awia-virtual-staff-registry.mjs";
+import { provisionPilotVirtualStaff } from "../../../packages/core-domain/src/awia-virtual-staff-provisioning.mjs";
+import { createRuntimeActionRequest, evaluateVirtualStaffRuntimeAction } from "../../../packages/core-domain/src/awia-virtual-staff-authority-gate.mjs";
+import { buildAwiaVirtualStaffEvidencePack } from "../../../packages/core-domain/src/awia-virtual-staff-evidence-gate.mjs";
+import { buildStaffMemoryEntry, buildConversationThread, buildConversationMessage } from "../../../packages/core-domain/src/awia-virtual-staff-memory.mjs";
+import { evaluateSeatBillingTransition } from "../../../packages/core-domain/src/awia-virtual-staff-payroll.mjs";
+import { resolveAwiaStaffTemplate, listAwiaStaffTemplates } from "../../../packages/core-domain/src/awia-virtual-staff-templates.mjs";
 
 const { Pool } = pg;
 const root = process.cwd();
@@ -22,6 +29,23 @@ const initialStore = () => ({
   service_skus: [],
   worker_templates: [],
   worker_instances: [],
+  awia_virtual_staff_provisioning_runs: [],
+  awia_virtual_staff_seats: [],
+  awia_virtual_staff_members: [],
+  awia_staff_role_assignments: [],
+  awia_staff_package_bindings: [],
+  awia_staff_lifecycle_events: [],
+  awia_staff_authority_decisions: [],
+  awia_staff_evidence_packs: [],
+  awia_staff_task_readiness_records: [],
+  awia_staff_workdesk_items: [],
+  awia_staff_output_drafts: [],
+  awia_staff_output_reviews: [],
+  awia_client_delivery_drafts: [],
+  awia_staff_memory_entries: [],
+  awia_staff_conversation_threads: [],
+  awia_staff_conversation_messages: [],
+  awia_staff_seat_billing_events: [],
   task_outputs: [],
   tool_invocations: [],
   marketplace_listings: [],
@@ -3444,6 +3468,476 @@ export async function acceptFactoryHandoffRecord(body, actor = systemActor(body.
     return { provisioning_run: run, provisioned_firm_instance: instance ?? null };
   });
 }
+
+function upsertById(collection, record) {
+  const id = record?.id;
+  const index = collection.findIndex((item) => item.id === id);
+  if (index >= 0) collection[index] = { ...collection[index], ...record };
+  else collection.push(record);
+}
+
+function awiaRecord(record, idField) {
+  return { id: record[idField], ...record };
+}
+
+function awiaProvisioningSnapshot(run) {
+  return {
+    id: run.provisioning_run_id,
+    provisioning_run_id: run.provisioning_run_id,
+    tenant_id: run.tenant_id,
+    firm_id: run.firm_id,
+    created_by_actor_id: run.created_by_actor_id,
+    boundary: run.boundary,
+    status: run.status,
+    salary_plan_id: run.salary_plan_id,
+    registry_id: run.registry_id,
+    runtime_execution_enabled: run.runtime_execution_enabled,
+    summary: run.summary,
+    findings: run.findings,
+    created_at: now(),
+    updated_at: now()
+  };
+}
+
+function awiaRunFromStore(store, tenant_id, firm_id) {
+  return {
+    provisioning_run_id: `awia-vs-s3-${firm_id}`,
+    tenant_id,
+    firm_id,
+    created_by_actor_id: "human-principal-001",
+    boundary: "provisioning_only_no_autonomous_execution",
+    status: "PROVISIONED_DRAFT",
+    salary_plan_id: "virtual-staff-controlled-pilot-plan",
+    registry_id: awiaVirtualStaffPackageRegistry.registry_id,
+    runtime_execution_enabled: false,
+    seats: (store.awia_virtual_staff_seats ?? []).filter((item) => item.tenant_id === tenant_id && item.firm_id === firm_id),
+    members: (store.awia_virtual_staff_members ?? []).filter((item) => item.organization_id === tenant_id && item.firm_id === firm_id),
+    role_assignments: (store.awia_staff_role_assignments ?? []).filter((item) => item.tenant_id === tenant_id && item.firm_id === firm_id),
+    package_bindings: (store.awia_staff_package_bindings ?? []).filter((item) => item.tenant_id === tenant_id && item.firm_id === firm_id),
+    lifecycle_events: (store.awia_staff_lifecycle_events ?? []).filter((item) => item.tenant_id === tenant_id && item.firm_id === firm_id),
+    findings: []
+  };
+}
+
+export async function provisionAwiaVirtualStaffPilotRecord(body, actor) {
+  return withStore((store) => {
+    const firm = store.firms.find((record) => record.id === body.firm_id && record.tenant_id === body.tenant_id);
+    if (!firm) throwNotFound("firms", body.firm_id);
+    const run = provisionPilotVirtualStaff({
+      tenant_id: body.tenant_id,
+      firm_id: body.firm_id,
+      created_by_actor_id: actor.actor_id,
+      salary_plan_id: body.salary_plan_id ?? "virtual-staff-controlled-pilot-plan",
+      registry: awiaVirtualStaffPackageRegistry
+    });
+    upsertById(store.awia_virtual_staff_provisioning_runs, awiaProvisioningSnapshot(run));
+    for (const seat of run.seats) upsertById(store.awia_virtual_staff_seats, awiaRecord(seat, "staff_seat_id"));
+    for (const member of run.members) upsertById(store.awia_virtual_staff_members, awiaRecord(member, "agent_id"));
+    for (const assignment of run.role_assignments) upsertById(store.awia_staff_role_assignments, awiaRecord(assignment, "role_assignment_id"));
+    for (const binding of run.package_bindings) upsertById(store.awia_staff_package_bindings, awiaRecord(binding, "package_binding_id"));
+    for (const event of run.lifecycle_events) upsertById(store.awia_staff_lifecycle_events, awiaRecord(event, "lifecycle_event_id"));
+    const evidencePack = buildAwiaVirtualStaffEvidencePack({ registry: awiaVirtualStaffPackageRegistry, provisioningRun: run });
+    upsertById(store.awia_staff_evidence_packs, { id: evidencePack.evidence_pack_id, ...evidencePack, tenant_id: body.tenant_id, firm_id: body.firm_id, created_at: now() });
+    appendEventAndAudit(store, { event_type: "awia.virtual_staff.provisioned", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaVirtualStaffProvisioningRun", aggregate_id: run.provisioning_run_id, payload: { staff_count: run.members.length, boundary: run.boundary, runtime_execution_enabled: run.runtime_execution_enabled }, summary: "AWIA virtual staff pilot roster provisioned as controlled records." });
+    return { provisioning_run: run, evidence_pack: evidencePack };
+  });
+}
+
+export async function updateAwiaVirtualStaffLifecycleRecord(body, actor) {
+  const allowedStates = new Set(["DRAFT", "ACTIVE", "PAUSED", "SUSPENDED", "RETIRED"]);
+  if (!allowedStates.has(body.to_state)) invalidState(`Unsupported AWIA staff lifecycle state: ${body.to_state}`);
+  return withStore((store) => {
+    const member = store.awia_virtual_staff_members.find((record) => record.organization_id === body.tenant_id && record.firm_id === body.firm_id && record.agent_code === body.staff_code);
+    if (!member) throwNotFound("awia_virtual_staff_members", body.staff_code);
+    const fromState = member.lifecycle_status;
+    member.lifecycle_status = body.to_state;
+    member.updated_at = now();
+    const event = {
+      id: `staff-lifecycle-${body.staff_code.toLowerCase()}-${body.to_state.toLowerCase()}-${store.awia_staff_lifecycle_events.length + 1}`,
+      lifecycle_event_id: `staff-lifecycle-${body.staff_code.toLowerCase()}-${body.to_state.toLowerCase()}-${store.awia_staff_lifecycle_events.length + 1}`,
+      tenant_id: body.tenant_id,
+      firm_id: body.firm_id,
+      staff_code: body.staff_code,
+      from_state: fromState,
+      to_state: body.to_state,
+      reason: body.reason ?? "controlled_operator_lifecycle_update",
+      actor_id: actor.actor_id,
+      event_boundary: "human_controlled_lifecycle_update_no_autonomous_execution",
+      created_at: now()
+    };
+    store.awia_staff_lifecycle_events.push(event);
+    appendEventAndAudit(store, { event_type: "awia.virtual_staff.lifecycle_updated", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaVirtualStaffMember", aggregate_id: member.id, payload: { staff_code: body.staff_code, from_state: fromState, to_state: body.to_state }, summary: "AWIA virtual staff lifecycle updated by a human operator." });
+    return { member, lifecycle_event: event };
+  });
+}
+
+export async function evaluateAwiaVirtualStaffTaskReadinessRecord(body, actor) {
+  return withStore((store) => {
+    const run = awiaRunFromStore(store, body.tenant_id, body.firm_id);
+    if (!run.members.length) throwNotFound("awia_virtual_staff_members", body.staff_code);
+    const request = createRuntimeActionRequest({
+      request_id: body.request_id ?? newId("awia_runtime_request"),
+      tenant_id: body.tenant_id,
+      firm_id: body.firm_id,
+      staff_code: body.staff_code,
+      action: body.action,
+      tool: body.tool,
+      risk_class: body.risk_class ?? "CONTROLLED",
+      client_id: body.client_id,
+      project_id: body.project_id,
+      evidence_refs: body.evidence_refs ?? [],
+      approval: body.approval ?? null,
+      requested_by_actor_id: actor.actor_id,
+      responsible_professional_id: body.responsible_professional_id ?? null,
+      sod: body.sod ?? { actor_has_conflicting_role: false },
+      prompt_authority_claim: body.prompt_authority_claim ?? null,
+      salary_authority_claim: body.salary_authority_claim ?? null,
+      package_binding_authority_claim: body.package_binding_authority_claim ?? null
+    });
+    const decision = evaluateVirtualStaffRuntimeAction({ provisioningRun: run, registry: awiaVirtualStaffPackageRegistry, request });
+    const record = {
+      id: request.request_id,
+      tenant_id: body.tenant_id,
+      firm_id: body.firm_id,
+      staff_code: body.staff_code,
+      action: body.action,
+      tool: body.tool,
+      decision: decision.decision,
+      risk_class: request.risk_class,
+      findings: decision.findings,
+      evidence_refs: request.evidence_refs,
+      requested_by_actor_id: actor.actor_id,
+      created_at: now()
+    };
+    upsertById(store.awia_staff_task_readiness_records, record);
+    upsertById(store.awia_staff_authority_decisions, { id: request.request_id, tenant_id: body.tenant_id, firm_id: body.firm_id, ...decision, created_at: now() });
+    appendEventAndAudit(store, { event_type: "awia.virtual_staff.task_readiness_evaluated", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaStaffAuthorityDecision", aggregate_id: record.id, payload: { staff_code: body.staff_code, action: body.action, decision: decision.decision }, summary: "AWIA virtual staff task readiness evaluated with deterministic authority gate." });
+    return record;
+  });
+}
+
+
+export async function assignAwiaVirtualStaffTaskRecord(body, actor) {
+  return withStore((store) => {
+    const member = store.awia_virtual_staff_members.find((record) => record.organization_id === body.tenant_id && record.firm_id === body.firm_id && record.agent_code === body.staff_code);
+    if (!member) throwNotFound("awia_virtual_staff_members", body.staff_code);
+    const task = store.tasks.find((record) => record.id === body.task_id && record.tenant_id === body.tenant_id && record.firm_id === body.firm_id);
+    if (!task) throwNotFound("tasks", body.task_id);
+    const readiness = evaluateVirtualStaffRuntimeAction({
+      provisioningRun: awiaRunFromStore(store, body.tenant_id, body.firm_id),
+      registry: awiaVirtualStaffPackageRegistry,
+      request: createRuntimeActionRequest({
+        request_id: body.readiness_request_id ?? newId("awia_runtime_request"),
+        tenant_id: body.tenant_id,
+        firm_id: body.firm_id,
+        staff_code: body.staff_code,
+        action: body.action ?? `${task.task_type}.prepare`,
+        tool: body.tool,
+        risk_class: body.risk_class ?? task.risk_class ?? "CONTROLLED",
+        client_id: body.client_id,
+        project_id: body.project_id ?? task.project_id,
+        evidence_refs: body.evidence_refs ?? [],
+        approval: body.approval ?? null,
+        requested_by_actor_id: actor.actor_id,
+        responsible_professional_id: body.responsible_professional_id ?? null,
+        sod: body.sod ?? { actor_has_conflicting_role: false }
+      })
+    });
+    const readinessRecord = {
+      id: readiness.request.request_id,
+      tenant_id: body.tenant_id,
+      firm_id: body.firm_id,
+      staff_code: body.staff_code,
+      task_id: task.id,
+      action: readiness.request.action,
+      tool: readiness.request.tool,
+      decision: readiness.decision,
+      risk_class: readiness.request.risk_class,
+      findings: readiness.findings,
+      evidence_refs: readiness.request.evidence_refs,
+      requested_by_actor_id: actor.actor_id,
+      created_at: now()
+    };
+    upsertById(store.awia_staff_task_readiness_records, readinessRecord);
+    upsertById(store.awia_staff_authority_decisions, { id: readiness.request.request_id, tenant_id: body.tenant_id, firm_id: body.firm_id, ...readiness, created_at: now() });
+    if (readiness.decision !== "ALLOW") invalidState(`AWIA staff task assignment denied: ${readiness.findings.map((finding) => finding.code).join(", ")}`);
+    const item = {
+      id: body.workdesk_item_id ?? newId("awia_workdesk"),
+      tenant_id: body.tenant_id,
+      firm_id: body.firm_id,
+      staff_code: body.staff_code,
+      staff_member_id: member.id,
+      task_id: task.id,
+      project_id: task.project_id,
+      workdesk_status: "ASSIGNED",
+      assignment_summary: body.assignment_summary ?? `Assigned ${task.task_type} to ${member.display_name ?? body.staff_code}.`,
+      action: readiness.request.action,
+      tool: readiness.request.tool,
+      risk_class: readiness.request.risk_class,
+      evidence_refs: readiness.request.evidence_refs,
+      readiness_record_id: readinessRecord.id,
+      assigned_by_actor_id: actor.actor_id,
+      assigned_at: now(),
+      updated_at: now(),
+      boundary: "assigned_workdesk_item_requires_human_supervision_and_review"
+    };
+    store.awia_staff_workdesk_items.push(item);
+    task.assigned_actor_or_worker_ref = member.id;
+    task.state = "ASSIGNED_TO_AWIA_STAFF";
+    task.updated_at = now();
+    appendEventAndAudit(store, { event_type: "awia.virtual_staff.task_assigned", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaStaffWorkdeskItem", aggregate_id: item.id, payload: { staff_code: body.staff_code, task_id: task.id, readiness_record_id: readinessRecord.id }, summary: "AWIA virtual staff task assigned to controlled workdesk after readiness gate." });
+    return { workdesk_item: item, task, readiness: readinessRecord };
+  });
+}
+
+
+export async function produceAwiaStaffOutputDraftRecord(body, actor) {
+  return withStore((store) => {
+    const item = store.awia_staff_workdesk_items.find((record) => record.id === body.workdesk_item_id && record.tenant_id === body.tenant_id && record.firm_id === body.firm_id);
+    if (!item) throwNotFound("awia_staff_workdesk_items", body.workdesk_item_id);
+    if (item.workdesk_status !== "ASSIGNED") invalidState("AWIA output drafts can only be produced from ASSIGNED workdesk items.");
+    const member = store.awia_virtual_staff_members.find((record) => record.id === item.staff_member_id && record.lifecycle_status === "ACTIVE");
+    if (!member) throwNotFound("active awia_virtual_staff_members", item.staff_code);
+    const output = {
+      id: body.output_draft_id ?? newId("awia_output_draft"),
+      tenant_id: body.tenant_id,
+      firm_id: body.firm_id,
+      workdesk_item_id: item.id,
+      task_id: item.task_id,
+      project_id: item.project_id,
+      staff_code: item.staff_code,
+      staff_member_id: item.staff_member_id,
+      output_title: body.output_title ?? `${item.staff_code} draft output`,
+      output_summary: body.output_summary ?? item.assignment_summary,
+      output_ref: body.output_ref ?? `awia://draft-output/${item.id}`,
+      evidence_refs: body.evidence_refs ?? item.evidence_refs ?? [],
+      status: "DRAFT_REVIEW_REQUIRED",
+      requires_human_review: true,
+      final_issue_allowed: false,
+      boundary: "draft_only_no_client_issue_without_human_review",
+      created_by_actor_id: member.audit_identity?.actor_ref ?? member.id,
+      created_at: now(),
+      updated_at: now()
+    };
+    store.awia_staff_output_drafts.push(output);
+    item.workdesk_status = "OUTPUT_DRAFTED";
+    item.output_draft_id = output.id;
+    item.updated_at = now();
+    const task = store.tasks.find((record) => record.id === item.task_id);
+    if (task) {
+      task.output_ref = output.output_ref;
+      task.state = "AWIA_OUTPUT_DRAFTED";
+      task.updated_at = now();
+    }
+    appendEventAndAudit(store, { event_type: "awia.virtual_staff.output_drafted", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaStaffOutputDraft", aggregate_id: output.id, payload: { workdesk_item_id: item.id, task_id: item.task_id, requires_human_review: true }, summary: "AWIA virtual staff produced a draft-only output for human review." });
+    return { output_draft: output, workdesk_item: item, task: task ?? null };
+  });
+}
+
+export async function reviewAwiaStaffOutputDraftRecord(body, actor) {
+  return withStore((store) => {
+    const output = store.awia_staff_output_drafts.find((record) => record.id === body.output_draft_id && record.tenant_id === body.tenant_id && record.firm_id === body.firm_id);
+    if (!output) throwNotFound("awia_staff_output_drafts", body.output_draft_id);
+    const allowed = new Set(["APPROVED_FOR_CLIENT_DRAFT", "REVISION_REQUIRED", "REJECTED"]);
+    if (!allowed.has(body.review_decision)) invalidState(`Unsupported AWIA output review decision: ${body.review_decision}`);
+    const review = {
+      id: body.review_id ?? newId("awia_output_review"),
+      tenant_id: body.tenant_id,
+      firm_id: body.firm_id,
+      output_draft_id: output.id,
+      workdesk_item_id: output.workdesk_item_id,
+      task_id: output.task_id,
+      project_id: output.project_id,
+      staff_code: output.staff_code,
+      review_decision: body.review_decision,
+      review_notes: body.review_notes ?? null,
+      reviewed_by_actor_id: actor.actor_id,
+      professional_authority_ref: body.professional_authority_ref ?? null,
+      reviewed_at: now(),
+      boundary: "human_review_required_before_client_delivery_draft"
+    };
+    store.awia_staff_output_reviews.push(review);
+    output.status = body.review_decision;
+    output.updated_at = now();
+    const item = store.awia_staff_workdesk_items.find((record) => record.id === output.workdesk_item_id);
+    if (item) {
+      item.workdesk_status = body.review_decision === "APPROVED_FOR_CLIENT_DRAFT" ? "REVIEWED_FOR_CLIENT_DRAFT" : "REVIEW_ACTION_REQUIRED";
+      item.updated_at = now();
+    }
+    appendEventAndAudit(store, { event_type: "awia.virtual_staff.output_reviewed", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaStaffOutputReview", aggregate_id: review.id, payload: { output_draft_id: output.id, review_decision: body.review_decision }, summary: "Human reviewed AWIA virtual staff draft output." });
+    return { output_draft: output, output_review: review, workdesk_item: item ?? null };
+  });
+}
+
+export async function prepareAwiaClientDeliveryDraftRecord(body, actor) {
+  return withStore((store) => {
+    const output = store.awia_staff_output_drafts.find((record) => record.id === body.output_draft_id && record.tenant_id === body.tenant_id && record.firm_id === body.firm_id);
+    if (!output) throwNotFound("awia_staff_output_drafts", body.output_draft_id);
+    const review = [...store.awia_staff_output_reviews].reverse().find((record) => record.output_draft_id === output.id && record.review_decision === "APPROVED_FOR_CLIENT_DRAFT");
+    if (!review) invalidState("Client delivery draft requires human review decision APPROVED_FOR_CLIENT_DRAFT.");
+    const draft = {
+      id: body.client_delivery_draft_id ?? newId("awia_client_delivery_draft"),
+      tenant_id: body.tenant_id,
+      firm_id: body.firm_id,
+      output_draft_id: output.id,
+      output_review_id: review.id,
+      workdesk_item_id: output.workdesk_item_id,
+      task_id: output.task_id,
+      project_id: output.project_id,
+      staff_code: output.staff_code,
+      client_id: body.client_id,
+      delivery_title: body.delivery_title ?? output.output_title,
+      delivery_summary: body.delivery_summary ?? output.output_summary,
+      delivery_ref: body.delivery_ref ?? `client-draft://${output.id}`,
+      evidence_refs: body.evidence_refs ?? output.evidence_refs,
+      status: "CLIENT_DELIVERY_DRAFT_PREPARED",
+      final_issue_allowed: false,
+      requires_human_issue_approval: true,
+      prepared_by_actor_id: actor.actor_id,
+      prepared_at: now(),
+      boundary: "client_delivery_draft_only_no_final_issue"
+    };
+    store.awia_client_delivery_drafts.push(draft);
+    const item = store.awia_staff_workdesk_items.find((record) => record.id === output.workdesk_item_id);
+    if (item) {
+      item.workdesk_status = "CLIENT_DELIVERY_DRAFT_PREPARED";
+      item.client_delivery_draft_id = draft.id;
+      item.updated_at = now();
+    }
+    appendEventAndAudit(store, { event_type: "awia.virtual_staff.client_delivery_draft_prepared", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaClientDeliveryDraft", aggregate_id: draft.id, payload: { output_draft_id: output.id, output_review_id: review.id, final_issue_allowed: false }, summary: "Client delivery draft prepared from reviewed AWIA staff output without final issue authority." });
+    return { client_delivery_draft: draft, output_draft: output, output_review: review, workdesk_item: item ?? null };
+  });
+}
+
+export async function appendAwiaStaffMemoryEntryRecord(body, actor) {
+  return withStore((store) => {
+    const member = store.awia_virtual_staff_members.find((record) => record.organization_id === body.tenant_id && record.firm_id === body.firm_id && record.agent_code === body.staff_code);
+    if (!member) throwNotFound("awia_virtual_staff_members", body.staff_code);
+    const built = buildStaffMemoryEntry({
+      ...body,
+      memory_entry_id: body.memory_entry_id ?? newId("awia_staff_memory_entry"),
+      tenant_id: body.tenant_id,
+      firm_id: body.firm_id,
+      staff_code: body.staff_code,
+      workdesk_item_id: body.workdesk_item_id ?? null,
+      task_id: body.task_id ?? null,
+      kind: body.kind,
+      content: body.content,
+      evidence_refs: body.evidence_refs ?? [],
+      authored_by_actor_id: actor.actor_id,
+      created_at: now()
+    });
+    if (!built.accepted) invalidState(`AWIA staff memory entry rejected: ${built.findings.join(", ")}`);
+    store.awia_staff_memory_entries.push(built.entry);
+    appendEventAndAudit(store, { event_type: "awia.virtual_staff.memory_entry_appended", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaStaffMemoryEntry", aggregate_id: built.entry.id, payload: { staff_code: body.staff_code, kind: body.kind }, summary: "AWIA virtual staff memory entry appended as bounded evidence summary." });
+    return built.entry;
+  });
+}
+
+export async function openAwiaStaffConversationThreadRecord(body, actor) {
+  return withStore((store) => {
+    const member = store.awia_virtual_staff_members.find((record) => record.organization_id === body.tenant_id && record.firm_id === body.firm_id && record.agent_code === body.staff_code);
+    if (!member) throwNotFound("awia_virtual_staff_members", body.staff_code);
+    const thread = buildConversationThread({
+      thread_id: body.thread_id ?? newId("awia_staff_conversation_thread"),
+      tenant_id: body.tenant_id,
+      firm_id: body.firm_id,
+      staff_code: body.staff_code,
+      workdesk_item_id: body.workdesk_item_id ?? null,
+      task_id: body.task_id ?? null,
+      opened_by_actor_id: actor.actor_id,
+      created_at: now()
+    });
+    store.awia_staff_conversation_threads.push(thread);
+    appendEventAndAudit(store, { event_type: "awia.virtual_staff.conversation_thread_opened", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaStaffConversationThread", aggregate_id: thread.id, payload: { staff_code: body.staff_code }, summary: "AWIA virtual staff conversation thread opened under human supervision." });
+    return thread;
+  });
+}
+
+export async function postAwiaStaffConversationMessageRecord(body, actor) {
+  return withStore((store) => {
+    const thread = store.awia_staff_conversation_threads.find((record) => record.id === body.thread_id && record.tenant_id === body.tenant_id && record.firm_id === body.firm_id);
+    if (!thread) throwNotFound("awia_staff_conversation_threads", body.thread_id);
+    const built = buildConversationMessage({
+      ...body,
+      message_id: body.message_id ?? newId("awia_staff_conversation_message"),
+      thread_id: thread.id,
+      tenant_id: body.tenant_id,
+      firm_id: body.firm_id,
+      staff_code: thread.staff_code,
+      participant_role: body.participant_role,
+      classification: body.classification ?? "INTERNAL_OPERATIONAL_CONTEXT",
+      content: body.content,
+      authored_by_actor_id: actor.actor_id,
+      created_at: now()
+    });
+    if (!built.accepted) invalidState(`AWIA staff conversation message rejected: ${built.findings.join(", ")}`);
+    store.awia_staff_conversation_messages.push(built.message);
+    appendEventAndAudit(store, { event_type: "awia.virtual_staff.conversation_message_posted", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaStaffConversationMessage", aggregate_id: built.message.id, payload: { thread_id: thread.id, participant_role: body.participant_role, classification: built.message.classification }, summary: "AWIA virtual staff conversation message posted as internal operational context." });
+    return { message: built.message, thread };
+  });
+}
+
+export async function updateAwiaStaffSeatBillingStatusRecord(body, actor) {
+  return withStore((store) => {
+    const seat = store.awia_virtual_staff_seats.find((record) => record.tenant_id === body.tenant_id && record.firm_id === body.firm_id && record.staff_code === body.staff_code);
+    if (!seat) throwNotFound("awia_virtual_staff_seats", body.staff_code);
+    const fromStatus = seat.billing_status ?? "DRAFT";
+    const evaluation = evaluateSeatBillingTransition({ from_status: fromStatus, to_status: body.to_status });
+    if (evaluation.decision !== "ALLOW") invalidState(`AWIA seat billing transition denied: ${evaluation.findings.join(", ")}`);
+    seat.billing_status = body.to_status;
+    seat.billing_status_updated_at = now();
+    const event = {
+      id: newId("awia_seat_billing_event"),
+      tenant_id: body.tenant_id,
+      firm_id: body.firm_id,
+      staff_code: body.staff_code,
+      from_status: fromStatus,
+      to_status: body.to_status,
+      note: body.note ?? null,
+      recorded_by_actor_id: actor.actor_id,
+      created_at: now(),
+      boundary: "billing_bookkeeping_only_no_live_payment_release"
+    };
+    store.awia_staff_seat_billing_events.push(event);
+    appendEventAndAudit(store, { event_type: "awia.virtual_staff.seat_billing_status_updated", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaVirtualStaffSeat", aggregate_id: seat.staff_seat_id, payload: { staff_code: body.staff_code, from_status: fromStatus, to_status: body.to_status }, summary: "AWIA virtual staff seat billing status updated as bookkeeping only; no live payment released." });
+    return { seat, billing_event: event };
+  });
+}
+
+export async function provisionAwiaVirtualStaffFromTemplateRecord(body, actor) {
+  return withStore((store) => {
+    const firm = store.firms.find((record) => record.id === body.firm_id && record.tenant_id === body.tenant_id);
+    if (!firm) throwNotFound("firms", body.firm_id);
+    const existingRun = (store.awia_virtual_staff_provisioning_runs ?? []).find((record) => record.tenant_id === body.tenant_id && record.firm_id === body.firm_id);
+    if (existingRun) invalidState(`AWIA virtual staff roster already provisioned for firm ${body.firm_id}; use lifecycle commands to manage existing staff.`);
+    const resolved = resolveAwiaStaffTemplate(body.template_id);
+    if (!resolved.found) invalidState(`AWIA staff template rejected: ${resolved.findings.join(", ")}`);
+    const run = provisionPilotVirtualStaff({
+      tenant_id: body.tenant_id,
+      firm_id: body.firm_id,
+      created_by_actor_id: actor.actor_id,
+      salary_plan_id: body.salary_plan_id ?? "virtual-staff-controlled-pilot-plan",
+      registry: awiaVirtualStaffPackageRegistry,
+      pilotStaff: resolved.template.staff_set
+    });
+    upsertById(store.awia_virtual_staff_provisioning_runs, { ...awiaProvisioningSnapshot(run), template_id: resolved.template.template_id, template_name: resolved.template.name, template_version: resolved.template.version });
+    for (const seat of run.seats) upsertById(store.awia_virtual_staff_seats, { ...awiaRecord(seat, "staff_seat_id"), template_id: resolved.template.template_id });
+    for (const member of run.members) upsertById(store.awia_virtual_staff_members, awiaRecord(member, "agent_id"));
+    for (const assignment of run.role_assignments) upsertById(store.awia_staff_role_assignments, awiaRecord(assignment, "role_assignment_id"));
+    for (const binding of run.package_bindings) upsertById(store.awia_staff_package_bindings, awiaRecord(binding, "package_binding_id"));
+    for (const event of run.lifecycle_events) upsertById(store.awia_staff_lifecycle_events, awiaRecord(event, "lifecycle_event_id"));
+    const evidencePack = buildAwiaVirtualStaffEvidencePack({ registry: awiaVirtualStaffPackageRegistry, provisioningRun: run });
+    upsertById(store.awia_staff_evidence_packs, { id: evidencePack.evidence_pack_id, ...evidencePack, tenant_id: body.tenant_id, firm_id: body.firm_id, template_id: resolved.template.template_id, created_at: now() });
+    appendEventAndAudit(store, { event_type: "awia.virtual_staff.provisioned_from_template", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaVirtualStaffProvisioningRun", aggregate_id: run.provisioning_run_id, payload: { staff_count: run.members.length, template_id: resolved.template.template_id, boundary: run.boundary, runtime_execution_enabled: run.runtime_execution_enabled }, summary: "AWIA virtual staff roster provisioned for this firm from a named reusable template." });
+    return { provisioning_run: { ...run, template_id: resolved.template.template_id, template_name: resolved.template.name }, evidence_pack: evidencePack };
+  });
+}
+
+export async function readAwiaStaffTemplateCatalogueRecord() {
+  return { boundary: "named_roster_templates_only_no_cross_firm_data_sharing_no_autonomous_authority", templates: listAwiaStaffTemplates() };
+}
+
 export async function withStore(mutator) {
   const store = await loadStore();
   const result = await mutator(store);
@@ -4044,6 +4538,19 @@ function stripRelationalCollections(store) {
   service_skus: [],
   worker_templates: [],
   worker_instances: [],
+  awia_virtual_staff_provisioning_runs: [],
+  awia_virtual_staff_seats: [],
+  awia_virtual_staff_members: [],
+  awia_staff_role_assignments: [],
+  awia_staff_package_bindings: [],
+  awia_staff_lifecycle_events: [],
+  awia_staff_authority_decisions: [],
+  awia_staff_evidence_packs: [],
+  awia_staff_task_readiness_records: [],
+  awia_staff_workdesk_items: [],
+  awia_staff_output_drafts: [],
+  awia_staff_output_reviews: [],
+  awia_client_delivery_drafts: [],
   task_outputs: [],
   tool_invocations: [],
   marketplace_listings: [],

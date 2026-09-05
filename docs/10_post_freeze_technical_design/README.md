@@ -70,6 +70,15 @@ These documents may evolve during implementation. They must not rewrite Architec
 | `VFIRM_RELEASE_3_TO_MARKETPLACE_ROADMAP_v1.0.md` | Defines the post-Release-2 roadmap for Release 3 Virtual Firm Factory, Release 4 controlled staging/private pilot, Release 5 trusted specialist network, and later marketplace/ecosystem intelligence. |
 | `VFIRM_RELEASE_3_PRODUCT_TARGET_AND_SPRINT_PLAN_v1.0.md` | Defines the executable Release 3 product target, sprint plan, checklist, acceptance criteria, and handoff gate for Virtual Firm Factory implementation. |
 | `VFIRM_RELEASE_2_PRODUCT_TARGET_AND_SPRINT_PLAN_v1.0.md` | Defines the bounded Release 2 compiler, governance, authority envelope, and Firm Runtime binding sprint plan. |
+| `VFIRM_AWIA_VIRTUAL_STAFF_MODEL_AND_IMPLEMENTATION_PLAN_v1.0.md` | Defines the post-freeze AWIA virtual staff model: monthly staff seats, persistent worker identity, package binding, authority envelope, AFCC supervision, and bounded implementation gate. |
+| `AWIA_VS_S1_CONTRACT_LOCK_COMPLETION_v1.0.md` | Records AWIA-VS-S1 contract lock for virtual staff terminology, objects, lifecycle, package registry status, authority invariants, pilot staff set, and negative controls. |
+| `AWIA_VS_S2_PACKAGE_REGISTRY_MAPPING_COMPLETION_v1.0.md` | Records AWIA-VS-S2 package registry mapping for every local Agent Skills folder, registry status, runtime eligibility, pilot staff package coverage, and smoke evidence. |
+| `AWIA_VS_S3_STAFF_PROVISIONING_KERNEL_COMPLETION_v1.0.md` | Records AWIA-VS-S3 staff provisioning kernel for draft staff seats, worker identities, role assignments, package bindings, lifecycle events, and runtime-disabled smoke evidence. |
+| `AWIA_VS_S4_AUTHORITY_AND_RUNTIME_GATE_COMPLETION_v1.0.md` | Records AWIA-VS-S4 deterministic authority and runtime gate for lifecycle, package, salary, prompt, task scope, tool, SOD, approval, regulated-output, and payment-release denials. |
+| `AWIA_VS_S5_AFCC_STAFF_MANAGEMENT_EXPERIENCE_COMPLETION_v1.0.md` | Records AWIA-VS-S5 AFCC staff management UI for roster, profile, readiness, approval queue semantics, lifecycle controls, and smoke evidence. |
+| `AWIA_VS_S6_EVIDENCE_AND_PILOT_GATE_COMPLETION_v1.0.md` | Records AWIA-VS-S6 evidence pack, append-only ledger projection, denial evidence, pilot readiness gate, and controlled human-governed rehearsal recommendation. |
+| `AWIA_VIRTUAL_STAFF_CONTROLLED_PILOT_REHEARSAL_RUNBOOK_AND_RESULT_v1.0.md` | Records the controlled human-governed AWIA virtual staff pilot rehearsal runbook, result, acceptance options, and next product-owner decision gate. |
+| `AWIA_VIRTUAL_STAFF_CONTROLLED_REHEARSAL_ACCEPTANCE_DECISION_v1.0.md` | Records product-owner acceptance of AWIA virtual staff controlled rehearsal readiness and the next bounded build options. |
 | `VFIRM_RELEASE_2_COMPLETION_AND_HANDOFF_TO_R3_v1.0.md` | Defines the evidence gate for closing Release 2 and starting Release 3. |
 | `VFIRM_RELEASE_3_IMPLEMENTATION_CHECKLIST_v1.0.md` | Tracks Release 3 Virtual Firm Factory implementation separately from the sprint plan. |
 | `VFIRM_RELEASE_3_EVIDENCE_PACK_TEMPLATE_v1.0.md` | Defines evidence required to close Release 3. |
@@ -297,3 +306,8 @@ The OP sprint plan and checklist govern the next bounded hardening pass after MT
 | `NHL_Q5_QUOTATION_OPERATIONS_DASHBOARD_AND_EXCEPTION_HANDLING_COMPLETION_v1.0.md` | Records NHL-Q5 quotation operations dashboard/readiness summary, exception categories, UI binding, and smoke evidence. |
 | `NHL_Q6_QUOTATION_EVIDENCE_PACK_AND_ACCEPTANCE_GATE_v1.0.md` | Evidence pack and technical recommendation for NHL-Q1 through NHL-Q6 controlled quotation workflow readiness. |
 | `NHL_Q_WORKFLOW_ACCEPTANCE_DECISION_GATE_v1.0.md` | Product-owner decision gate for accepting, holding, or rejecting the controlled NHL quotation workflow. |
+| `AWIA_NEXT_IMPLEMENTATION_BUNDLE_COMPLETION_v1.0.md` | Completion evidence for AUTHORIZE_AWIA_NEXT_IMPLEMENTATION_BUNDLE: persisted AWIA staff records, API lifecycle/readiness commands, AFCC live-record UI binding, evidence pack persistence, and smoke checks. |
+| `AWIA_CLIENT_STAFF_OPERATING_EXPERIENCE_AND_WORKDESK_COMPLETION_v1.0.md` | Completion evidence for AFCC live staff operating controls and real AWIA staff workdesk assignment after deterministic readiness gating. |
+| `AWIA_STAFF_OUTPUT_REVIEW_AND_CLIENT_DELIVERY_DRAFT_LOOP_COMPLETION_v1.0.md` | Completion evidence for AWIA staff draft output, human review, and client delivery draft loop without final issue authority. |
+| `AWIA_PILOT_DAY_CLIENT_WALKTHROUGH_AND_OPERATOR_SCRIPT_v1.0.md` | Controlled local pilot-day client walkthrough and operator script for named AWIA virtual staff operation. |
+| `AWIA_CONTROLLED_LOCAL_PILOT_ACCEPTANCE_LOCK_v1.0.md` | Product-owner acceptance lock for AWIA controlled local/private pilot readiness with mandatory boundaries preserved. |

@@ -3,3 +3,7 @@ export * from "./events.js";
 export * from "./api-contracts.js";
 export * from "./factory-blueprints.js";
 export * from "./pack-certification.js";
+export * from "./awia-virtual-staff-registry.js";
+export * from "./awia-virtual-staff-provisioning.js";
+export * from "./awia-virtual-staff-authority-gate.js";
+export * from "./awia-virtual-staff-evidence-gate.js";

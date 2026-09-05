@@ -4,7 +4,9 @@ import { join } from "node:path";
 import { evaluatePolicy } from "../../../packages/policy-engine/src/index.mjs";
 import { apiContracts } from "../../../packages/core-domain/src/api-contracts.mjs";
 import { formworkServicePack } from "../../../packages/service-packs/src/formwork.mjs";
-import { acceptProposalRecord, approveProposalRecord, createClientRecord, completeTaskRecord, createDeliverableDraftRecord, createEvidenceBundleRecord, createFirmRecord, createIntakeSessionRecord, createInvoiceRecord, createMarketplaceListingRecord, updateMarketplaceListingStatusRecord, createDirectoryReviewBoardDecisionRecord, createPrivateDirectoryEnquiryRecord, createDirectoryEnquiryCollaborationRequestRecord, createQualificationRenewalReviewRecord, createCapacityOfferRecord, createCollaborationRequestRecord, createObservatorySnapshotRecord, createPolicyDecisionRecord, createProposalRecord, createTenantRecord, findValidProfessionalAuthority, invitePilotUserRecord, activatePilotUserRecord, revokePilotUserRecord, suspendPilotUserRecord, createSupportCaseRecord, updateSupportCaseRecord, createPilotIncidentRecord, updatePilotIncidentRecord, createPilotFeedbackRecord, createPilotAcceptanceReviewRecord, createPilotImprovementItemRecord, updatePilotImprovementItemRecord, createPilotReportPackRecord, createStakeholderReviewBoardRecord, createStakeholderReviewDecisionRecord, createPilotExpansionCohortRecord, updatePilotExpansionCohortRecord, activatePrivatePilotCohortRecord, createTenantOnboardingPlanRecord, updateTenantOnboardingPlanRecord, createReleaseCandidateGateRecord, createTenantPilotControlRecord, recordTenantUsageEventRecord, createBillingReadinessReviewRecord, createPaymentProviderConfigRecord, createSubscriptionPackageRecord, createCommercialLaunchControlRecord, issueDeliverableRecord, issueInvoiceRecord, produceTaskOutputRecord, provisionWorkerInstanceRecord, recordPaymentStatusRecord, requestToolInvocationRecord, reviewDeliverableRecord, activateWorkerInstanceRecord, assignTaskToWorkerRecord, startTaskRecord, getStoreInfo, newId, now, openProjectDeliveryRecord, readStore, requireFields, systemActor, withStore } from "./store.mjs";
+import { buildAwiaStaffDepartmentDashboard } from "../../../packages/core-domain/src/awia-virtual-staff-department-dashboard.mjs";
+import { buildAwiaFirmPayrollSummary } from "../../../packages/core-domain/src/awia-virtual-staff-payroll.mjs";
+import { acceptProposalRecord, approveProposalRecord, createClientRecord, completeTaskRecord, createDeliverableDraftRecord, createEvidenceBundleRecord, createFirmRecord, createIntakeSessionRecord, createInvoiceRecord, createMarketplaceListingRecord, updateMarketplaceListingStatusRecord, createDirectoryReviewBoardDecisionRecord, createPrivateDirectoryEnquiryRecord, createDirectoryEnquiryCollaborationRequestRecord, createQualificationRenewalReviewRecord, createCapacityOfferRecord, createCollaborationRequestRecord, createObservatorySnapshotRecord, createPolicyDecisionRecord, createProposalRecord, createTenantRecord, findValidProfessionalAuthority, invitePilotUserRecord, activatePilotUserRecord, revokePilotUserRecord, suspendPilotUserRecord, createSupportCaseRecord, updateSupportCaseRecord, createPilotIncidentRecord, updatePilotIncidentRecord, createPilotFeedbackRecord, createPilotAcceptanceReviewRecord, createPilotImprovementItemRecord, updatePilotImprovementItemRecord, createPilotReportPackRecord, createStakeholderReviewBoardRecord, createStakeholderReviewDecisionRecord, createPilotExpansionCohortRecord, updatePilotExpansionCohortRecord, activatePrivatePilotCohortRecord, createTenantOnboardingPlanRecord, updateTenantOnboardingPlanRecord, createReleaseCandidateGateRecord, createTenantPilotControlRecord, recordTenantUsageEventRecord, createBillingReadinessReviewRecord, createPaymentProviderConfigRecord, createSubscriptionPackageRecord, createCommercialLaunchControlRecord, issueDeliverableRecord, issueInvoiceRecord, produceTaskOutputRecord, provisionWorkerInstanceRecord, recordPaymentStatusRecord, requestToolInvocationRecord, reviewDeliverableRecord, activateWorkerInstanceRecord, assignTaskToWorkerRecord, startTaskRecord, getStoreInfo, newId, now, openProjectDeliveryRecord, provisionAwiaVirtualStaffPilotRecord, updateAwiaVirtualStaffLifecycleRecord, evaluateAwiaVirtualStaffTaskReadinessRecord, assignAwiaVirtualStaffTaskRecord, produceAwiaStaffOutputDraftRecord, reviewAwiaStaffOutputDraftRecord, prepareAwiaClientDeliveryDraftRecord, appendAwiaStaffMemoryEntryRecord, openAwiaStaffConversationThreadRecord, postAwiaStaffConversationMessageRecord, updateAwiaStaffSeatBillingStatusRecord, provisionAwiaVirtualStaffFromTemplateRecord, readAwiaStaffTemplateCatalogueRecord, readStore, requireFields, systemActor, withStore } from "./store.mjs";
 import { createFrontDeskEnquiryRecord, qualifyFrontDeskEnquiryRecord, createClientCommunicationDraftRecord, handoffFrontDeskEnquiryRecord } from "./store.mjs";
 import { bindAdministrationSkillsRecord, createCorrespondenceRecord, registerDocumentRecord, addDocumentRevisionRecord, createAdministrativeDeadlineRecord, completeAdministrativeDeadlineRecord, createTransmittalDraftRecord } from "./store.mjs";
 import { bindCommercialSkillsRecord, createSalesPipelineRecord, updateSalesPipelineRecord, dispatchProposalRecord, createExpenseRecord, approveExpenseRecord, createReceivableFollowUpRecord, readCashSnapshot } from "./store.mjs";
@@ -72,6 +74,23 @@ const readCollections = new Map([
   ["service-skus", "service_skus"],
   ["worker-templates", "worker_templates"],
   ["worker-instances", "worker_instances"],
+  ["awia-virtual-staff-provisioning-runs", "awia_virtual_staff_provisioning_runs"],
+  ["awia-virtual-staff-seats", "awia_virtual_staff_seats"],
+  ["awia-virtual-staff-members", "awia_virtual_staff_members"],
+  ["awia-staff-role-assignments", "awia_staff_role_assignments"],
+  ["awia-staff-package-bindings", "awia_staff_package_bindings"],
+  ["awia-staff-lifecycle-events", "awia_staff_lifecycle_events"],
+  ["awia-staff-authority-decisions", "awia_staff_authority_decisions"],
+  ["awia-staff-evidence-packs", "awia_staff_evidence_packs"],
+  ["awia-staff-task-readiness-records", "awia_staff_task_readiness_records"],
+  ["awia-staff-workdesk-items", "awia_staff_workdesk_items"],
+  ["awia-staff-output-drafts", "awia_staff_output_drafts"],
+  ["awia-staff-output-reviews", "awia_staff_output_reviews"],
+  ["awia-client-delivery-drafts", "awia_client_delivery_drafts"],
+  ["awia-staff-memory-entries", "awia_staff_memory_entries"],
+  ["awia-staff-conversation-threads", "awia_staff_conversation_threads"],
+  ["awia-staff-conversation-messages", "awia_staff_conversation_messages"],
+  ["awia-staff-seat-billing-events", "awia_staff_seat_billing_events"],
   ["task-outputs", "task_outputs"],
   ["tool-invocations", "tool_invocations"],
   ["marketplace-listings", "marketplace_listings"],
@@ -1708,6 +1727,81 @@ async function createObservatorySnapshot(body, req = null) {
   assertMEObservatoryGovernance(body, actor);
   return createObservatorySnapshotRecord(body, actor);
 }
+
+async function provisionAwiaVirtualStaffPilot(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id"]);
+  const actor = actorFromBody(body, req, body.tenant_id, body.firm_id);
+  return provisionAwiaVirtualStaffPilotRecord(body, actor);
+}
+
+async function updateAwiaVirtualStaffLifecycle(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "staff_code", "to_state"]);
+  const actor = actorFromBody(body, req, body.tenant_id, body.firm_id);
+  return updateAwiaVirtualStaffLifecycleRecord(body, actor);
+}
+
+async function evaluateAwiaVirtualStaffTaskReadiness(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "staff_code", "action", "tool", "client_id", "project_id"]);
+  const actor = actorFromBody(body, req, body.tenant_id, body.firm_id);
+  return evaluateAwiaVirtualStaffTaskReadinessRecord(body, actor);
+}
+
+
+async function assignAwiaVirtualStaffTask(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "staff_code", "task_id", "tool", "client_id"]);
+  const actor = actorFromBody(body, req, body.tenant_id, body.firm_id);
+  return assignAwiaVirtualStaffTaskRecord(body, actor);
+}
+
+
+async function produceAwiaStaffOutputDraft(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "workdesk_item_id"]);
+  const actor = actorFromBody(body, req, body.tenant_id, body.firm_id);
+  return produceAwiaStaffOutputDraftRecord(body, actor);
+}
+
+async function reviewAwiaStaffOutputDraft(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "output_draft_id", "review_decision"]);
+  const actor = actorFromBody(body, req, body.tenant_id, body.firm_id);
+  return reviewAwiaStaffOutputDraftRecord(body, actor);
+}
+
+async function prepareAwiaClientDeliveryDraft(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "output_draft_id", "client_id"]);
+  const actor = actorFromBody(body, req, body.tenant_id, body.firm_id);
+  return prepareAwiaClientDeliveryDraftRecord(body, actor);
+}
+
+async function appendAwiaStaffMemoryEntry(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "staff_code", "kind", "content"]);
+  const actor = actorFromBody(body, req, body.tenant_id, body.firm_id);
+  return appendAwiaStaffMemoryEntryRecord(body, actor);
+}
+
+async function openAwiaStaffConversationThread(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "staff_code"]);
+  const actor = actorFromBody(body, req, body.tenant_id, body.firm_id);
+  return openAwiaStaffConversationThreadRecord(body, actor);
+}
+
+async function postAwiaStaffConversationMessage(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "thread_id", "participant_role", "content"]);
+  const actor = actorFromBody(body, req, body.tenant_id, body.firm_id);
+  return postAwiaStaffConversationMessageRecord(body, actor);
+}
+
+async function updateAwiaStaffSeatBillingStatus(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "staff_code", "to_status"]);
+  const actor = actorFromBody(body, req, body.tenant_id, body.firm_id);
+  return updateAwiaStaffSeatBillingStatusRecord(body, actor);
+}
+
+async function provisionAwiaVirtualStaffFromTemplate(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "template_id"]);
+  const actor = actorFromBody(body, req, body.tenant_id, body.firm_id);
+  return provisionAwiaVirtualStaffFromTemplateRecord(body, actor);
+}
+
 async function provisionWorkerInstance(body, req = null) {
   requireFields(body, ["tenant_id", "firm_id"]);
   const actor = actorFromBody(body, req, body.tenant_id, body.firm_id);
@@ -1838,6 +1932,86 @@ function buildQuotationOperationsSummary(store, tenantId, firmId) {
     exceptions,
     next_actions: exceptions.map((item) => ({ key: item.key, severity: item.severity, action: item.detail })),
     boundaries: ["advisory_boq_extraction_only", "human_controlled_quotation_issue", "no_live_payment_movement", "no_autonomous_measurement_pricing_or_approval", "tenant_scoped_audit_export"]
+  };
+}
+
+async function readAwiaStaffDepartmentDashboard(url) {
+  const store = await readStore();
+  const tenantId = url.searchParams.get("tenant_id");
+  const firmId = url.searchParams.get("firm_id");
+  const scoped = (collection) => (Array.isArray(store[collection]) ? store[collection] : []).filter((record) => (!tenantId || record.tenant_id === tenantId || record.organization_id === tenantId) && (!firmId || record.firm_id === firmId));
+  return buildAwiaStaffDepartmentDashboard({
+    members: scoped("awia_virtual_staff_members"),
+    workdeskItems: scoped("awia_staff_workdesk_items"),
+    outputDrafts: scoped("awia_staff_output_drafts"),
+    outputReviews: scoped("awia_staff_output_reviews"),
+    taskReadinessRecords: scoped("awia_staff_task_readiness_records")
+  });
+}
+
+async function readAwiaStaffPayrollSummary(url) {
+  const store = await readStore();
+  const tenantId = url.searchParams.get("tenant_id");
+  const firmId = url.searchParams.get("firm_id");
+  const scoped = (collection) => (Array.isArray(store[collection]) ? store[collection] : []).filter((record) => (!tenantId || record.tenant_id === tenantId || record.organization_id === tenantId) && (!firmId || record.firm_id === firmId));
+  return buildAwiaFirmPayrollSummary({
+    seats: scoped("awia_virtual_staff_seats"),
+    members: scoped("awia_virtual_staff_members")
+  });
+}
+
+async function readAwiaStagingReadiness() {
+  const findings = [];
+  let schemaText = "";
+  let migrationsText = "";
+  try {
+    schemaText = await readFile(join(process.cwd(), "infra/database/schema.sql"), "utf8");
+  } catch {
+    findings.push({ code: "SCHEMA_FILE_UNREADABLE", severity: "WARN" });
+  }
+  try {
+    const { readdir } = await import("node:fs/promises");
+    const migrationFiles = await readdir(join(process.cwd(), "infra/database/migrations"));
+    for (const file of migrationFiles) {
+      if (!file.endsWith(".sql")) continue;
+      migrationsText += await readFile(join(process.cwd(), "infra/database/migrations", file), "utf8");
+    }
+  } catch {
+    findings.push({ code: "MIGRATIONS_DIR_UNREADABLE", severity: "WARN" });
+  }
+
+  const postgresSchemaHasAwiaTables = /awia/i.test(schemaText) || /awia/i.test(migrationsText);
+  if (!postgresSchemaHasAwiaTables) {
+    findings.push({ code: "AWIA_POSTGRES_SCHEMA_MISSING", severity: "BLOCKER", detail: "No awia_* table is defined in infra/database/schema.sql or infra/database/migrations/*.sql. AWIA persistence currently only works under VFIRM_STORE_BACKEND=json." });
+  }
+  findings.push({ code: "AWIA_RECORD_IDS_NOT_BACKEND_AWARE", severity: "BLOCKER", detail: 'AWIA store functions call newId(prefix) unconditionally (prefixed non-uuid strings) instead of the isPostgresStore()-aware id scheme used elsewhere in store.mjs (see newUuid() and the existing storeBackend-postgres-ternary pattern). These ids would not satisfy uuid-typed Postgres columns even once a schema exists.' });
+
+  const currentBackend = process.env.VFIRM_STORE_BACKEND ?? "json";
+  const blockers = findings.filter((finding) => finding.severity === "BLOCKER");
+
+  return {
+    boundary: "staging_preparation_only_no_production_launch_authorization",
+    code: "AWIA-STAGING-READINESS-001",
+    checked_at: now(),
+    current_backend: currentBackend,
+    postgres_schema_has_awia_tables: postgresSchemaHasAwiaTables,
+    findings,
+    required_before_staging: [
+      "Add infra/database/migrations/NNNN_awia_virtual_staff_persistence.sql covering all 16 awia_* collections, with uuid-typed primary keys and tenant/firm foreign keys matching the existing schema convention.",
+      'Update every AWIA store.mjs function to generate ids via the existing isPostgresStore()-aware pattern instead of an unconditional newId(prefix).',
+      "Run npm run check:db:postgres and the full check:awia:* suite against a live staging Postgres instance before any staging cutover.",
+      "Re-run npm run check:awia:acceptance-lock against the staging backend and re-confirm AWIA_CONTROLLED_LOCAL_PILOT_READY still holds on that backend.",
+      "Set the standard staging environment variables already required by /ops/staging-package (DATABASE_URL, VFIRM_AUTH_PROVIDER, VFIRM_ALLOWED_ORIGINS, VFIRM_BACKUP_POLICY, VFIRM_RELEASE_CHANNEL)."
+    ],
+    preflight_commands: [
+      "npm run check:awia:acceptance-lock",
+      "npm run check:awia:staff-memory",
+      "npm run check:awia:department-dashboards",
+      "npm run check:awia:payroll-billing",
+      "npm run check:awia:template-scaling",
+      "npm run check:db:postgres"
+    ],
+    recommendation: blockers.length > 0 ? "NOT_READY_FOR_STAGING_BACKEND_MIGRATION_REQUIRED" : "READY_FOR_STAGING_CUTOVER_REHEARSAL"
   };
 }
 
@@ -2654,6 +2828,18 @@ const routes = new Map([
   ["POST /network/specialist-assignments/review", (body, req) => transitionSpecialistAssignment(body, req, "review")],
   ["POST /network/specialist-assignments/approve", (body, req) => transitionSpecialistAssignment(body, req, "approve")],
   ["POST /network/specialist-assignments/close", (body, req) => transitionSpecialistAssignment(body, req, "close")],
+  ["POST /awia/virtual-staff/provision-pilot", provisionAwiaVirtualStaffPilot],
+  ["POST /awia/virtual-staff/lifecycle", updateAwiaVirtualStaffLifecycle],
+  ["POST /awia/virtual-staff/task-readiness", evaluateAwiaVirtualStaffTaskReadiness],
+  ["POST /awia/virtual-staff/assign-task", assignAwiaVirtualStaffTask],
+  ["POST /awia/virtual-staff/output-draft", produceAwiaStaffOutputDraft],
+  ["POST /awia/virtual-staff/output-review", reviewAwiaStaffOutputDraft],
+  ["POST /awia/virtual-staff/client-delivery-draft", prepareAwiaClientDeliveryDraft],
+  ["POST /awia/virtual-staff/memory/append", appendAwiaStaffMemoryEntry],
+  ["POST /awia/virtual-staff/conversation/open", openAwiaStaffConversationThread],
+  ["POST /awia/virtual-staff/conversation/message", postAwiaStaffConversationMessage],
+  ["POST /awia/virtual-staff/seat-billing-status", updateAwiaStaffSeatBillingStatus],
+  ["POST /awia/virtual-staff/provision-from-template", provisionAwiaVirtualStaffFromTemplate],
   ["POST /worker-instances", provisionWorkerInstance],
   ["POST /worker-instances/activate", activateWorkerInstance],
   ["POST /runtime/tasks/assign-ai", assignTaskToWorker],
@@ -2767,6 +2953,10 @@ const server = createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/pilot/formwork") return sendJson(req, res, 200, { ok: true, data: readFormworkPilotPackage() });
     if (req.method === "GET" && url.pathname === "/workspace/active-summary") return sendJson(req, res, 200, { ok: true, data: await readActiveWorkspaceSummary(req, url) });
     if (req.method === "GET" && url.pathname === "/dashboard/summary") return sendJson(req, res, 200, { ok: true, data: await readDashboardSummary(url) });
+    if (req.method === "GET" && url.pathname === "/awia/virtual-staff/department-dashboard") return sendJson(req, res, 200, { ok: true, data: await readAwiaStaffDepartmentDashboard(url) });
+    if (req.method === "GET" && url.pathname === "/awia/virtual-staff/payroll-summary") return sendJson(req, res, 200, { ok: true, data: await readAwiaStaffPayrollSummary(url) });
+    if (req.method === "GET" && url.pathname === "/awia/virtual-staff/templates") return sendJson(req, res, 200, { ok: true, data: await readAwiaStaffTemplateCatalogueRecord() });
+    if (req.method === "GET" && url.pathname === "/awia/virtual-staff/staging-readiness") return sendJson(req, res, 200, { ok: true, data: await readAwiaStagingReadiness() });
     if (req.method === "GET" && url.pathname === "/quotation-operations-summary") return sendJson(req, res, 200, { ok: true, data: await readQuotationOperationsSummary(req, url) });
     if (req.method === "GET" && url.pathname === "/auth/context") return sendJson(req, res, 200, { ok: true, data: await readAuthContext(req) });
     if (req.method === "GET" && url.pathname === "/auth/provider/config") return sendJson(req, res, 200, { ok: true, data: authProviderConfig() });

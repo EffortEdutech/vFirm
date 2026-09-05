@@ -147,3 +147,24 @@ Target stage: 3
 - TD-004 closed by entity list/detail endpoints and web resource-endpoint integration.
 - TD-005 moved to WATCH: Sprint 2.5 now has consistent response envelopes, contract catalogue, required-field validation, and API fixture smoke tests. Full generated schema validation remains a later hardening improvement before external API exposure.
 
+## TD-009 — AWIA Virtual Staff Not Yet Postgres/Staging Ready
+
+Status: OPEN
+
+AWIA virtual staff (provisioning, lifecycle, memory, conversation, seat billing, department dashboards, multi-firm templates) currently only persists correctly under `VFIRM_STORE_BACKEND=json`. Two concrete gaps block staging cutover:
+
+- No `awia_*` table is defined in `infra/database/schema.sql` or `infra/database/migrations/*.sql`.
+- Every AWIA store.mjs function generates record ids via an unconditional `newId(prefix)` (a prefixed non-uuid string), instead of the `isPostgresStore()`-aware id scheme already used elsewhere in the file. These ids would not satisfy uuid-typed Postgres columns even once a schema exists.
+
+Current mitigation:
+
+- controlled local/private pilot operation is unaffected (JSON store backend only, matching the AWIA_CONTROLLED_LOCAL_PILOT_ACCEPTANCE_LOCK_v1.0.md scope);
+- a live readiness check is available at `GET /awia/virtual-staff/staging-readiness` (see `AWIA_STAGING_PREPARATION_COMPLETION_v1.0.md`) that reports this gap and returns `NOT_READY_FOR_STAGING_BACKEND_MIGRATION_REQUIRED` until it is closed.
+
+Required resolution:
+
+- add a Postgres migration covering all 16 `awia_*` collections with uuid-typed primary keys and tenant/firm foreign keys matching the existing schema convention;
+- switch every AWIA store.mjs id generation call to the existing backend-aware pattern;
+- re-run `npm run check:db:postgres` and the full `check:awia:*` suite against a live staging Postgres instance before any staging cutover.
+
+Target sprint: next AWIA staging cutover sprint (post-bundle-5).

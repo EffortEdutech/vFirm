@@ -167,7 +167,7 @@ For new work, classify the request before implementation as one of:
 
 Keep changes small, use focused checks, and refresh Graphify after meaningful code, schema, or docs structure changes when possible.
 
-## Current Durable State - 2026-09-04
+## Current Durable State - 2026-09-05
 
 The compact current-state bridge is `docs\AI_WORKSPACE_CONTEXT.md`.
 
@@ -176,7 +176,9 @@ As of this date:
 - Multi-tenant runtime binding is accepted for controlled local/private pilot operation.
 - Controlled multi-firm pilot operations are accepted for Amanah Formwork Pilot Firm and NHL Global Solution.
 - Controlled private directory operation is accepted only within its private/human-governed boundary.
-- NHL-Q1 through NHL-Q6 are technically complete for NHL Global Solution BOQ/image quotation workflow readiness.
-- NHL-Q acceptance remains pending explicit product-owner decision; no silent acceptance is allowed.
+- NHL-Q1 through NHL-Q6 (NHL Global Solution BOQ/image quotation workflow) are ACCEPTED for controlled local/private pilot operation. Decision code `ACCEPT_NHL_Q_CONTROLLED_LOCAL_PRIVATE_PILOT`, recorded 2026-09-05 in `NHL_Q_WORKFLOW_ACCEPTANCE_DECISION_GATE_v1.0.md`. No further product-owner action required to operate this workflow within its controlled pilot boundary.
+- AWIA Virtual Staff (named virtual workers hired into a firm via staff seats/packages) reached `AWIA_CONTROLLED_LOCAL_PILOT_READY` and is locked in `AWIA_CONTROLLED_LOCAL_PILOT_ACCEPTANCE_LOCK_v1.0.md`. Mandatory authorizations remaining: 0. Verified via `npm run check:awia:acceptance-lock`.
+- Approved next-stage AWIA expansion bundles, all explicit user-approved scope expansion, all COMPLETED on 2026-09-05: `AUTHORIZE_AWIA_STAFF_MEMORY_AND_CONVERSATION_WORKSPACE`, `AUTHORIZE_AWIA_DEPARTMENT_DASHBOARDS`, `AUTHORIZE_AWIA_PAYROLL_AND_SEAT_BILLING_POLISH`, `AUTHORIZE_AWIA_MULTI_FIRM_STAFF_TEMPLATE_SCALING`, `AUTHORIZE_AWIA_STAGING_PREPARATION` (staging prep concluded NOT_READY, tracked as TD-009 — Postgres schema/id-generation gap; JSON-store local pilot is unaffected). None of these lift the locked boundaries (no autonomous regulated approval, no direct-LLM-to-regulated-output, no final client deliverable issue by virtual staff, no live payment release, no public marketplace, no production launch).
+- Repository working tree currently carries widespread CRLF/LF line-ending churn across tracked files (no content change) alongside real uncommitted AWIA implementation files; verify with `git diff --stat` before assuming a file has real content changes.
 
 Use `docs\00_project_control\AI_DEVELOPMENT_WORKSPACE_GRAPHIFY_OBSIDIAN_PROTOCOL_v1.0.md` to reduce repeated context loading and recover after forced stops.

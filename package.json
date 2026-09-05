@@ -125,7 +125,22 @@
                     "check:nhl:q3":  "node scripts/smoke-nhl-q3-quotation-draft-correspondence.mjs",
                     "check:nhl:q4":  "node scripts/smoke-nhl-q4-controlled-issue-receivables.mjs",
                     "check:nhl:q5":  "node scripts/smoke-nhl-q5-quotation-operations-dashboard.mjs",
-                    "check:nhl:q6":  "node scripts/smoke-nhl-q6-quotation-evidence-acceptance-gate.mjs"
+                    "check:nhl:q6":  "node scripts/smoke-nhl-q6-quotation-evidence-acceptance-gate.mjs",
+                    "check:awia:vs:s2":  "node scripts/smoke-awia-vs-s2-package-registry.mjs",
+                    "check:awia:vs:s3":  "node scripts/smoke-awia-vs-s3-staff-provisioning.mjs",
+                    "check:awia:vs:s4":  "node scripts/smoke-awia-vs-s4-authority-runtime-gate.mjs",
+                    "check:awia:vs:s5":  "node scripts/smoke-awia-vs-s5-afcc-staff-management.mjs",
+                    "check:awia:vs:s6":  "node scripts/smoke-awia-vs-s6-evidence-pilot-gate.mjs",
+                    "check:awia:pilot-rehearsal":  "node scripts/smoke-awia-virtual-staff-controlled-pilot-rehearsal.mjs",
+                    "check:awia:next-bundle":  "node scripts/smoke-awia-next-implementation-bundle.mjs",
+                    "check:awia:workdesk":  "node scripts/smoke-awia-next-implementation-bundle.mjs",
+                    "check:awia:output-loop":  "node scripts/smoke-awia-next-implementation-bundle.mjs",
+                    "check:awia:acceptance-lock":  "node scripts/smoke-awia-controlled-local-pilot-acceptance-lock.mjs",
+                    "check:awia:staff-memory":  "node scripts/smoke-awia-staff-memory-and-conversation-workspace.mjs",
+                    "check:awia:department-dashboards":  "node scripts/smoke-awia-department-dashboards.mjs",
+                    "check:awia:payroll-billing":  "node scripts/smoke-awia-payroll-and-seat-billing-polish.mjs",
+                    "check:awia:template-scaling":  "node scripts/smoke-awia-multi-firm-staff-template-scaling.mjs",
+                    "check:awia:staging-prep":  "node scripts/smoke-awia-staging-preparation.mjs"
                 },
     "engines":  {
                     "node":  "\u003e=22"

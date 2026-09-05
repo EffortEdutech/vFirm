@@ -14,7 +14,7 @@ Use the live vault when accessible. If not accessible, treat this file as the lo
 
 virtual-firm is the Virtual Firm Platform: professional practice infrastructure for client-facing firms with governed AI workers, shared business systems, Service Delivery Packs, Practice Packs, finance, documents, audit, and professional approval controls.
 
-## Current Durable State - 2026-09-04
+## Current Durable State - 2026-09-05
 
 Architecture Baseline v1.0 is frozen.
 
@@ -26,9 +26,18 @@ Accepted controlled local/private pilot scopes:
 
 Current NHL quotation state:
 
-- NHL-Q1 through NHL-Q6 are technically complete for NHL Global Solution BOQ/image quotation workflow readiness.
-- NHL-Q6 recommends `GO_FOR_PRODUCT_OWNER_ACCEPTANCE_REVIEW`.
-- The NHL-Q workflow acceptance decision remains pending product-owner review; no silent acceptance is allowed.
+- NHL-Q1 through NHL-Q6 are ACCEPTED for controlled local/private pilot operation for NHL Global Solution BOQ/image quotation workflow. Decision code `ACCEPT_NHL_Q_CONTROLLED_LOCAL_PRIVATE_PILOT`, recorded 2026-09-05 in `docs/10_post_freeze_technical_design/NHL_Q_WORKFLOW_ACCEPTANCE_DECISION_GATE_v1.0.md`.
+
+Current AWIA virtual staff state:
+
+- AWIA Virtual Staff (named virtual workers occupying paid staff seats, mapped to local Agent Skills packages such as CFO/FAO/SAO/OPO/ARO/CMO/CTO/CIO/CHRO) reached `AWIA_CONTROLLED_LOCAL_PILOT_READY`.
+- Locked in `docs/10_post_freeze_technical_design/AWIA_CONTROLLED_LOCAL_PILOT_ACCEPTANCE_LOCK_v1.0.md` on 2026-09-05. Mandatory authorizations remaining: 0. Verify with `npm run check:awia:acceptance-lock`.
+- All 5 optional expansion bundles are COMPLETED on 2026-09-05 (none lift locked boundaries): staff memory & conversation workspace, department dashboards, payroll & seat billing polish, multi-firm staff template scaling, staging preparation. Staging preparation concluded `NOT_READY_FOR_STAGING_BACKEND_MIGRATION_REQUIRED` (tracked as TD-009 in TECHNICAL_DEBT_REGISTER_v1.0.md); the JSON-store-backed local/private pilot is unaffected.
+- Reference: `docs/10_post_freeze_technical_design/VFIRM_AWIA_VIRTUAL_STAFF_MODEL_AND_IMPLEMENTATION_PLAN_v1.0.md` for the canonical staff/seat/authority model.
+
+Repository hygiene note:
+
+- The working tree currently shows widespread modified-file status across nearly the whole repo. This is CRLF/LF line-ending churn only (confirmed via `git diff --stat` on sampled files, no content change) mixed with genuinely new, uncommitted AWIA source/doc files. Diff before assuming any given "M" file has real content changes.
 
 Locked boundaries still in force:
 

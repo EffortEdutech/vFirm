@@ -662,3 +662,20 @@ body.sidebar-open .sidebar-scrim {
   .active-workspace-form, .workspace-system-row { grid-template-columns: 1fr; }
   .status-card.compact { grid-column: auto; }
 }
+.afcc-staff-experience { margin-bottom: 20px; }
+.afcc-metric-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin: 14px 0; }
+.afcc-journey-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin: 14px 0; }
+.afcc-journey-grid span { min-height: 42px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid #d4ebe2; background: #f6fbf8; color: var(--accent-dark); border-radius: 12px; padding: 8px 10px; font-size: 12px; font-weight: 900; text-align: center; }
+.metric-card { border: 1px solid var(--line); border-radius: 16px; background: white; padding: 14px; display: grid; gap: 5px; min-height: 112px; }
+.metric-card span { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; font-weight: 900; }
+.metric-card strong { color: var(--ink); font-size: 26px; }
+.metric-card small { color: var(--muted); line-height: 1.35; }
+@media (max-width: 1050px) { .afcc-metric-grid, .afcc-journey-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .afcc-metric-grid, .afcc-journey-grid { grid-template-columns: 1fr; } }
+
+.staff-command-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 12px 0;
+}

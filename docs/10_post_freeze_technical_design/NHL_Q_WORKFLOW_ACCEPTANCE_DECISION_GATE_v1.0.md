@@ -1,7 +1,8 @@
 ﻿# NHL Quotation Workflow Acceptance Decision Gate v1.0
 
 Date: 2026-09-04
-Status: Pending Product-Owner Decision
+Status: Accepted
+Decision Date: 2026-09-05
 Scope: NHL-Q1 through NHL-Q6 controlled BOQ/image quotation workflow for NHL Global Solution
 
 ## 1. Decision purpose
@@ -72,3 +73,21 @@ Effect:
 If no product-owner decision is recorded, the workflow remains development-ready only.
 
 No silent acceptance is allowed.
+
+
+## 8. Recorded Decision
+
+Decision code: `ACCEPT_NHL_Q_CONTROLLED_LOCAL_PRIVATE_PILOT`
+
+Decision date: 2026-09-05
+
+Decided by: Product owner (explicit authorization, "Bismillah...")
+
+Effect:
+
+- NHL-Q workflow (Q1 through Q6) is accepted for controlled local/private pilot operation for NHL Global Solution.
+- Human principal remains responsible for quotation issue and commercial decisions.
+- Known limitations from the Q6 evidence pack are accepted into backlog rather than blocking pilot use.
+- This acceptance does not authorize production onboarding, public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, pricing intelligence, autonomous award, autonomous regulated approval, live payment movement, autonomous external sending, or autonomous quotation approval.
+
+No further product-owner action is required to operate the NHL-Q workflow within this controlled local/private pilot boundary.
