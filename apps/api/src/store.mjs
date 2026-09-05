@@ -4538,19 +4538,14 @@ function stripRelationalCollections(store) {
   service_skus: [],
   worker_templates: [],
   worker_instances: [],
-  awia_virtual_staff_provisioning_runs: [],
-  awia_virtual_staff_seats: [],
-  awia_virtual_staff_members: [],
-  awia_staff_role_assignments: [],
-  awia_staff_package_bindings: [],
-  awia_staff_lifecycle_events: [],
-  awia_staff_authority_decisions: [],
-  awia_staff_evidence_packs: [],
-  awia_staff_task_readiness_records: [],
-  awia_staff_workdesk_items: [],
-  awia_staff_output_drafts: [],
-  awia_staff_output_reviews: [],
-  awia_client_delivery_drafts: [],
+  // NOTE (Phase A pilot-day fix, TD-009 partial mitigation): the awia_* collections have no real
+  // Postgres relational tables yet (see readRelationalStore -- none of them are queried there), so
+  // stripping them here before every save silently discarded all AWIA virtual-staff data on the
+  // Postgres backend: a provision/assign/etc call would succeed and return the right payload for
+  // that one response, but the very next read came back empty because the data was never actually
+  // persisted anywhere. Until the real AWIA Postgres schema lands (TD-009, Phase B), these
+  // collections must round-trip through the JSONB app_state blob like any other non-relational
+  // collection, so they are intentionally NOT stripped here.
   task_outputs: [],
   tool_invocations: [],
   marketplace_listings: [],

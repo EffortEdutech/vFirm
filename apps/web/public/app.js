@@ -3421,6 +3421,34 @@ function awiaStaffForStore(store) {
     };
   });
 }
+// AWIA pilot role/tool policy mirror (kept in sync with packages/core-domain/src/awia-virtual-staff-registry.mjs
+// pilotStaffRoster and packages/core-domain/src/awia-virtual-staff-authority-gate.mjs defaultToolPolicyByRole).
+// The Assign Work form uses this so the "tool" choices offered for a selected staff member are always ones
+// their role is actually authorized for -- avoiding an ACTION_NOT_ALLOWED_FOR_ROLE denial on submit.
+const AWIA_STAFF_ROLE_CODE = {
+  "CFO-001": "CFO",
+  "FA-001": "FAO",
+  "FAO-AP-001": "FAO",
+  "FAO-REV-001": "FAO",
+  "SAO-001": "SAO",
+  "OPO-001": "OPO",
+  "ARO-001": "ARO",
+  "DATA-001": "FAO",
+};
+const AWIA_ROLE_ACTIONS = {
+  CFO: ["finance.analysis.prepare", "finance.governance.review", "evidence.bundle.review"],
+  FAO: ["accounts.ap.prepare", "accounts.receivable.prepare", "evidence.bundle.prepare"],
+  SAO: ["sales.opportunity.prepare", "proposal.draft.prepare", "customer.communication.draft"],
+  OPO: ["project.delivery.coordinate", "workload.summary.prepare", "evidence.bundle.review"],
+  ARO: ["administration.document.register", "administration.deadline.prepare", "evidence.bundle.prepare"],
+};
+function awiaToolOptionsForStaffCode(staffCode) {
+  const role = AWIA_STAFF_ROLE_CODE[staffCode];
+  const actions = (role && AWIA_ROLE_ACTIONS[role]) || [];
+  return actions
+    .map((action) => `<option value="${escapeHtml(action)}">${escapeHtml(action)}</option>`)
+    .join("");
+}
 function renderAfccStaffManagementExperience(store) {
   const staff = awiaStaffForStore(store);
   const active = staff.filter((member) => member.lifecycle_status === "ACTIVE");
@@ -3446,7 +3474,7 @@ function renderAfccStaffManagementExperience(store) {
   const activeStaffOptions = active
     .map(
       (member) =>
-        `<option value="${escapeHtml(member.staff_code)}">${escapeHtml(member.name)} - ${escapeHtml(member.role)}</option>`,
+        `<option value="${escapeHtml(member.staff_code)}" data-role="${escapeHtml(AWIA_STAFF_ROLE_CODE[member.staff_code] ?? "")}">${escapeHtml(member.name)} - ${escapeHtml(member.role)}</option>`,
     )
     .join("");
   const taskOptions = tasks
@@ -3464,7 +3492,7 @@ function renderAfccStaffManagementExperience(store) {
   const workdeskRows = workdesk.length
     ? `<div class="record-table-wrap"><table class="record-table"><thead><tr><th>Staff</th><th>Task</th><th>Status</th><th>Tool</th><th>Evidence</th></tr></thead><tbody>${workdesk.map((item) => `<tr><td>${escapeHtml(item.staff_code)}</td><td>${escapeHtml(shortId(item.task_id))}<br><small>${escapeHtml(item.assignment_summary)}</small></td><td><span class="pill">${escapeHtml(item.workdesk_status)}</span></td><td>${escapeHtml(item.tool)}</td><td>${escapeHtml((item.evidence_refs ?? []).join(", ") || "-")}</td></tr>`).join("")}</tbody></table></div>`
     : `<p class="empty">No AWIA staff workdesk items yet.</p>`;
-  return `<section class="panel afcc-staff-experience"><div class="panel-heading"><h2>AFCC Staff Management</h2><p>Hire, assign, supervise, approve, pause, suspend, retire, replace, and inspect named virtual staff through governed staff records.</p></div><div class="boundary-note"><strong>AWIA controlled operation</strong><span>Monthly salary, package binding, chat, and model capability do not grant authority. Runtime decisions remain deterministic and human approval remains explicit.</span></div><div class="afcc-metric-grid"><article class="metric-card"><span>Virtual staff</span><strong>${staff.length}</strong><small>Draft and active staff seats</small></article><article class="metric-card"><span>Active now</span><strong>${active.length}</strong><small>Only active staff may pass runtime gates</small></article><article class="metric-card warning"><span>Human queue</span><strong>${waiting}</strong><small>Approval required before controlled outputs</small></article><article class="metric-card warning"><span>Workdesk</span><strong>${workdesk.length}</strong><small>Assigned staff tasks</small></article><article class="metric-card"><span>Drafts</span><strong>${outputDrafts.length}</strong><small>${clientDeliveryDrafts.length} client draft ready</small></article></div><div class="afcc-journey-grid"><span>Hire staff</span><span>Assign work</span><span>Supervise execution</span><span>Approve with evidence</span><span>Manage lifecycle</span></div><div class="grid two"><section class="detail-card compact-form"><h3>Operate Staff</h3><div class="staff-command-row"><button class="secondary" id="awiaProvisionPilotStaff">Provision Pilot Staff</button><button class="secondary" id="awiaReadinessCheck" ${active.length ? "" : "disabled"}>Run Readiness Check</button></div><form id="awiaLifecycleForm"><label>Staff<select name="staff_code" required>${staffOptions}</select></label><label>Lifecycle<select name="to_state" required><option>ACTIVE</option><option>PAUSED</option><option>SUSPENDED</option><option>RETIRED</option><option>DRAFT</option></select></label><button type="submit" ${staff.length ? "" : "disabled"}>Update Lifecycle</button></form></section><section class="detail-card compact-form"><h3>Assign Work</h3><form id="awiaAssignTaskForm"><label>Active staff<select name="staff_code" required>${activeStaffOptions}</select></label><label>Task<select name="task_id" required>${taskOptions}</select></label><label>Tool<input name="tool" value="finance.analysis.prepare" /></label><button type="submit" ${active.length && tasks.length ? "" : "disabled"}>Assign to Workdesk</button>${disabledHint(Boolean(active.length && tasks.length), "Provision and activate staff, then open a project task.")}</form><div class="staff-command-row"><button class="secondary" id="awiaProduceOutputDraft" ${workdesk.some((item) => item.workdesk_status === "ASSIGNED") ? "" : "disabled"}>Produce Draft</button><button class="secondary" id="awiaReviewOutputDraft" ${outputDrafts.some((item) => item.status === "DRAFT_REVIEW_REQUIRED") ? "" : "disabled"}>Human Review</button><button class="secondary" id="awiaPrepareClientDraft" ${outputReviews.some((item) => item.review_decision === "APPROVED_FOR_CLIENT_DRAFT") ? "" : "disabled"}>Prepare Client Draft</button></div></section></div><div class="record-table-wrap"><table class="record-table"><thead><tr><th>Staff</th><th>Lifecycle</th><th>Grade</th><th>Package</th><th>Salary plan</th><th>Readiness</th><th>Profile</th></tr></thead><tbody>${rows}</tbody></table></div><div class="grid two"><section class="detail-card"><h3>Staff Workdesk</h3>${workdeskRows}</section><section class="detail-card"><h3>Draft Review Loop</h3>${renderRelatedContext(
+  return `<section class="panel afcc-staff-experience"><div class="panel-heading"><h2>AFCC Staff Management</h2><p>Hire, assign, supervise, approve, pause, suspend, retire, replace, and inspect named virtual staff through governed staff records.</p></div><div class="boundary-note"><strong>AWIA controlled operation</strong><span>Monthly salary, package binding, chat, and model capability do not grant authority. Runtime decisions remain deterministic and human approval remains explicit.</span></div><div class="afcc-metric-grid"><article class="metric-card"><span>Virtual staff</span><strong>${staff.length}</strong><small>Draft and active staff seats</small></article><article class="metric-card"><span>Active now</span><strong>${active.length}</strong><small>Only active staff may pass runtime gates</small></article><article class="metric-card warning"><span>Human queue</span><strong>${waiting}</strong><small>Approval required before controlled outputs</small></article><article class="metric-card warning"><span>Workdesk</span><strong>${workdesk.length}</strong><small>Assigned staff tasks</small></article><article class="metric-card"><span>Drafts</span><strong>${outputDrafts.length}</strong><small>${clientDeliveryDrafts.length} client draft ready</small></article></div><div class="afcc-journey-grid"><span>Hire staff</span><span>Assign work</span><span>Supervise execution</span><span>Approve with evidence</span><span>Manage lifecycle</span></div><div class="grid two"><section class="detail-card compact-form"><h3>Operate Staff</h3><div class="staff-command-row"><button class="secondary" id="awiaProvisionPilotStaff">Provision Pilot Staff</button><button class="secondary" id="awiaReadinessCheck" ${active.length ? "" : "disabled"}>Run Readiness Check</button></div><form id="awiaLifecycleForm"><label>Staff<select name="staff_code" required>${staffOptions}</select></label><label>Lifecycle<select name="to_state" required><option>ACTIVE</option><option>PAUSED</option><option>SUSPENDED</option><option>RETIRED</option><option>DRAFT</option></select></label><button type="submit" ${staff.length ? "" : "disabled"}>Update Lifecycle</button></form></section><section class="detail-card compact-form"><h3>Assign Work</h3><form id="awiaAssignTaskForm"><label>Active staff<select name="staff_code" required>${activeStaffOptions}</select></label><label>Task<select name="task_id" required>${taskOptions}</select></label><label>Tool<select name="tool" required>${awiaToolOptionsForStaffCode(active[0]?.staff_code)}</select></label><label>Evidence reference<input name="evidence_ref" required value="pilot-controlled-evidence-001" placeholder="evidence bundle id or reference" /></label><button type="submit" ${active.length && tasks.length ? "" : "disabled"}>Assign to Workdesk</button>${disabledHint(Boolean(active.length && tasks.length), "Provision and activate staff, then open a project task.")}</form><div class="staff-command-row"><button class="secondary" id="awiaProduceOutputDraft" ${workdesk.some((item) => item.workdesk_status === "ASSIGNED") ? "" : "disabled"}>Produce Draft</button><button class="secondary" id="awiaReviewOutputDraft" ${outputDrafts.some((item) => item.status === "DRAFT_REVIEW_REQUIRED") ? "" : "disabled"}>Human Review</button><button class="secondary" id="awiaPrepareClientDraft" ${outputReviews.some((item) => item.review_decision === "APPROVED_FOR_CLIENT_DRAFT") ? "" : "disabled"}>Prepare Client Draft</button></div></section></div><div class="record-table-wrap"><table class="record-table"><thead><tr><th>Staff</th><th>Lifecycle</th><th>Grade</th><th>Package</th><th>Salary plan</th><th>Readiness</th><th>Profile</th></tr></thead><tbody>${rows}</tbody></table></div><div class="grid two"><section class="detail-card"><h3>Staff Workdesk</h3>${workdeskRows}</section><section class="detail-card"><h3>Draft Review Loop</h3>${renderRelatedContext(
     "Client draft controls",
     [
       ["Staff outputs", outputDrafts.length],
@@ -3474,216 +3502,205 @@ function renderAfccStaffManagementExperience(store) {
     ],
   )}</section></div><pre class="output detail-output" id="afccStaffDetailBox">Select a virtual staff profile.</pre></section>`;
 }
-function bindAfccStaffControls(
-  store,
-  latestTenant,
-  latestFirm,
-  principalActor,
-) {
-  if (!latestTenant?.id || !latestFirm?.id) return;
-  const actor =
-    principalActor ?? systemActorForBrowser(latestTenant.id, latestFirm.id);
-  const staff = awiaStaffForStore(store);
-  const activeStaff = staff.filter(
-    (member) => member.lifecycle_status === "ACTIVE",
-  );
-  const workdesk = store.awia_staff_workdesk_items ?? [];
-  const outputDrafts = store.awia_staff_output_drafts ?? [];
-  const outputReviews = store.awia_staff_output_reviews ?? [];
-  const latestClient = latestRecord(store, "clients");
-  const latestProject = latestRecord(store, "projects");
-  const latestTask = latestRecord(store, "tasks");
-  const firstActiveStaff = () => activeStaff[0] ?? staff[0] ?? null;
-  const run = (label, control, success, action) =>
-    runUiCommand({
-      label,
-      button: control?.tagName === "FORM" ? null : control,
-      form: control?.tagName === "FORM" ? control : null,
-      success,
-      action,
-    });
-  document
-    .querySelector("#awiaProvisionPilotStaff")
-    ?.addEventListener("click", async (event) => {
-      await run(
-        "Provision AWIA pilot staff",
-        event.currentTarget,
-        "AWIA pilot staff provisioned",
-        async () => {
+let __afccDelegationBound = false;
+function bindAfccStaffControls(store, latestTenant, latestFirm, principalActor) {
+  // NOTE: this panel's HTML is fully rebuilt on every refresh() (renderAll -> renderRecordViews
+  // re-renders every module unconditionally, not just the visible one), which discards and
+  // recreates these form/button nodes. Binding directly to those nodes each time is fragile:
+  // any refresh that completes between bind and click leaves the click hitting a stale/detached
+  // node, and the click silently falls through to native form submission (a GET reload) instead
+  // of calling the API. Delegating once on the stable "#aiWorkforceView" container (only the
+  // container's innerHTML is replaced, never the container itself) and recomputing fresh context
+  // from the live store at the moment of the event fixes both the lost-listener bug and any
+  // staleness in the closured tenant/firm/staff/task values.
+  if (__afccDelegationBound) return;
+  const container = document.querySelector("#aiWorkforceView");
+  if (!container) return;
+  __afccDelegationBound = true;
+
+  function afccContext() {
+    const scopedStore = lastStore ? scopedStoreForActiveFirm(lastStore) : store;
+    const contract = activeWorkspaceContract(scopedStore);
+    const tenant = contract.tenant ?? latestTenant;
+    const firm = contract.firm ?? latestFirm;
+    const actor =
+      contract.principal ??
+      principalActor ??
+      systemActorForBrowser(tenant?.id, firm?.id);
+    const staff = awiaStaffForStore(scopedStore);
+    const activeStaff = staff.filter(
+      (member) => member.lifecycle_status === "ACTIVE",
+    );
+    return {
+      store: scopedStore,
+      tenant,
+      firm,
+      actor,
+      staff,
+      activeStaff,
+      workdesk: scopedStore.awia_staff_workdesk_items ?? [],
+      outputDrafts: scopedStore.awia_staff_output_drafts ?? [],
+      outputReviews: scopedStore.awia_staff_output_reviews ?? [],
+      latestClient: latestRecord(scopedStore, "clients"),
+      latestProject: latestRecord(scopedStore, "projects"),
+      latestTask: latestRecord(scopedStore, "tasks"),
+      firstActiveStaff() {
+        return activeStaff[0] ?? staff[0] ?? null;
+      },
+    };
+  }
+
+  function syncAssignToolOptions(assignForm) {
+    const staffSelect = assignForm.querySelector('select[name="staff_code"]');
+    const toolSelect = assignForm.querySelector('select[name="tool"]');
+    if (!staffSelect || !toolSelect) return;
+    const selectedOption = staffSelect.selectedOptions?.[0];
+    const staffCode = selectedOption?.value ?? staffSelect.value;
+    const previousTool = toolSelect.value;
+    toolSelect.innerHTML = awiaToolOptionsForStaffCode(staffCode);
+    if ([...toolSelect.options].some((option) => option.value === previousTool)) {
+      toolSelect.value = previousTool;
+    }
+  }
+
+  container.addEventListener("change", (event) => {
+    const staffSelect = event.target.closest(
+      '#awiaAssignTaskForm select[name="staff_code"]',
+    );
+    if (!staffSelect) return;
+    syncAssignToolOptions(staffSelect.closest("#awiaAssignTaskForm"));
+  });
+
+  container.addEventListener("click", async (event) => {
+    const provisionBtn = event.target.closest("#awiaProvisionPilotStaff");
+    if (provisionBtn) {
+      const ctx = afccContext();
+      await runUiCommand({
+        label: "Provision AWIA pilot staff",
+        button: provisionBtn,
+        success: "AWIA pilot staff provisioned",
+        action: async () => {
           const data = await request("/awia/virtual-staff/provision-pilot", {
             method: "POST",
             body: JSON.stringify({
-              tenant_id: latestTenant.id,
-              firm_id: latestFirm.id,
-              actor,
+              tenant_id: ctx.tenant.id,
+              firm_id: ctx.firm.id,
+              actor: ctx.actor,
             }),
           });
           await refresh();
           switchView("ai-workforce");
           return data;
         },
-      );
-    });
-  document
-    .querySelector("#awiaReadinessCheck")
-    ?.addEventListener("click", async (event) => {
-      const member = firstActiveStaff();
-      await run(
-        "Run AWIA staff readiness",
-        event.currentTarget,
-        "AWIA readiness decision recorded",
-        async () => {
+      });
+      return;
+    }
+    const readinessBtn = event.target.closest("#awiaReadinessCheck");
+    if (readinessBtn) {
+      const ctx = afccContext();
+      const member = ctx.firstActiveStaff();
+      await runUiCommand({
+        label: "Run AWIA staff readiness",
+        button: readinessBtn,
+        success: "AWIA readiness decision recorded",
+        action: async () => {
           const data = await request("/awia/virtual-staff/task-readiness", {
             method: "POST",
             body: JSON.stringify({
-              tenant_id: latestTenant.id,
-              firm_id: latestFirm.id,
+              tenant_id: ctx.tenant.id,
+              firm_id: ctx.firm.id,
               staff_code: member?.staff_code,
-              task_id: latestTask?.id ?? "controlled-pilot-task",
-              client_id: latestClient?.id ?? "controlled-pilot-client",
-              project_id: latestProject?.id,
-              actor,
+              task_id: ctx.latestTask?.id ?? "controlled-pilot-task",
+              client_id: ctx.latestClient?.id ?? "controlled-pilot-client",
+              project_id: ctx.latestProject?.id,
+              actor: ctx.actor,
             }),
           });
           await refresh();
           switchView("ai-workforce");
           return data;
         },
-      );
-    });
-  document
-    .querySelector("#awiaLifecycleForm")
-    ?.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      const fd = new FormData(event.currentTarget);
-      await run(
-        "Update AWIA staff lifecycle",
-        event.currentTarget,
-        "AWIA staff lifecycle updated",
-        async () => {
-          const data = await request("/awia/virtual-staff/lifecycle", {
-            method: "POST",
-            body: JSON.stringify({
-              tenant_id: latestTenant.id,
-              firm_id: latestFirm.id,
-              staff_code: fd.get("staff_code"),
-              to_state: fd.get("to_state"),
-              actor,
-            }),
-          });
-          await refresh();
-          switchView("ai-workforce");
-          return data;
-        },
-      );
-    });
-  document
-    .querySelector("#awiaAssignTaskForm")
-    ?.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      const fd = new FormData(event.currentTarget);
-      const task =
-        (store.tasks ?? []).find((item) => item.id === fd.get("task_id")) ??
-        latestTask;
-      await run(
-        "Assign AWIA staff task",
-        event.currentTarget,
-        "AWIA staff workdesk item assigned",
-        async () => {
-          const data = await request("/awia/virtual-staff/assign-task", {
-            method: "POST",
-            body: JSON.stringify({
-              tenant_id: latestTenant.id,
-              firm_id: latestFirm.id,
-              staff_code: fd.get("staff_code"),
-              task_id: fd.get("task_id"),
-              client_id: latestClient?.id ?? "controlled-pilot-client",
-              project_id: task?.project_id ?? latestProject?.id,
-              tool: fd.get("tool"),
-              actor,
-            }),
-          });
-          await refresh();
-          switchView("ai-workforce");
-          return data;
-        },
-      );
-    });
-  document
-    .querySelector("#awiaProduceOutputDraft")
-    ?.addEventListener("click", async (event) => {
+      });
+      return;
+    }
+    const produceBtn = event.target.closest("#awiaProduceOutputDraft");
+    if (produceBtn) {
+      const ctx = afccContext();
       const item =
-        workdesk.find((record) => record.workdesk_status === "ASSIGNED") ??
-        workdesk[0];
-      await run(
-        "Produce AWIA staff output draft",
-        event.currentTarget,
-        "AWIA output draft prepared for review",
-        async () => {
+        ctx.workdesk.find((record) => record.workdesk_status === "ASSIGNED") ??
+        ctx.workdesk[0];
+      await runUiCommand({
+        label: "Produce AWIA staff output draft",
+        button: produceBtn,
+        success: "AWIA output draft prepared for review",
+        action: async () => {
           const data = await request("/awia/virtual-staff/output-draft", {
             method: "POST",
             body: JSON.stringify({
-              tenant_id: latestTenant.id,
-              firm_id: latestFirm.id,
+              tenant_id: ctx.tenant.id,
+              firm_id: ctx.firm.id,
               workdesk_item_id: item?.id,
-              actor,
+              actor: ctx.actor,
             }),
           });
           await refresh();
           switchView("ai-workforce");
           return data;
         },
-      );
-    });
-  document
-    .querySelector("#awiaReviewOutputDraft")
-    ?.addEventListener("click", async (event) => {
+      });
+      return;
+    }
+    const reviewBtn = event.target.closest("#awiaReviewOutputDraft");
+    if (reviewBtn) {
+      const ctx = afccContext();
       const draft =
-        outputDrafts.find((item) => item.status === "DRAFT_REVIEW_REQUIRED") ??
-        outputDrafts[0];
-      await run(
-        "Review AWIA staff output draft",
-        event.currentTarget,
-        "AWIA output approved for client draft",
-        async () => {
+        ctx.outputDrafts.find(
+          (item) => item.status === "DRAFT_REVIEW_REQUIRED",
+        ) ?? ctx.outputDrafts[0];
+      await runUiCommand({
+        label: "Review AWIA staff output draft",
+        button: reviewBtn,
+        success: "AWIA output approved for client draft",
+        action: async () => {
           const data = await request("/awia/virtual-staff/output-review", {
             method: "POST",
             body: JSON.stringify({
-              tenant_id: latestTenant.id,
-              firm_id: latestFirm.id,
+              tenant_id: ctx.tenant.id,
+              firm_id: ctx.firm.id,
               output_draft_id: draft?.id,
               review_decision: "APPROVED_FOR_CLIENT_DRAFT",
-              actor,
+              actor: ctx.actor,
             }),
           });
           await refresh();
           switchView("ai-workforce");
           return data;
         },
-      );
-    });
-  document
-    .querySelector("#awiaPrepareClientDraft")
-    ?.addEventListener("click", async (event) => {
+      });
+      return;
+    }
+    const prepareBtn = event.target.closest("#awiaPrepareClientDraft");
+    if (prepareBtn) {
+      const ctx = afccContext();
       const review =
-        outputReviews.find(
+        ctx.outputReviews.find(
           (item) => item.review_decision === "APPROVED_FOR_CLIENT_DRAFT",
-        ) ?? outputReviews[0];
-      await run(
-        "Prepare AWIA client delivery draft",
-        event.currentTarget,
-        "AWIA client delivery draft prepared",
-        async () => {
+        ) ?? ctx.outputReviews[0];
+      await runUiCommand({
+        label: "Prepare AWIA client delivery draft",
+        button: prepareBtn,
+        success: "AWIA client delivery draft prepared",
+        action: async () => {
           const data = await request(
             "/awia/virtual-staff/client-delivery-draft",
             {
               method: "POST",
               body: JSON.stringify({
-                tenant_id: latestTenant.id,
-                firm_id: latestFirm.id,
+                tenant_id: ctx.tenant.id,
+                firm_id: ctx.firm.id,
                 output_review_id: review?.id,
-                client_id: latestClient?.id ?? "controlled-pilot-client",
-                actor,
+                client_id: ctx.latestClient?.id ?? "controlled-pilot-client",
+                actor: ctx.actor,
               }),
             },
           );
@@ -3691,30 +3708,99 @@ function bindAfccStaffControls(
           switchView("ai-workforce");
           return data;
         },
-      );
-    });
-  document
-    .querySelectorAll("button[data-afcc-staff-detail]")
-    .forEach((button) =>
-      button.addEventListener("click", () => {
-        const member = staff[Number(button.dataset.afccStaffDetail)];
-        if (!member) return;
-        document.querySelector("#afccStaffDetailBox").innerHTML =
-          renderHumanDetail(
-            member.name,
-            [
-              ["Staff code", member.staff_code],
-              ["Role", member.role],
-              ["Lifecycle", member.lifecycle_status],
-              ["Package", member.package_id],
-              ["Salary", member.monthly_salary],
-              ["Authority", member.authority],
-              ["Tools", (member.tools ?? []).join(", ")],
-            ],
-            member,
-          );
-      }),
-    );
+      });
+      return;
+    }
+    const detailBtn = event.target.closest("button[data-afcc-staff-detail]");
+    if (detailBtn) {
+      const ctx = afccContext();
+      const member = ctx.staff[Number(detailBtn.dataset.afccStaffDetail)];
+      if (!member) return;
+      const box = document.querySelector("#afccStaffDetailBox");
+      if (box) {
+        box.innerHTML = renderHumanDetail(
+          member.name,
+          [
+            ["Staff code", member.staff_code],
+            ["Role", member.role],
+            ["Lifecycle", member.lifecycle_status],
+            ["Package", member.package_id],
+            ["Salary", member.monthly_salary],
+            ["Authority", member.authority],
+            ["Tools", (member.tools ?? []).join(", ")],
+          ],
+          member,
+        );
+      }
+    }
+  });
+
+  container.addEventListener("submit", async (event) => {
+    const lifecycleForm = event.target.closest("#awiaLifecycleForm");
+    if (lifecycleForm) {
+      event.preventDefault();
+      const ctx = afccContext();
+      const fd = new FormData(lifecycleForm);
+      await runUiCommand({
+        label: "Update AWIA staff lifecycle",
+        form: lifecycleForm,
+        success: "AWIA staff lifecycle updated",
+        action: async () => {
+          const data = await request("/awia/virtual-staff/lifecycle", {
+            method: "POST",
+            body: JSON.stringify({
+              tenant_id: ctx.tenant.id,
+              firm_id: ctx.firm.id,
+              staff_code: fd.get("staff_code"),
+              to_state: fd.get("to_state"),
+              actor: ctx.actor,
+            }),
+          });
+          await refresh();
+          switchView("ai-workforce");
+          return data;
+        },
+      });
+      return;
+    }
+    const assignForm = event.target.closest("#awiaAssignTaskForm");
+    if (assignForm) {
+      event.preventDefault();
+      const ctx = afccContext();
+      const fd = new FormData(assignForm);
+      const task =
+        (ctx.store.tasks ?? []).find((item) => item.id === fd.get("task_id")) ??
+        ctx.latestTask;
+      await runUiCommand({
+        label: "Assign AWIA staff task",
+        form: assignForm,
+        success: "AWIA staff workdesk item assigned",
+        action: async () => {
+          const selectedTool = fd.get("tool");
+          const evidenceRef = (fd.get("evidence_ref") ?? "").toString().trim();
+          const data = await request("/awia/virtual-staff/assign-task", {
+            method: "POST",
+            body: JSON.stringify({
+              tenant_id: ctx.tenant.id,
+              firm_id: ctx.firm.id,
+              staff_code: fd.get("staff_code"),
+              task_id: fd.get("task_id"),
+              client_id: ctx.latestClient?.id ?? "controlled-pilot-client",
+              project_id: task?.project_id ?? ctx.latestProject?.id,
+              tool: selectedTool,
+              action: selectedTool,
+              evidence_refs: evidenceRef ? [evidenceRef] : [],
+              actor: ctx.actor,
+            }),
+          });
+          await refresh();
+          switchView("ai-workforce");
+          return data;
+        },
+      });
+      return;
+    }
+  });
 }
 function renderAiWorkforceModule(store) {
   const contract = activeWorkspaceContract(store);
