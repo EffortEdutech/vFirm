@@ -56,6 +56,7 @@ const workspaceCollections = [
   ["awia_staff_output_drafts", "/awia-staff-output-drafts"],
   ["awia_staff_output_reviews", "/awia-staff-output-reviews"],
   ["awia_client_delivery_drafts", "/awia-client-delivery-drafts"],
+  ["awia_firm_package_assignments", "/awia-firm-package-assignments"],
   ["task_outputs", "/task-outputs"],
   ["tool_invocations", "/tool-invocations"],
   ["marketplace_listings", "/marketplace-listings"],
@@ -3806,6 +3807,185 @@ function bindAfccStaffControls(store, latestTenant, latestFirm, principalActor) 
     }
   });
 }
+// "My Team" -- the business-owner-facing hire-a-worker screen. Built on the
+// same HireMe package-assignment and one-at-a-time hire-worker endpoints as
+// the rest of the AWIA backend, but presented as "run your business," not as
+// an internal operator console.
+const MY_TEAM_HIREABLE_ROLES = [
+  { role_code: "CFO", title: "Chief Finance Officer", blurb: "Prepares finance analysis and governance reviews for your approval." },
+  { role_code: "FAO", title: "Finance Administration Officer", blurb: "Prepares accounts payable and receivable work for your approval." },
+  { role_code: "SAO", title: "Sales & Customer Operations Officer", blurb: "Drafts sales opportunities, proposals, and client communication." },
+  { role_code: "OPO", title: "Operations & Project Delivery Officer", blurb: "Coordinates project delivery and prepares workload summaries." },
+  { role_code: "ARO", title: "Administration & Resources Officer", blurb: "Registers documents and prepares administrative deadlines." },
+];
+let __myTeamDelegationBound = false;
+function renderMyTeamModule(store) {
+  const contract = activeWorkspaceContract(store);
+  const firm = contract.firm;
+  const members = store.awia_virtual_staff_members ?? [];
+  const roleAssignments = store.awia_staff_role_assignments ?? [];
+  const readiness = store.awia_staff_task_readiness_records ?? [];
+  const assignment = (store.awia_firm_package_assignments ?? []).find(
+    (item) => item.firm_id === firm?.id,
+  );
+  const hiringEnabled = Boolean(assignment);
+
+  const teamRows = members
+    .map((member) => {
+      const roleAssignment = roleAssignments.find(
+        (item) => item.staff_code === member.agent_code,
+      );
+      const decisions = readiness.filter(
+        (item) => item.staff_code === member.agent_code,
+      );
+      const pendingApprovals = decisions.filter(
+        (item) => item.decision !== "ALLOW",
+      ).length;
+      const isDraft = member.lifecycle_status === "DRAFT";
+      const isActive = member.lifecycle_status === "ACTIVE";
+      return `<tr><td><strong>${escapeHtml(member.display_name ?? member.agent_code)}</strong><br><small>${escapeHtml(roleAssignment?.role_name ?? roleAssignment?.role_code ?? "Virtual worker")} &middot; ${escapeHtml(member.agent_code)}</small></td><td><span class="pill">${escapeHtml(member.lifecycle_status)}</span></td><td>${pendingApprovals ? `${pendingApprovals} waiting on you` : "None"}</td><td>${isDraft ? `<button class="secondary small" data-my-team-activate="${escapeHtml(member.agent_code)}">Start working</button>` : ""}${isActive ? `<button class="secondary small" data-my-team-pause="${escapeHtml(member.agent_code)}">Pause</button>` : ""}</td></tr>`;
+    })
+    .join("");
+  const teamTable = members.length
+    ? `<div class="record-table-wrap"><table class="record-table"><thead><tr><th>Worker</th><th>Status</th><th>Needs your approval</th><th></th></tr></thead><tbody>${teamRows}</tbody></table></div>`
+    : `<p class="empty">You haven't hired anyone yet. Choose a role below to hire your first virtual worker.</p>`;
+
+  const roleCards = MY_TEAM_HIREABLE_ROLES.map(
+    (role) =>
+      `<article class="my-team-role-card"><h3>${escapeHtml(role.title)}</h3><p>${escapeHtml(role.blurb)}</p><button class="primary" data-my-team-hire="${escapeHtml(role.role_code)}" ${hiringEnabled ? "" : "disabled"}>Hire a ${escapeHtml(role.role_code)}</button></article>`,
+  ).join("");
+
+  const setupBanner = hiringEnabled
+    ? `<div class="boundary-note"><strong>Hiring is set up</strong><span>You choose exactly who to hire for ${escapeHtml(firm?.name ?? "this firm")}. Every worker's output still needs your approval before it reaches a client.</span></div>`
+    : `<div class="boundary-note warning"><strong>Set up hiring first</strong><span>Turn on hiring for ${escapeHtml(firm?.name ?? "this firm")} before choosing a worker.</span></div><button class="primary" id="myTeamEnableHiring" ${firm ? "" : "disabled"}>Turn on hiring for this firm</button>`;
+
+  const host = document.querySelector("#myTeamView");
+  if (!host) return;
+  host.innerHTML = `<section class="panel"><div class="panel-heading"><h2>My Team</h2><p>Hire named virtual workers to run parts of ${escapeHtml(firm?.name ?? "your business")}. A human always approves their work before it goes out.</p></div>${setupBanner}</section><section class="panel"><div class="panel-heading"><h2>Hire a Worker</h2><p>Pick a role. You can hire more than one of the same role if you need to.</p></div><div class="my-team-role-grid">${roleCards}</div></section><section class="panel"><div class="panel-heading"><h2>Your Team</h2></div>${teamTable}</section>`;
+
+  bindMyTeamControls();
+}
+function bindMyTeamControls() {
+  if (__myTeamDelegationBound) return;
+  const container = document.querySelector("#myTeamView");
+  if (!container) return;
+  __myTeamDelegationBound = true;
+
+  function myTeamContext() {
+    const scopedStore = lastStore ? scopedStoreForActiveFirm(lastStore) : {};
+    const contract = activeWorkspaceContract(scopedStore);
+    return {
+      tenant: contract.tenant,
+      firm: contract.firm,
+      actor:
+        contract.principal ??
+        systemActorForBrowser(contract.tenant?.id, contract.firm?.id),
+    };
+  }
+
+  container.addEventListener("click", async (event) => {
+    const enableBtn = event.target.closest("#myTeamEnableHiring");
+    if (enableBtn) {
+      const ctx = myTeamContext();
+      await runUiCommand({
+        label: "Turn on hiring",
+        button: enableBtn,
+        success: "Hiring is set up for this firm",
+        action: async () => {
+          const data = await request("/ops/awia-package-assignment", {
+            method: "POST",
+            body: JSON.stringify({
+              tenant_id: ctx.tenant.id,
+              firm_id: ctx.firm.id,
+              package_code: "HIRE_ME",
+              actor: ctx.actor,
+            }),
+          });
+          await refresh();
+          switchView("my-team");
+          return data;
+        },
+      });
+      return;
+    }
+    const hireBtn = event.target.closest("[data-my-team-hire]");
+    if (hireBtn) {
+      const roleCode = hireBtn.dataset.myTeamHire;
+      const ctx = myTeamContext();
+      await runUiCommand({
+        label: `Hire a ${roleCode}`,
+        button: hireBtn,
+        success: `Hired a new ${roleCode}`,
+        action: async () => {
+          const data = await request("/awia/virtual-staff/hire-worker", {
+            method: "POST",
+            body: JSON.stringify({
+              tenant_id: ctx.tenant.id,
+              firm_id: ctx.firm.id,
+              role_code: roleCode,
+              actor: ctx.actor,
+            }),
+          });
+          await refresh();
+          switchView("my-team");
+          return data;
+        },
+      });
+      return;
+    }
+    const activateBtn = event.target.closest("[data-my-team-activate]");
+    if (activateBtn) {
+      const staffCode = activateBtn.dataset.myTeamActivate;
+      const ctx = myTeamContext();
+      await runUiCommand({
+        label: `Have ${staffCode} start working`,
+        button: activateBtn,
+        success: `${staffCode} is now active`,
+        action: async () => {
+          const data = await request("/awia/virtual-staff/lifecycle", {
+            method: "POST",
+            body: JSON.stringify({
+              tenant_id: ctx.tenant.id,
+              firm_id: ctx.firm.id,
+              staff_code: staffCode,
+              to_state: "ACTIVE",
+              actor: ctx.actor,
+            }),
+          });
+          await refresh();
+          switchView("my-team");
+          return data;
+        },
+      });
+      return;
+    }
+    const pauseBtn = event.target.closest("[data-my-team-pause]");
+    if (pauseBtn) {
+      const staffCode = pauseBtn.dataset.myTeamPause;
+      const ctx = myTeamContext();
+      await runUiCommand({
+        label: `Pause ${staffCode}`,
+        button: pauseBtn,
+        success: `${staffCode} is paused`,
+        action: async () => {
+          const data = await request("/awia/virtual-staff/lifecycle", {
+            method: "POST",
+            body: JSON.stringify({
+              tenant_id: ctx.tenant.id,
+              firm_id: ctx.firm.id,
+              staff_code: staffCode,
+              to_state: "PAUSED",
+              actor: ctx.actor,
+            }),
+          });
+          await refresh();
+          switchView("my-team");
+          return data;
+        },
+      });
+    }
+  });
+}
 function renderAiWorkforceModule(store) {
   const contract = activeWorkspaceContract(store);
   const allowedTemplateCodes = workerTemplateCodesForContract(contract);
@@ -6454,6 +6634,7 @@ function safeRenderModule(target, title, renderer, store) {
 }
 function renderRecordViews(store) {
   safeRenderModule("#myFirmView", "My Firm", renderMyFirmModule, store);
+  safeRenderModule("#myTeamView", "My Team", renderMyTeamModule, store);
   safeRenderModule("#clientsView", "Clients", renderClientModule, store);
   safeRenderModule("#intakeView", "Intake", renderIntakeModule, store);
   safeRenderModule(

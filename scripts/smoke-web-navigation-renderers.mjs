@@ -62,7 +62,7 @@ for (const renderer of requiredRenderers) {
   assert(renderRecordViewsBody.includes(`safeRenderModule(`), "renderRecordViews must use safeRenderModule guards.");
   assert(!renderRecordViewsBody.includes(`${renderer}(store);`), `Unsafe direct renderer call found in renderRecordViews: ${renderer}(store);`);
 }
-assert(renderRecordViewsBody.includes('safeRenderModule("#auditView", "Audit"') && renderRecordViewsBody.includes('renderAuditModule'), "Audit view must be guarded by safeRenderModule.");
+assert(/safeRenderModule\(\s*"#auditView"\s*,\s*"Audit"/.test(renderRecordViewsBody) && renderRecordViewsBody.includes('renderAuditModule'), "Audit view must be guarded by safeRenderModule.");
 assert(!app.includes("renderFrontDeskModule is not defined"), "Debug text leaked into app source.");
 assert(!app.includes("personName is not defined"), "Debug text leaked into app source.");
 
@@ -150,6 +150,26 @@ const nhlQ5Markers = [
 for (const marker of nhlQ5Markers) {
   assert(app.includes(marker), `NHL-Q5 quotation operations UI marker missing: ${marker}`);
 }
+
+const myTeamMarkers = [
+  'data-view="my-team"',
+  'id="view-my-team"',
+  'id="myTeamView"',
+  "function renderMyTeamModule(",
+  "function bindMyTeamControls(",
+  "data-my-team-hire",
+  "data-my-team-activate",
+  "data-my-team-pause",
+  "myTeamEnableHiring",
+  "/ops/awia-package-assignment",
+  "/awia/virtual-staff/hire-worker",
+  "my-team-role-grid"
+];
+for (const marker of myTeamMarkers) {
+  assert(html.includes(marker) || app.includes(marker), `My Team hire-a-worker UI marker missing: ${marker}`);
+}
+assert(css.includes(".my-team-role-grid"), "My Team role grid CSS missing.");
+assert(new RegExp(`safeRenderModule\\(\\s*"#myTeamView"`).test(app), "My Team view must be guarded by safeRenderModule.");
 
 console.log(JSON.stringify({
   smoke: "web-navigation-renderers",

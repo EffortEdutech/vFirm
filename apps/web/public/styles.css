@@ -679,3 +679,10 @@ body.sidebar-open .sidebar-scrim {
   gap: 10px;
   margin: 12px 0;
 }
+
+/* My Team (business-owner hire-a-worker screen) */
+.my-team-role-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-top: 10px; }
+.my-team-role-card { border: 1px solid var(--line); border-radius: 16px; background: white; padding: 16px; display: grid; gap: 10px; align-content: start; }
+.my-team-role-card h3 { margin: 0; font-size: 15px; }
+.my-team-role-card p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.4; }
+@media (max-width: 560px) { .my-team-role-grid { grid-template-columns: 1fr; } }
