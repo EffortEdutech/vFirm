@@ -1984,9 +1984,37 @@ async function readAwiaStagingReadiness() {
   if (!postgresSchemaHasAwiaTables) {
     findings.push({ code: "AWIA_POSTGRES_SCHEMA_MISSING", severity: "BLOCKER", detail: "No awia_* table is defined in infra/database/schema.sql or infra/database/migrations/*.sql. AWIA persistence currently only works under VFIRM_STORE_BACKEND=json." });
   }
-  findings.push({ code: "AWIA_RECORD_IDS_NOT_BACKEND_AWARE", severity: "BLOCKER", detail: 'AWIA store functions call newId(prefix) unconditionally (prefixed non-uuid strings) instead of the isPostgresStore()-aware id scheme used elsewhere in store.mjs (see newUuid() and the existing storeBackend-postgres-ternary pattern). These ids would not satisfy uuid-typed Postgres columns even once a schema exists.' });
 
-  const currentBackend = process.env.VFIRM_STORE_BACKEND ?? "json";
+  // Phase B (TD-009) live check, replacing the old unconditional finding: read this file's own
+  // sibling store.mjs source and confirm none of the ten call sites that used to generate AWIA
+  // record ids via an unconditional newId(prefix) still do -- see
+  // infra/database/migrations/0024_awia_virtual_staff_persistence.sql and the
+  // deterministicUuid()/AWIA_RELATIONAL_TABLES additions in store.mjs for the fix itself.
+  let storeSourceText = "";
+  try {
+    storeSourceText = await readFile(join(process.cwd(), "apps/api/src/store.mjs"), "utf8");
+  } catch {
+    findings.push({ code: "STORE_SOURCE_UNREADABLE", severity: "WARN" });
+  }
+  const unguardedAwiaIdPatterns = [
+    'request_id: body.request_id ?? newId("awia_runtime_request")',
+    'request_id: body.readiness_request_id ?? newId("awia_runtime_request")',
+    'id: body.workdesk_item_id ?? newId("awia_workdesk")',
+    'id: body.output_draft_id ?? newId("awia_output_draft")',
+    'id: body.review_id ?? newId("awia_output_review")',
+    'id: body.client_delivery_draft_id ?? newId("awia_client_delivery_draft")',
+    'memory_entry_id: body.memory_entry_id ?? newId("awia_staff_memory_entry")',
+    'thread_id: body.thread_id ?? newId("awia_staff_conversation_thread")',
+    'message_id: body.message_id ?? newId("awia_staff_conversation_message")',
+    'id: newId("awia_seat_billing_event")'
+  ];
+  const remainingUnguardedAwiaIds = storeSourceText ? unguardedAwiaIdPatterns.filter((pattern) => storeSourceText.includes(pattern)) : unguardedAwiaIdPatterns;
+  const awiaRecordIdsBackendAware = storeSourceText.length > 0 && remainingUnguardedAwiaIds.length === 0;
+  if (!awiaRecordIdsBackendAware) {
+    findings.push({ code: "AWIA_RECORD_IDS_NOT_BACKEND_AWARE", severity: "BLOCKER", detail: `AWIA store functions still call newId(prefix) unconditionally at ${remainingUnguardedAwiaIds.length || "an unknown number of"} call site(s) instead of the isPostgresStore()-aware id scheme used elsewhere in store.mjs.` });
+  }
+
+  const currentBackend = getStoreInfo().backend;
   const blockers = findings.filter((finding) => finding.severity === "BLOCKER");
 
   return {
@@ -1995,13 +2023,16 @@ async function readAwiaStagingReadiness() {
     checked_at: now(),
     current_backend: currentBackend,
     postgres_schema_has_awia_tables: postgresSchemaHasAwiaTables,
+    awia_record_ids_backend_aware: awiaRecordIdsBackendAware,
     findings,
-    required_before_staging: [
-      "Add infra/database/migrations/NNNN_awia_virtual_staff_persistence.sql covering all 16 awia_* collections, with uuid-typed primary keys and tenant/firm foreign keys matching the existing schema convention.",
+    required_before_staging: blockers.length > 0 ? [
+      "Add infra/database/migrations/NNNN_awia_virtual_staff_persistence.sql covering all 17 awia_* collections, with uuid-typed primary keys and tenant/firm foreign keys matching the existing schema convention.",
       'Update every AWIA store.mjs function to generate ids via the existing isPostgresStore()-aware pattern instead of an unconditional newId(prefix).',
       "Run npm run check:db:postgres and the full check:awia:* suite against a live staging Postgres instance before any staging cutover.",
       "Re-run npm run check:awia:acceptance-lock against the staging backend and re-confirm AWIA_CONTROLLED_LOCAL_PILOT_READY still holds on that backend.",
       "Set the standard staging environment variables already required by /ops/staging-package (DATABASE_URL, VFIRM_AUTH_PROVIDER, VFIRM_ALLOWED_ORIGINS, VFIRM_BACKUP_POLICY, VFIRM_RELEASE_CHANNEL)."
+    ] : [
+      "Set the standard staging environment variables already required by /ops/staging-package (DATABASE_URL, VFIRM_AUTH_PROVIDER, VFIRM_ALLOWED_ORIGINS, VFIRM_BACKUP_POLICY, VFIRM_RELEASE_CHANNEL) for the target staging environment."
     ],
     preflight_commands: [
       "npm run check:awia:acceptance-lock",

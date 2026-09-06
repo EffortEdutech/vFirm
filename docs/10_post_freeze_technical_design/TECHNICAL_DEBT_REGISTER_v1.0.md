@@ -149,7 +149,7 @@ Target stage: 3
 
 ## TD-009 — AWIA Virtual Staff Not Yet Postgres/Staging Ready
 
-Status: CODE COMPLETE, AWAITING LIVE POSTGRES VERIFICATION (Phase B, 2026-09-05)
+Status: CLOSED (Phase B, 2026-09-06 -- verified live against a real Postgres backend)
 
 AWIA virtual staff (provisioning, lifecycle, memory, conversation, seat billing, department dashboards, multi-firm templates) previously only persisted correctly under `VFIRM_STORE_BACKEND=json`. Two concrete gaps blocked staging cutover:
 
@@ -164,9 +164,10 @@ Resolution implemented (Phase B):
 - `stripRelationalCollections` now strips the 17 `awia_*` collections from the JSONB `app_state` blob (superseding the Phase A stopgap that kept them there), and `savePostgresStore`/`loadPostgresStore` write/read them through the new tables via `persistAwiaVirtualStaffFromStore` / `readAwiaVirtualStaffRelational`.
 - Full `check:awia:*` smoke suite re-run against the JSON backend: 11 of 13 pass; the 2 failures (`check:awia:vs:s2`, `check:awia:vs:s5`) reproduce identically on the pre-Phase-B commit (verified via `git stash`), so they are pre-existing and unrelated to this change, not regressions.
 
-Outstanding before this can close:
+Live verification (2026-09-06): the developer applied migration 0024 with `npm run db:migrate:docker` (17 tables + 34 indexes created) and restarted the dev server onto the Postgres backend. Live-driven through the running API (not a script) against the Amanah Formwork Pilot Firm:
 
-- Live verification against a running Postgres instance (`npm run db:migrate:docker` to apply migration 0024, then re-run `check:awia:*` and a pilot-day-style live UI pass with `VFIRM_STORE_BACKEND` resolved to `postgres`) has not yet been done — the coding agent's sandbox has no network path to the developer's local Postgres container, so this step needs to be run on the developer's machine.
-- Once verified, flip `GET /awia/virtual-staff/staging-readiness` (`AWIA_STAGING_PREPARATION_COMPLETION_v1.0.md`) from `NOT_READY_FOR_STAGING_BACKEND_MIGRATION_REQUIRED` and close this entry.
+- `GET /awia/virtual-staff/staging-readiness` now returns `current_backend: "postgres"`, `postgres_schema_has_awia_tables: true`, `awia_record_ids_backend_aware: true`, zero findings, and `recommendation: "READY_FOR_STAGING_CUTOVER_REHEARSAL"` — flipped from `NOT_READY_FOR_STAGING_BACKEND_MIGRATION_REQUIRED` as required. (This readiness check itself had a second, separate bug found and fixed in the same pass: it previously reported a hardcoded `AWIA_RECORD_IDS_NOT_BACKEND_AWARE` finding unconditionally and read `current_backend` from an unset env var instead of the resolved store backend — both replaced with real checks in `apps/api/src/server.mjs`.)
+- A full provision -> activate -> assign -> produce -> review -> prepare-client-draft cycle run against Postgres produced real relational rows in the new `awia_*` tables (e.g. a workdesk item and output draft both landed with genuine random UUIDs, not prefixed strings) and, critically, real `audit_events`/`event_log` rows for all 5 runtime event types (`lifecycle_updated`, `task_assigned`, `output_drafted`, `output_reviewed`, `client_delivery_draft_prepared`) — the exact entries Phase A found silently missing. `final_issue_allowed: false` held throughout, as required.
+- One caveat surfaced during this verification, worth recording: the audit/event write also requires the calling actor's `actor_id` to be a real UUID from the `actors` table (`actor_id uuid not null references actors(id)`) — an initial verification pass using a placeholder dev actor id correctly produced zero AWIA audit rows for that reason, not because of an AWIA-specific defect. The real pilot-day UI already resolves a real actor (`contract.principal`) via `afccContext()` in `apps/web/public/app.js`, so this does not affect the actual application flow; it only affects hand-written API calls that skip the UI's actor resolution.
 
-Target sprint: AWIA staging cutover sprint (Phase B of `VFIRM_AWIA_HIRE_A_VIRTUAL_WORKER_UNIFIED_SPRINT_PLAN_AND_CHECKLIST_v1.0.md`).
+Target sprint: closed. Superseded by Phase C (`OP_H1_TO_H6_CONTROLLED_MULTI_FIRM_PILOT_OPERATIONS_SPRINT_PLAN_v1.0.md`) and Phase D (`VFIRM_RELEASE_4_PRODUCT_TARGET_AND_SPRINT_PLAN_v1.0.md`) in `VFIRM_AWIA_HIRE_A_VIRTUAL_WORKER_UNIFIED_SPRINT_PLAN_AND_CHECKLIST_v1.0.md`.
