@@ -212,6 +212,21 @@ try {
   const issuedDeliverable = await post("/deliverables/issue", { tenant_id: formwork.tenant_id, firm_id: formwork.id, project_id: projectOpen.project.id, document_version_id: deliverableDraft.document_version.id, evidence_bundle_id: evidence.id, approval_id: humanReview.approval.id, subject_version_or_hash: deliverableDraft.document_version.hash }, h);
   assert.equal(issuedDeliverable.document_version.status, "ISSUED");
 
+  // AWIA virtual staff daily workload rehearsal (Phase C AWIA-in-daily-workload extension).
+  const awiaProvision = await post("/awia/virtual-staff/provision-pilot", { tenant_id: formwork.tenant_id, firm_id: formwork.id }, h);
+  assert(awiaProvision.provisioning_run.members.length > 0, "OP-H3 AWIA provisioning must create staff members.");
+  await post("/awia/virtual-staff/lifecycle", { tenant_id: formwork.tenant_id, firm_id: formwork.id, staff_code: "OPO-001", to_state: "ACTIVE" }, h);
+  const awiaAssign = await post("/awia/virtual-staff/assign-task", { tenant_id: formwork.tenant_id, firm_id: formwork.id, staff_code: "OPO-001", task_id: projectOpen.task.id, action: "project.delivery.coordinate", tool: "project.delivery.coordinate", client_id: "op-h3-controlled-client", project_id: projectOpen.project.id, evidence_refs: ["op-h3-controlled-evidence"] }, h);
+  assert.equal(awiaAssign.workdesk_item.workdesk_status, "ASSIGNED");
+  const awiaDraft = await post("/awia/virtual-staff/output-draft", { tenant_id: formwork.tenant_id, firm_id: formwork.id, workdesk_item_id: awiaAssign.workdesk_item.id, output_title: "OP-H3 Formwork delivery coordination note" }, h);
+  assert.equal(awiaDraft.output_draft.final_issue_allowed, false, "AWIA Formwork draft output must never carry final issue authority.");
+  const awiaReview = await post("/awia/virtual-staff/output-review", { tenant_id: formwork.tenant_id, firm_id: formwork.id, output_draft_id: awiaDraft.output_draft.id, review_decision: "APPROVED_FOR_CLIENT_DRAFT", review_notes: "Virtual Principal reviewed the OP-H3 AWIA coordination note." }, h);
+  assert.equal(awiaReview.output_review.review_decision, "APPROVED_FOR_CLIENT_DRAFT");
+  const awiaClientDraft = await post("/awia/virtual-staff/client-delivery-draft", { tenant_id: formwork.tenant_id, firm_id: formwork.id, output_draft_id: awiaDraft.output_draft.id, client_id: "op-h3-controlled-client" }, h);
+  assert.equal(awiaClientDraft.client_delivery_draft.final_issue_allowed, false, "AWIA Formwork client delivery draft must never carry final issue authority.");
+  const awiaAssignDeniedForNhl = await request("/awia/virtual-staff/assign-task", { method: "POST", headers: authHeaders(initialStore, nhl), body: { tenant_id: nhl.tenant_id, firm_id: nhl.id, staff_code: "OPO-001", task_id: projectOpen.task.id, tool: "project.delivery.coordinate", client_id: "op-h3-controlled-client", project_id: projectOpen.project.id } });
+  assert(awiaAssignDeniedForNhl.response.status >= 400, "NHL must not be able to assign Formwork's AWIA staff or task.");
+
   const today = await get(`/operations/today?tenant_id=${formwork.tenant_id}&firm_id=${formwork.id}`, h);
   assert(today.counts.ready_delivery_packages >= 1, "Today view must show ready Formwork delivery package.");
   assert(today.counts.audit_events >= 1, "Today view must include audit count.");
@@ -219,13 +234,13 @@ try {
 
   const events = await get(`/event-log?tenant_id=${formwork.tenant_id}&firm_id=${formwork.id}`, h);
   const types = eventTypes(events);
-  for (const eventType of ["front_desk.enquiry_captured", "proposal.accepted", "technical.drawing_revisions_checked", "technical.qa_finding_raised", "technical.delivery_package_blocked", "technical.qa_finding_resolved", "technical.delivery_package_ready_for_principal_review", "deliverable.review_approved", "deliverable.issued"]) {
+  for (const eventType of ["front_desk.enquiry_captured", "proposal.accepted", "technical.drawing_revisions_checked", "technical.qa_finding_raised", "technical.delivery_package_blocked", "technical.qa_finding_resolved", "technical.delivery_package_ready_for_principal_review", "deliverable.review_approved", "deliverable.issued", "awia.virtual_staff.provisioned", "awia.virtual_staff.lifecycle_updated", "awia.virtual_staff.task_assigned", "awia.virtual_staff.output_drafted", "awia.virtual_staff.output_reviewed", "awia.virtual_staff.client_delivery_draft_prepared"]) {
     assert(types.has(eventType), `Missing Formwork pilot-day event: ${eventType}`);
   }
   const audit = await get(`/audit-events?tenant_id=${formwork.tenant_id}&firm_id=${formwork.id}`, h);
   assert(audit.length >= events.length, "Audit records should reconstruct material Formwork actions.");
   const exported = await get(`/data-protection/export-package?tenant_id=${formwork.tenant_id}&firm_id=${formwork.id}`, h);
-  for (const key of ["clients", "projects", "documents", "document_versions", "evidence_bundles", "drawing_review_records", "technical_qa_findings", "delivery_package_records", "event_log", "audit_events"]) {
+  for (const key of ["clients", "projects", "documents", "document_versions", "evidence_bundles", "drawing_review_records", "technical_qa_findings", "delivery_package_records", "awia_virtual_staff_members", "awia_staff_workdesk_items", "awia_staff_output_drafts", "awia_staff_output_reviews", "awia_client_delivery_drafts", "event_log", "audit_events"]) {
     assert(exported.counts[key] >= 1, `Formwork export missing ${key}.`);
   }
   assert.equal(exported.tenant_id, formwork.tenant_id, "Export tenant scope mismatch.");
@@ -241,9 +256,10 @@ try {
     firm: formwork.name,
     tenant: formworkSummary.tenant.name,
     fixture: "Formwork pilot-day fixture",
-    scenario: ["client_enquiry_intake", "project_opened", "drawing_review", "qa_issue", "blocked_delivery_package", "human_professional_review", "controlled_issue", "audit_reconstruction", "firm_scoped_export"],
-    denials: ["ai_qa_resolution_denied", "issue_before_approval_denied", "ai_deliverable_review_denied", "nhl_cross_firm_technical_access_denied"],
+    scenario: ["client_enquiry_intake", "project_opened", "drawing_review", "qa_issue", "blocked_delivery_package", "human_professional_review", "controlled_issue", "audit_reconstruction", "firm_scoped_export", "awia_virtual_staff_daily_workload"],
+    denials: ["ai_qa_resolution_denied", "issue_before_approval_denied", "ai_deliverable_review_denied", "nhl_cross_firm_technical_access_denied", "nhl_cross_tenant_awia_assign_denied"],
     evidence: { events: events.length, audit_events: audit.length, export_counts: exported.counts },
+    awia_daily_workload: { staff_code: "OPO-001", workdesk_item_id: awiaAssign.workdesk_item.id, output_draft_id: awiaDraft.output_draft.id, client_delivery_draft_id: awiaClientDraft.client_delivery_draft.id, final_issue_allowed: false },
     next_active_sprint: "OP-H4 - NHL Global Solution Pilot Day Rehearsal"
   }, null, 2));
 } finally {

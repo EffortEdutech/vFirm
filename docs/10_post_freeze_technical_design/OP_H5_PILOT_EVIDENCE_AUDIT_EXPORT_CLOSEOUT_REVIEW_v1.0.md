@@ -210,3 +210,10 @@ OP-H5 does not authorize:
 ## 13. Next active sprint
 
 `OP-H6 - Controlled Multi-Firm Pilot Operations Acceptance Gate`
+
+
+## Addendum (Phase C AWIA-in-daily-workload extension, 2026-09-06)
+
+OP-H3 and OP-H4 now rehearse an AWIA virtual staff member inside each firm's controlled pilot day (see their respective addenda). The firm-scoped evidence pack and export package used by this closeout now include the 17 `awia_*` collections, tenant/firm-scoped, for both Amanah Formwork Pilot Firm and NHL Global Solution. The `organization_id`-vs-`tenant_id` field-name difference used by `awia_virtual_staff_members` no longer bypasses tenant scoping in the export path.
+
+Re-running the OP-H3 -> OP-H4 -> OP-H5 chain (`npm run check:op:h5`) confirms this holds without introducing any new blocker: current blocker count remains `0`.

@@ -130,3 +130,10 @@ If OP-H6 is accepted, the recommended next development scope is not automatic im
 5. pause implementation and run the controlled pilot manually.
 
 The safest next technical improvement is service-specific evidence validator split, because OP-H4/OP-H5 recorded that the current deliverable-review gate still carries inherited reference-vertical evidence validator keys.
+
+
+## Addendum (Phase C AWIA-in-daily-workload extension, 2026-09-06)
+
+Before this addendum, OP-H1 through OP-H5 evidence (2026-09-03) predated AWIA virtual staff and covered only a human-only pilot day for both firms, even though the unified AWIA sprint plan's Phase C objective requires day-to-day operation "including AWIA virtual staff in the daily workload." OP-H3 and OP-H4 were extended so each firm's controlled pilot-day rehearsal now genuinely assigns a task to an AWIA virtual staff member, produces a draft-only output, routes it through human review, and prepares a client delivery draft without final-issue authority -- and the tenant/firm-scoped evidence/export package now includes AWIA staff records for both firms. This gate's technical recommendation is unchanged (`GO_FOR_CONTROLLED_MULTI_FIRM_PILOT_OPERATIONS_ACCEPTANCE`); the pilot day it now describes includes AWIA in the daily workload as the unified plan requires.
+
+Gate status remains `Pending Product-Owner Decision` until the product owner records Option A, B, C, or D below.

@@ -147,3 +147,10 @@ This evidence pack does not authorize:
 The OP evidence pack is ready for the OP-H6 Controlled Multi-Firm Pilot Operations Acceptance Gate.
 
 Recommended decision: product owner may accept controlled local/private pilot operations readiness with the listed limitations, or hold/reject if additional evidence is required.
+
+
+## Addendum (Phase C AWIA-in-daily-workload extension, 2026-09-06)
+
+The unified AWIA sprint plan's Phase C objective explicitly requires day-to-day operation "including AWIA virtual staff in the daily workload." This evidence pack originally rehearsed OP-H1 through OP-H5 (2026-09-03) before AWIA virtual staff existed in the codebase, so the pilot-day rehearsals it evidences were human-only.
+
+OP-H3 (Formwork) and OP-H4 (NHL) were each extended to also rehearse one AWIA virtual staff member performing a real task inside that firm's controlled pilot day, with human review and draft-only client delivery preserved (`final_issue_allowed: false` at every stage), and the firm-scoped evidence/export package was extended to include AWIA staff records. See the OP-H3, OP-H4, and OP-H5 addenda for the specifics. Technical recommendation and blocker count are unchanged (`GO_FOR_CONTROLLED_MULTI_FIRM_PILOT_OPERATIONS_ACCEPTANCE_REVIEW`, `0` blockers), now on a pilot day that genuinely includes AWIA.

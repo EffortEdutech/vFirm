@@ -160,3 +160,12 @@ OP-H4 does not authorize:
 ## 11. Next active sprint
 
 `OP-H5 - Pilot Evidence, Audit, Export, and Closeout Review`
+
+
+## Addendum (Phase C AWIA-in-daily-workload extension, 2026-09-06)
+
+Matching the OP-H3 addendum, `scripts/smoke-op-h4-nhl-global-solution-pilot-day-rehearsal.mjs` was extended to rehearse an AWIA virtual staff member (`ARO-001`, Administration/Records role) inside the same controlled NHL pilot day: pilot staff provisioning, lifecycle activation, task assignment to the pilot-day project task, draft-only BizKick EDCS register output, human review, and client delivery draft preparation, with `final_issue_allowed: false` verified throughout. A negative check confirms Formwork's principal cannot read NHL's AWIA workdesk items (cross-tenant denial).
+
+The same tenant/firm-scoped export fix described in the OP-H3 addendum applies here: NHL's AWIA staff, workdesk, output-draft, output-review, and client-delivery-draft records are now included in `/data-protection/export-package` and remain correctly scoped to the NHL tenant/firm.
+
+Evidence: re-run `npm run check:op:h4` (passes with `awia_daily_workload` present in the JSON evidence output).

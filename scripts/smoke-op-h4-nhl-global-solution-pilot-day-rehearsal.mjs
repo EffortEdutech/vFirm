@@ -390,6 +390,21 @@ try {
   assert.equal(receivableDraft.status, "DRAFT_REVIEW_REQUIRED");
   assert.equal(receivableDraft.sent_at, null);
 
+  // AWIA virtual staff daily workload rehearsal (Phase C AWIA-in-daily-workload extension).
+  const awiaProvision = await post("/awia/virtual-staff/provision-pilot", { tenant_id: nhl.tenant_id, firm_id: nhl.id }, h);
+  assert(awiaProvision.provisioning_run.members.length > 0, "OP-H4 AWIA provisioning must create staff members.");
+  await post("/awia/virtual-staff/lifecycle", { tenant_id: nhl.tenant_id, firm_id: nhl.id, staff_code: "ARO-001", to_state: "ACTIVE" }, h);
+  const awiaAssign = await post("/awia/virtual-staff/assign-task", { tenant_id: nhl.tenant_id, firm_id: nhl.id, staff_code: "ARO-001", task_id: accepted.task.id, action: "administration.document.register", tool: "administration.document.register", client_id: "op-h4-controlled-client", project_id: accepted.project.id, evidence_refs: ["op-h4-controlled-evidence"] }, h);
+  assert.equal(awiaAssign.workdesk_item.workdesk_status, "ASSIGNED");
+  const awiaDraft = await post("/awia/virtual-staff/output-draft", { tenant_id: nhl.tenant_id, firm_id: nhl.id, workdesk_item_id: awiaAssign.workdesk_item.id, output_title: "OP-H4 NHL BizKick EDCS register draft" }, h);
+  assert.equal(awiaDraft.output_draft.final_issue_allowed, false, "AWIA NHL draft output must never carry final issue authority.");
+  const awiaReview = await post("/awia/virtual-staff/output-review", { tenant_id: nhl.tenant_id, firm_id: nhl.id, output_draft_id: awiaDraft.output_draft.id, review_decision: "APPROVED_FOR_CLIENT_DRAFT", review_notes: "Virtual Principal reviewed the OP-H4 AWIA EDCS register note." }, h);
+  assert.equal(awiaReview.output_review.review_decision, "APPROVED_FOR_CLIENT_DRAFT");
+  const awiaClientDraft = await post("/awia/virtual-staff/client-delivery-draft", { tenant_id: nhl.tenant_id, firm_id: nhl.id, output_draft_id: awiaDraft.output_draft.id, client_id: "op-h4-controlled-client" }, h);
+  assert.equal(awiaClientDraft.client_delivery_draft.final_issue_allowed, false, "AWIA NHL client delivery draft must never carry final issue authority.");
+  const awiaExportDeniedForFormwork = await request(`/awia-staff-workdesk-items?tenant_id=${nhl.tenant_id}&firm_id=${nhl.id}`, { headers: authHeaders(initialStore, formwork) });
+  assert(awiaExportDeniedForFormwork.response.status >= 400 || (awiaExportDeniedForFormwork.json.data ?? []).length === 0, "Formwork must not read NHL's AWIA workdesk items.");
+
   const today = await get(`/operations/today?tenant_id=${nhl.tenant_id}&firm_id=${nhl.id}`, h);
   assert(today.counts.pending_approvals >= 1, "NHL Today view must show pending human review/draft approvals.");
   assert(today.cash.outstanding >= 3500, "NHL Today view must show deterministic receivables/cash position.");
@@ -398,13 +413,13 @@ try {
 
   const events = await get(`/event-log?tenant_id=${nhl.tenant_id}&firm_id=${nhl.id}`, h);
   const types = eventTypes(events);
-  for (const eventType of ["front_desk.enquiry_captured", "front_desk.communication_drafted", "approval.granted", "proposal.dispatched", "proposal.accepted", "administration.correspondence_registered", "administration.document_registered", "task.assigned_to_worker", "tool.invocation_requested", "task.output_produced", "evidence_bundle.created", "deliverable.review_approved", "deliverable.issued", "invoice.issued", "accounts.receivable_follow_up_drafted"]) {
+  for (const eventType of ["front_desk.enquiry_captured", "front_desk.communication_drafted", "approval.granted", "proposal.dispatched", "proposal.accepted", "administration.correspondence_registered", "administration.document_registered", "task.assigned_to_worker", "tool.invocation_requested", "task.output_produced", "evidence_bundle.created", "deliverable.review_approved", "deliverable.issued", "invoice.issued", "accounts.receivable_follow_up_drafted", "awia.virtual_staff.provisioned", "awia.virtual_staff.lifecycle_updated", "awia.virtual_staff.task_assigned", "awia.virtual_staff.output_drafted", "awia.virtual_staff.output_reviewed", "awia.virtual_staff.client_delivery_draft_prepared"]) {
     assert(types.has(eventType), `Missing NHL pilot-day event: ${eventType}`);
   }
   const audit = await get(`/audit-events?tenant_id=${nhl.tenant_id}&firm_id=${nhl.id}`, h);
   assert(audit.length >= events.length, "Audit records should reconstruct material NHL pilot-day actions.");
   const exported = await get(`/data-protection/export-package?tenant_id=${nhl.tenant_id}&firm_id=${nhl.id}`, h);
-  for (const key of ["clients", "projects", "correspondence_records", "document_register_entries", "document_revision_records", "administrative_deadlines", "proposals", "approvals", "documents", "document_versions", "evidence_bundles", "invoices", "receivable_follow_ups", "worker_instances", "task_outputs", "tool_invocations", "event_log", "audit_events"]) {
+  for (const key of ["clients", "projects", "correspondence_records", "document_register_entries", "document_revision_records", "administrative_deadlines", "proposals", "approvals", "documents", "document_versions", "evidence_bundles", "invoices", "receivable_follow_ups", "worker_instances", "task_outputs", "tool_invocations", "awia_virtual_staff_members", "awia_staff_workdesk_items", "awia_staff_output_drafts", "awia_staff_output_reviews", "awia_client_delivery_drafts", "event_log", "audit_events"]) {
     assert(exported.counts[key] >= 1, `NHL export missing ${key}.`);
   }
   assert.equal(exported.tenant_id, nhl.tenant_id, "NHL export tenant scope mismatch.");
@@ -423,9 +438,10 @@ try {
     tenant: summary.tenant.name,
     owner: summary.workspace.principal_display_name,
     fixture: "NHL pilot-day fixture",
-    scenario: ["client_enquiry_intake", "project_reporting", "technical_writing", "clerical_work", "bizkick_edcs", "proposal_task_document_correspondence", "human_review_before_client_facing_issue", "invoice_receivable_monitoring", "audit_reconstruction", "firm_scoped_export"],
-    denials: ["draft_proposal_dispatch_denied", "ai_client_facing_review_denied", "issue_before_human_review_denied", "ai_payment_release_denied", "cross_tenant_today_denied", "cross_tenant_export_denied"],
+    scenario: ["client_enquiry_intake", "project_reporting", "technical_writing", "clerical_work", "bizkick_edcs", "proposal_task_document_correspondence", "human_review_before_client_facing_issue", "invoice_receivable_monitoring", "audit_reconstruction", "firm_scoped_export", "awia_virtual_staff_daily_workload"],
+    denials: ["draft_proposal_dispatch_denied", "ai_client_facing_review_denied", "issue_before_human_review_denied", "ai_payment_release_denied", "cross_tenant_today_denied", "cross_tenant_export_denied", "formwork_cross_tenant_awia_read_denied"],
     evidence: { events: events.length, audit_events: audit.length, export_counts: exported.counts },
+    awia_daily_workload: { staff_code: "ARO-001", workdesk_item_id: awiaAssign.workdesk_item.id, output_draft_id: awiaDraft.output_draft.id, client_delivery_draft_id: awiaClientDraft.client_delivery_draft.id, final_issue_allowed: false },
     known_limitations: ["core delivery review still requires inherited reference-vertical evidence validator keys until service-specific evidence validators are split in a later sprint"],
     next_active_sprint: "OP-H5 - Pilot Evidence, Audit, Export, and Closeout Review"
   }, null, 2));

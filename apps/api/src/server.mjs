@@ -735,14 +735,20 @@ const tenantExportCollections = [
   "technical_skill_bindings", "drawing_review_records", "calculation_input_sets", "technical_qa_findings", "delivery_package_records",
   "documents", "document_versions", "evidence_bundles", "invoices", "payment_statuses", "expense_records", "receivable_follow_ups",
   "worker_instances", "task_outputs", "tool_invocations", "pilot_handoff_records", "pilot_users", "support_cases", "pilot_incidents", "pilot_feedback", "pilot_acceptance_reviews", "pilot_improvement_items", "pilot_report_packs", "stakeholder_review_boards", "stakeholder_review_decisions",
-  "tenant_pilot_controls", "tenant_usage_events", "billing_readiness_reviews", "payment_provider_configs", "subscription_packages", "commercial_launch_controls", "factory_firm_blueprints", "factory_provisioning_runs", "provisioned_firm_instances", "factory_worker_bindings", "pack_compatibility_checks", "pack_binding_certifications", "service_activation_records", "policy_decisions", "event_log", "audit_events"
+  "tenant_pilot_controls", "tenant_usage_events", "billing_readiness_reviews", "payment_provider_configs", "subscription_packages", "commercial_launch_controls", "factory_firm_blueprints", "factory_provisioning_runs", "provisioned_firm_instances", "factory_worker_bindings", "pack_compatibility_checks", "pack_binding_certifications", "service_activation_records", "policy_decisions",
+  "awia_virtual_staff_provisioning_runs", "awia_virtual_staff_seats", "awia_virtual_staff_members", "awia_staff_role_assignments", "awia_staff_package_bindings", "awia_staff_lifecycle_events", "awia_staff_authority_decisions", "awia_staff_evidence_packs", "awia_staff_task_readiness_records", "awia_staff_workdesk_items", "awia_staff_output_drafts", "awia_staff_output_reviews", "awia_client_delivery_drafts", "awia_staff_memory_entries", "awia_staff_conversation_threads", "awia_staff_conversation_messages", "awia_staff_seat_billing_events",
+  "event_log", "audit_events"
 ];
 
 function tenantExportRecords(store, collection, tenantId, firmId = null) {
   const records = Array.isArray(store[collection]) ? store[collection] : [];
   return records.filter((record) => {
     if (collection === "tenants") return !tenantId || String(record.id) === String(tenantId);
-    if (tenantId && record?.tenant_id && String(record.tenant_id) !== String(tenantId)) return false;
+    // Some AWIA virtual-staff provisioning-identity records key tenant scope as organization_id
+    // instead of tenant_id (see awia_virtual_staff_members); fall back to it so per-firm export
+    // packages do not silently skip tenant scoping for those records.
+    const recordTenantId = record?.tenant_id ?? record?.organization_id;
+    if (tenantId && recordTenantId && String(recordTenantId) !== String(tenantId)) return false;
     if (firmId && record?.firm_id && String(record.firm_id) !== String(firmId)) return false;
     return true;
   });

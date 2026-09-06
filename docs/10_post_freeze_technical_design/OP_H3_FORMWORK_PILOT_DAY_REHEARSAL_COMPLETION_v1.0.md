@@ -124,3 +124,13 @@ OP-H3 does not implement:
 The next active sprint is:
 
 `OP-H4 - NHL Global Solution Pilot Day Rehearsal`
+
+## Addendum (Phase C AWIA-in-daily-workload extension, 2026-09-06)
+
+The unified AWIA sprint plan's Phase C objective requires day-to-day operation "including AWIA virtual staff in the daily workload." The original OP-H3 rehearsal (2026-09-03) predates AWIA virtual staff entirely and covered only the human-operated Formwork technical delivery loop.
+
+`scripts/smoke-op-h3-formwork-pilot-day-rehearsal.mjs` was extended to also rehearse an AWIA virtual staff member (`OPO-001`, Operations role) inside the same controlled Formwork pilot day: pilot staff provisioning, lifecycle activation, task assignment to the project task opened by the pilot-day fixture, draft-only output production, human review (`APPROVED_FOR_CLIENT_DRAFT`), and client delivery draft preparation -- with `final_issue_allowed: false` verified at every stage. A negative check confirms NHL's principal cannot assign work to Formwork's AWIA staff or task (cross-tenant denial).
+
+The tenant/firm-scoped export package (`/data-protection/export-package`) previously omitted all 17 `awia_*` collections; it was extended to include them, and the underlying tenant-scope filter was corrected to also honor `organization_id` (the field `awia_virtual_staff_members` uses instead of `tenant_id`) so AWIA staff records are neither silently excluded nor leaked across tenants in export packages.
+
+Evidence: re-run `npm run check:op:h3` (passes with `awia_daily_workload` present in the JSON evidence output).

@@ -45,6 +45,7 @@ scope: "Controlled local/private pilot operation for verified active firm worksp
 - [x] Verify audit reconstruction for Formwork pilot day.
 - [x] Verify export sample is Formwork tenant/firm scoped.
 - [x] Add Formwork pilot-day smoke test.
+- [x] Rehearse AWIA virtual staff daily workload (task assignment, draft, human review, client delivery draft) inside the Formwork pilot day.
 - [x] Update evidence and decision register.
 
 ## OP-H4 - NHL Global Solution Pilot Day Rehearsal
@@ -59,6 +60,7 @@ scope: "Controlled local/private pilot operation for verified active firm worksp
 - [x] Monitor invoice/receivable without live payment movement.
 - [x] Verify audit reconstruction for NHL pilot day.
 - [x] Add NHL pilot-day smoke test.
+- [x] Rehearse AWIA virtual staff daily workload (task assignment, draft, human review, client delivery draft) inside the NHL pilot day.
 - [x] Update evidence and decision register.
 
 ## OP-H5 - Pilot Evidence, Audit, Export, and Closeout Review
@@ -72,6 +74,7 @@ scope: "Controlled local/private pilot operation for verified active firm worksp
 - [x] Verify separate evidence records for Formwork and NHL.
 - [x] Verify export records are tenant/firm scoped.
 - [x] Add evidence/export smoke test.
+- [x] Verify AWIA staff records are included in tenant/firm-scoped evidence export for both firms.
 - [x] Update decision register.
 
 ## OP-H6 - Controlled Multi-Firm Pilot Operations Acceptance Gate
