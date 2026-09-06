@@ -63,3 +63,10 @@ R4-S3 - Pilot Support and Incident Controls
 ```
 
 R4-S3 must make support cases, incident response, escalation, suspension/recovery, and support authority boundaries operational before private pilot cohort activation.
+
+
+## Addendum (Phase D AWIA-under-staging-controls extension, 2026-09-06)
+
+R4-S2 was completed 2026-08-30, before AWIA virtual staff existed. `scripts/smoke-r4-staging-deployment-data-protection.mjs` was extended to provision an AWIA virtual staff roster inside the staging-simulated tenant/firm and confirm the tenant-scoped export manifest and export package count and include the AWIA staff/seat records, that no environment secret leaks through the AWIA export path, and that a second tenant cannot read the first tenant's AWIA staff records. This relies on the Phase C export-scoping fix in `apps/api/src/server.mjs` (see ADR-070) that added the 17 `awia_*` collections to `tenantExportCollections`.
+
+Evidence: re-run `npm run check:r4:s2` (passes with `awia_under_staging_controls` present in the JSON evidence output).

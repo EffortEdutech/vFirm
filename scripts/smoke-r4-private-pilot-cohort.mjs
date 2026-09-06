@@ -195,6 +195,14 @@ try {
   const auditEvents = await get("/audit-events", headers);
   assert(auditEvents.some((event) => event.action === "pilot_private_cohort.activated"), "Private pilot activation audit event missing.");
 
+  // Phase D AWIA-under-staging-controls extension: once the tenant is a fully onboarded, activated
+  // private pilot cohort, prove AWIA virtual staff seats can actually be provisioned for it -- AWIA
+  // must not be something only bare, non-cohort pilot tenants can use.
+  const awiaProvision = await post("/awia/virtual-staff/provision-pilot", { tenant_id: tenant.id, firm_id: firm.firm.id, actor: firm.principal_actor }, headers);
+  assert(awiaProvision.provisioning_run.members.length > 0, "AWIA staff provisioning must succeed for an activated private pilot cohort tenant.");
+  const awiaProvisionEvents = await get(`/event-log?tenant_id=${tenant.id}&firm_id=${firm.firm.id}`, headers);
+  assert(awiaProvisionEvents.some((event) => event.event_type === "awia.virtual_staff.provisioned"), "AWIA provisioning event missing for private pilot cohort tenant.");
+
   console.log(JSON.stringify({
     smoke: "r4-s5-private-pilot-cohort",
     result: "passed",
@@ -203,7 +211,8 @@ try {
     counts: readyGate.counts,
     checks: readyGate.checks.map((check) => `${check.key}:${check.status}`),
     denials: ["early_activation_without_evidence", "ai_private_cohort_activation"],
-    boundaries: readyGate.boundaries
+    boundaries: readyGate.boundaries,
+    awia_under_staging_controls: { staff_provisioned_for_activated_cohort: awiaProvision.provisioning_run.members.length }
   }, null, 2));
 } finally {
   if (api.exitCode === null && !api.killed) {

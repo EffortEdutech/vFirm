@@ -163,6 +163,15 @@ try {
     actor: firm.principal_actor
   }, headers);
 
+  // Phase D AWIA-under-staging-controls extension: rehearse an AWIA virtual staff action inside
+  // this tenant/firm and confirm R4-S4's observability/audit review picks it up like any other
+  // reviewable business action, without leaking private reasoning content.
+  const reviewBeforeAwiaTask = await get(`/ops/r4-observability-audit-review?tenant_id=${tenant.id}&firm_id=${firm.firm.id}`, headers);
+  const eventsBeforeAwiaTask = reviewBeforeAwiaTask.counts.runtime_events;
+  const awiaProvision = await post("/awia/virtual-staff/provision-pilot", { tenant_id: tenant.id, firm_id: firm.firm.id }, headers);
+  assert(awiaProvision.provisioning_run.members.length > 0, "R4-S4 AWIA provisioning must create staff members.");
+  await post("/awia/virtual-staff/lifecycle", { tenant_id: tenant.id, firm_id: firm.firm.id, staff_code: "OPO-001", to_state: "ACTIVE" }, headers);
+
   const review = await get(`/ops/r4-observability-audit-review?tenant_id=${tenant.id}&firm_id=${firm.firm.id}`, headers);
   assert(review.code === "R4-S4-OBSERVABILITY-AUDIT-REVIEW", "Wrong R4-S4 review code.");
   assert(review.status === "REVIEW_READY", `Review should be ready: ${JSON.stringify(review.review_completeness)}`);
@@ -178,6 +187,8 @@ try {
   assert(review.redaction_policy.private_chain_of_thought_excluded, "Private chain-of-thought exclusion not confirmed.");
   assert(review.review_completeness.every((check) => check.status === "PASS"), `Completeness checks not all pass: ${JSON.stringify(review.review_completeness)}`);
   assert(!containsForbiddenReasoning(review), "Review output appears to expose forbidden private reasoning content.");
+  assert(review.counts.runtime_events >= eventsBeforeAwiaTask + 2, "AWIA provisioning and lifecycle activation must add reviewable runtime events.");
+  assert(!containsForbiddenReasoning(review), "Review output must still exclude forbidden private reasoning content with AWIA activity present.");
 
   console.log(JSON.stringify({
     smoke: "r4-s4-observability-audit-review",
@@ -185,7 +196,8 @@ try {
     status: review.status,
     counts: review.counts,
     checks: review.review_completeness.map((check) => `${check.key}:${check.status}`),
-    redaction_policy: review.redaction_policy
+    redaction_policy: review.redaction_policy,
+    awia_under_staging_controls: { members_provisioned: awiaProvision.provisioning_run.members.length, events_before: eventsBeforeAwiaTask, events_after: review.counts.runtime_events }
   }, null, 2));
 } finally {
   if (api.exitCode === null && !api.killed) {

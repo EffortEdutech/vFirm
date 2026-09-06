@@ -111,3 +111,9 @@ The client continues to buy from the Virtual Firm, not from AI. Professional aut
 R4-S6 - Pilot Learning Loop and R4 Evidence may proceed after this completion record and Release 4 aggregate checks are accepted.
 
 R4-S6 must collect feedback, classify it, convert accepted items into governed backlog, reject out-of-scope feedback, assemble the Release 4 evidence pack, and prepare the Release 4 go/no-go recommendation.
+
+## Addendum (Phase D AWIA-under-staging-controls extension, 2026-09-06)
+
+R4-S5 was completed 2026-08-30, before AWIA virtual staff existed. `scripts/smoke-r4-private-pilot-cohort.mjs` was extended so that, once the private pilot cohort is fully onboarded and activated (`PRIVATE_PILOT_ACTIVE`), it provisions an AWIA virtual staff roster for that same tenant/firm and confirms the provisioning succeeds and produces a real `awia.virtual_staff.provisioned` event -- proving AWIA staff seats work for a fully activated private pilot cohort tenant, not only for bare, non-cohort pilot tenants.
+
+Evidence: re-run `npm run check:r4:s5` (passes with `awia_under_staging_controls` present in the JSON evidence output).

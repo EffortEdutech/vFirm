@@ -87,3 +87,9 @@ The review output exposes auditable evidence summaries only: timestamps, actor i
 R4-S5 - Private Pilot Cohort may proceed after this completion record and Release 4 aggregate checks are accepted.
 
 R4-S5 must keep private pilot activation blocked unless R4-S1 through R4-S4 evidence remains accepted.
+
+## Addendum (Phase D AWIA-under-staging-controls extension, 2026-09-06)
+
+R4-S4 was completed 2026-08-29, before AWIA virtual staff existed. `scripts/smoke-r4-observability-audit-review.mjs` was extended to provision and activate an AWIA virtual staff member for the reviewed tenant/firm and confirm `/ops/r4-observability-audit-review` picks up the resulting runtime events like any other reviewable business action -- counts increase, review status stays `REVIEW_READY`, and no private chain-of-thought, raw prompt, or raw completion content leaks into the review output.
+
+Evidence: re-run `npm run check:r4:s4` (passes with `awia_under_staging_controls` present in the JSON evidence output).

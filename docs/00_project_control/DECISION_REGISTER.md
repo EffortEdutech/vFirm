@@ -775,3 +775,22 @@ Boundaries: This acceptance authorizes controlled local/private pilot operation 
 Evidence: `docs/10_post_freeze_technical_design/OP_H6_CONTROLLED_MULTI_FIRM_PILOT_OPERATIONS_ACCEPTANCE_GATE_v1.0.md` section 9; `docs/10_post_freeze_technical_design/OP_H1_TO_H6_CONTROLLED_MULTI_FIRM_PILOT_OPERATIONS_CHECKLIST_v1.0.md` (Final OP acceptance readiness gate, all items checked); ADR-070.
 
 Follow-up: Phase C is closed in `VFIRM_AWIA_HIRE_A_VIRTUAL_WORKER_UNIFIED_SPRINT_PLAN_AND_CHECKLIST_v1.0.md`. Phase D (Release 4: staging and private pilot operations) is the next scope and still requires its own separate "Proceed Phase D ... Bismillah" authorization before any work begins.
+
+## ADR-072 - Phase D verified AWIA virtual staff under Release 4 staging controls
+
+Date: 2026-09-06
+Status: Accepted for controlled local/private pilot readiness (supplements the existing Release 4 acceptance, ADR dated 2026-08-30 in `R4_ACCEPTANCE_AND_R5_SCOPE_AUTHORIZATION_v1.0.md`; does not reopen it)
+
+Decision: Release 4 (R4-S1 through R4-S6: staging identity/tenant admin, staging deployment/data protection, pilot support/incident controls, observability/audit review, private pilot cohort, pilot learning loop) was built and accepted by the product owner on 2026-08-30, before AWIA virtual staff existed. None of the seven R4 smoke tests referenced AWIA at all. Rather than re-running the already-accepted R4-S1 through R4-S6 sequence verbatim (which would only re-verify non-AWIA staging plumbing that already passed and was already accepted), R4-S2, R4-S4, and R4-S5 were extended to specifically rehearse AWIA virtual staff operating under Release 4's real staging controls:
+
+- R4-S2 (staging deployment/data protection): AWIA staff provisioned inside a staging-simulated tenant/firm are correctly counted in the tenant-scoped export manifest and export package, no environment secret leaks through the AWIA export path, and a second tenant cannot read the first tenant's AWIA records.
+- R4-S4 (observability/audit review): an AWIA provisioning and lifecycle-activation action produces reviewable runtime events picked up by `/ops/r4-observability-audit-review` like any other business action, with review status remaining `REVIEW_READY` and no private chain-of-thought/raw-prompt/raw-completion leakage.
+- R4-S5 (private pilot cohort): once a tenant's private pilot cohort is fully onboarded and activated (`PRIVATE_PILOT_ACTIVE`), AWIA virtual staff can be provisioned for that same tenant/firm and produce a real `awia.virtual_staff.provisioned` audit/event record.
+
+Rationale: The unified AWIA sprint plan's Phase D objective is for AWIA to operate correctly once real staging identity, tenant administration, data protection, observability, and private-pilot-cohort controls are active - not merely for the generic Release 4 staging plumbing (already accepted, unrelated to AWIA) to still pass in isolation.
+
+Boundaries: This decision does not reopen or re-litigate the original Release 4 acceptance (`R4_ACCEPTANCE_AND_R5_SCOPE_AUTHORIZATION_v1.0.md`, 2026-08-30) or any Release 5+ work built since. It does not authorize production multi-tenant onboarding, public marketplace, live matching, autonomous regulated approval, or live payment movement.
+
+Evidence: `scripts/smoke-r4-staging-deployment-data-protection.mjs`, `scripts/smoke-r4-observability-audit-review.mjs`, `scripts/smoke-r4-private-pilot-cohort.mjs`; `npm run check:r4:s2`, `check:r4:s4`, `check:r4:s5` (and `check:r4:s0`, `check:r4:s1`, `check:r4:s3`, `check:r4:s6` re-confirmed unaffected); addenda in `R4_S2_STAGING_DEPLOYMENT_AND_DATA_PROTECTION_COMPLETION_v1.0.md`, `R4_S4_OBSERVABILITY_AND_AUDIT_REVIEW_COMPLETION_v1.0.md`, `R4_S5_PRIVATE_PILOT_COHORT_COMPLETION_v1.0.md`.
+
+Follow-up: Phase D is closed in `VFIRM_AWIA_HIRE_A_VIRTUAL_WORKER_UNIFIED_SPRINT_PLAN_AND_CHECKLIST_v1.0.md`. Phase E (commercial activation for AWIA staff seats) is next and still requires its own separate "Proceed Phase E ... Bismillah" authorization before any work begins; it explicitly requires a product-owner commercial decision (payment provider selection) that this ADR does not make.

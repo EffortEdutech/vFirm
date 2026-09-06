@@ -142,6 +142,15 @@ try {
   assert(manifest.counts.tenants === 1, "Export manifest should include only one tenant.");
   assert(manifest.counts.pilot_users === 1, "Export manifest should include the invited pilot user.");
 
+  // Phase D AWIA-under-staging-controls extension: prove AWIA staff records are covered by the
+  // same staging data-protection guarantees (tenant scoping, secret exclusion, backup/export) as
+  // every other tenant record, not just left out because they postdate R4-S2's original build.
+  const awiaProvision = await post("/awia/virtual-staff/provision-pilot", { tenant_id: tenantA.id, firm_id: firmA.firm.id }, headersA);
+  assert(awiaProvision.provisioning_run.members.length > 0, "R4-S2 AWIA provisioning must create staff members.");
+  const manifestAfterAwia = await get(`/data-protection/export-manifest?tenant_id=${tenantA.id}`, headersA);
+  assert(manifestAfterAwia.counts.awia_virtual_staff_members >= 1, "Export manifest must count AWIA staff members once provisioned.");
+  assert(manifestAfterAwia.counts.awia_virtual_staff_seats >= 1, "Export manifest must count AWIA staff seats once provisioned.");
+
   const exportPackage = await get(`/data-protection/export-package?tenant_id=${tenantA.id}&firm_id=${firmA.firm.id}`, headersA);
   assert(exportPackage.integrity.provider_tokens_excluded, "Export package must exclude provider tokens.");
   assert(exportPackage.integrity.professional_authority_preserved, "Export package must preserve professional authority records.");
@@ -153,13 +162,21 @@ try {
   const crossTenant = await request(`/data-protection/export-package?tenant_id=${tenantA.id}&firm_id=${firmA.firm.id}`, { headers: headersB });
   assert(crossTenant.res.status === 403, `Cross-tenant export should be denied, got ${crossTenant.res.status}.`);
 
+  const exportPackageAfterAwia = await get(`/data-protection/export-package?tenant_id=${tenantA.id}&firm_id=${firmA.firm.id}`, headersA);
+  assert(exportPackageAfterAwia.counts.awia_virtual_staff_members >= 1, "Firm-scoped export package must include AWIA staff members.");
+  const serializedAwiaExport = JSON.stringify(exportPackageAfterAwia);
+  assert(!serializedAwiaExport.includes("must-not-appear-in-export"), "AWIA export path leaked an environment secret.");
+  const crossTenantAwia = await request(`/awia-virtual-staff-members?tenant_id=${tenantA.id}&firm_id=${firmA.firm.id}`, { headers: headersB });
+  assert(crossTenantAwia.res.status >= 400 || (crossTenantAwia.json.data ?? []).length === 0, "Cross-tenant read of AWIA staff members should be denied or empty.");
+
   console.log(JSON.stringify({
     smoke: "r4-s2-staging-deployment-data-protection",
     mode: process.argv.includes("--postgres") ? "postgres-contract" : process.argv.includes("--staging") ? "staging-contract" : "json-contract",
     result: "passed",
     selected_environment: readiness.selected_environment,
     private_pilot_invitation_gate: readiness.private_pilot_invitation_gate,
-    checks: readiness.checks.map((check) => `${check.key}:${check.status}`)
+    checks: readiness.checks.map((check) => `${check.key}:${check.status}`),
+    awia_under_staging_controls: { members: manifestAfterAwia.counts.awia_virtual_staff_members, seats: manifestAfterAwia.counts.awia_virtual_staff_seats, secrets_leaked: false }
   }, null, 2));
 } finally {
   if (api.exitCode === null && !api.killed) {
