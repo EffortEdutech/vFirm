@@ -760,3 +760,18 @@ Evidence: `scripts/smoke-op-h3-formwork-pilot-day-rehearsal.mjs`, `scripts/smoke
 Known unrelated findings surfaced but not fixed in this pass (pre-existing, unrelated to this ADR): `scripts/smoke-awia-vs-s2-package-registry.mjs` depends on Windows-absolute skill-folder paths and can only be verified by running `npm run check` directly on the developer's machine, not inside a Linux sandbox; `scripts/smoke-awia-vs-s5-afcc-staff-management.mjs` asserts a UI marker (`bindAfccStaffProfileButtons`) that does not match the actual function name in `apps/web/public/app.js` (`bindAfccStaffControls`), introduced in commit `e99dc27` (2026-09-05) and unrelated to Phase C.
 
 Follow-up: Product owner still needs to explicitly accept, hold, reject, or defer OP-H6 controlled multi-firm pilot operations readiness (Option A/B/C/D in `OP_H6_CONTROLLED_MULTI_FIRM_PILOT_OPERATIONS_ACCEPTANCE_GATE_v1.0.md`), now on a pilot day that genuinely includes AWIA virtual staff in the daily workload.
+
+## ADR-071 - Product owner accepted OP-H6 controlled multi-firm pilot operations readiness
+
+Date: 2026-09-06
+Status: Accepted
+
+Decision: The product owner reviewed a direct summary of the OP-H6 acceptance gate (technical recommendation `GO_FOR_CONTROLLED_MULTI_FIRM_PILOT_OPERATIONS_ACCEPTANCE`, the Phase C AWIA-in-daily-workload extension recorded in ADR-070, and the unrelated pre-existing gaps surfaced but not fixed - `smoke-awia-vs-s2-package-registry.mjs`, `smoke-awia-vs-s5-afcc-staff-management.mjs`, `smoke-mt-h5-module-worker-binding.mjs`, `smoke-web-navigation-renderers.mjs`) and selected Option A - Accept OP readiness for both Amanah Formwork Pilot Firm and NHL Global Solution.
+
+Rationale: OP-H1 through OP-H6 evidence is complete, the controlled pilot day for both firms (now including AWIA virtual staff in the daily workload) can be reconstructed from audit/event records, records stay tenant/firm separated, human approval boundaries hold, and the current blocker count is `0`.
+
+Boundaries: This acceptance authorizes controlled local/private pilot operation only. It does not authorize production multi-tenant onboarding, public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, pricing intelligence, autonomous award, autonomous regulated approval, live payment movement, or uncontrolled tenant/client data sharing.
+
+Evidence: `docs/10_post_freeze_technical_design/OP_H6_CONTROLLED_MULTI_FIRM_PILOT_OPERATIONS_ACCEPTANCE_GATE_v1.0.md` section 9; `docs/10_post_freeze_technical_design/OP_H1_TO_H6_CONTROLLED_MULTI_FIRM_PILOT_OPERATIONS_CHECKLIST_v1.0.md` (Final OP acceptance readiness gate, all items checked); ADR-070.
+
+Follow-up: Phase C is closed in `VFIRM_AWIA_HIRE_A_VIRTUAL_WORKER_UNIFIED_SPRINT_PLAN_AND_CHECKLIST_v1.0.md`. Phase D (Release 4: staging and private pilot operations) is the next scope and still requires its own separate "Proceed Phase D ... Bismillah" authorization before any work begins.

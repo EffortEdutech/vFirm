@@ -105,10 +105,12 @@ scope: "Controlled local/private pilot operation for verified active firm worksp
 
 ## Final OP acceptance readiness gate
 
-- [ ] Amanah Formwork Pilot Firm controlled pilot day can be completed.
-- [ ] NHL Global Solution controlled pilot day can be completed.
-- [ ] Each firm has separate readiness, activity, issue, evidence, audit, and export records.
-- [ ] Human approval boundaries are explicit.
-- [ ] AI worker actions are attributable.
-- [ ] Material business actions can be reconstructed.
-- [ ] Product owner can choose accept, hold, or reject OP readiness.
+- [x] Amanah Formwork Pilot Firm controlled pilot day can be completed.
+- [x] NHL Global Solution controlled pilot day can be completed.
+- [x] Each firm has separate readiness, activity, issue, evidence, audit, and export records.
+- [x] Human approval boundaries are explicit.
+- [x] AI worker actions are attributable.
+- [x] Material business actions can be reconstructed.
+- [x] Product owner can choose accept, hold, or reject OP readiness.
+
+Product owner decision recorded 2026-09-06: **Accept OP readiness** (Option A). See `OP_H6_CONTROLLED_MULTI_FIRM_PILOT_OPERATIONS_ACCEPTANCE_GATE_v1.0.md` section 9 and `DECISION_REGISTER.md` ADR-071.

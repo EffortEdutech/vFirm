@@ -137,3 +137,14 @@ The safest next technical improvement is service-specific evidence validator spl
 Before this addendum, OP-H1 through OP-H5 evidence (2026-09-03) predated AWIA virtual staff and covered only a human-only pilot day for both firms, even though the unified AWIA sprint plan's Phase C objective requires day-to-day operation "including AWIA virtual staff in the daily workload." OP-H3 and OP-H4 were extended so each firm's controlled pilot-day rehearsal now genuinely assigns a task to an AWIA virtual staff member, produces a draft-only output, routes it through human review, and prepares a client delivery draft without final-issue authority -- and the tenant/firm-scoped evidence/export package now includes AWIA staff records for both firms. This gate's technical recommendation is unchanged (`GO_FOR_CONTROLLED_MULTI_FIRM_PILOT_OPERATIONS_ACCEPTANCE`); the pilot day it now describes includes AWIA in the daily workload as the unified plan requires.
 
 Gate status remains `Pending Product-Owner Decision` until the product owner records Option A, B, C, or D below.
+
+
+## 9. Decision recorded (2026-09-06)
+
+Gate status: `Accepted`.
+
+The product owner reviewed the Phase C AWIA-in-daily-workload extension addendum above (OP-H3/H4 rehearsals now genuinely include an AWIA virtual staff member in each firm's controlled pilot day; the tenant/firm-scoped evidence/export package now includes AWIA records; a stale AWIA staging-readiness smoke test was corrected) and selected Option A - Accept OP readiness, in response to a direct summary of this gate's evidence, findings, and unrelated pre-existing gaps.
+
+Recorded decision: Option A - Accept OP readiness. Amanah Formwork Pilot Firm and NHL Global Solution controlled local/private pilot operation is authorized. Production multi-tenant onboarding, public marketplace, live matching, ranking, capacity allocation, VF-24 observatory publication, pricing intelligence, autonomous award, autonomous regulated approval, live payment movement, and uncontrolled tenant/client data sharing remain not authorized.
+
+This decision closes Phase C in `VFIRM_AWIA_HIRE_A_VIRTUAL_WORKER_UNIFIED_SPRINT_PLAN_AND_CHECKLIST_v1.0.md`. Phase D (Release 4: staging and private pilot operations) is the next scope in that plan and still requires its own separate "Proceed Phase D ... Bismillah" authorization before any work begins.
