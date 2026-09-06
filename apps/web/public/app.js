@@ -3986,6 +3986,300 @@ function bindMyTeamControls() {
     }
   });
 }
+// "Work" -- the business-owner-facing screen where hired workers get real
+// tasks and their drafts move through the human-approval loop. Wired to the
+// same assign-task/output-draft/output-review/client-delivery-draft
+// endpoints already proven by the AI Workforce operator panel, but a
+// worker's role is looked up live from awia_staff_role_assignments (works
+// for any incrementally-hired staff code, e.g. CFO-002 -- unlike that older
+// panel's hardcoded AWIA_STAFF_ROLE_CODE map) and the client for a
+// client-ready draft is resolved from the task's real project/relationship
+// instead of a guessed fallback client.
+function awiaRoleCodeForStaffCode(store, staffCode) {
+  const assignment = (store.awia_staff_role_assignments ?? []).find(
+    (item) => item.staff_code === staffCode,
+  );
+  return assignment?.role_code ?? null;
+}
+function awiaToolOptionsForRoleCode(roleCode) {
+  const actions = (roleCode && AWIA_ROLE_ACTIONS[roleCode]) || [];
+  return actions
+    .map((action) => `<option value="${escapeHtml(action)}">${escapeHtml(action)}</option>`)
+    .join("");
+}
+function awiaClientIdForTask(store, task) {
+  const project = (store.projects ?? []).find(
+    (item) => item.id === task?.project_id,
+  );
+  const relationship = (store.firm_client_relationships ?? []).find(
+    (item) => item.id === project?.relationship_id,
+  );
+  return relationship?.client_id ?? null;
+}
+let __workDelegationBound = false;
+function renderWorkModule(store) {
+  const members = (store.awia_virtual_staff_members ?? []).filter(
+    (member) => member.lifecycle_status === "ACTIVE",
+  );
+  const roleAssignments = store.awia_staff_role_assignments ?? [];
+  const tasks = store.tasks ?? [];
+  const workdesk = store.awia_staff_workdesk_items ?? [];
+  const outputDrafts = store.awia_staff_output_drafts ?? [];
+  const outputReviews = store.awia_staff_output_reviews ?? [];
+  const clientDeliveryDrafts = store.awia_client_delivery_drafts ?? [];
+
+  const openTasks = tasks.filter(
+    (task) => !workdesk.some((item) => item.task_id === task.id),
+  );
+
+  const firstRoleCode = members.length
+    ? awiaRoleCodeForStaffCode(store, members[0].agent_code)
+    : null;
+  const workerOptions = members
+    .map((member) => {
+      const assignment = roleAssignments.find(
+        (item) => item.staff_code === member.agent_code,
+      );
+      return `<option value="${escapeHtml(member.agent_code)}">${escapeHtml(member.display_name ?? member.agent_code)} - ${escapeHtml(assignment?.role_name ?? assignment?.role_code ?? "Virtual worker")}</option>`;
+    })
+    .join("");
+  const taskOptions = openTasks
+    .map(
+      (task) =>
+        `<option value="${escapeHtml(task.id)}">${escapeHtml(task.task_type)} - ${escapeHtml(shortId(task.id))}</option>`,
+    )
+    .join("");
+  const toolOptions = awiaToolOptionsForRoleCode(firstRoleCode);
+
+  const assignForm = `<form id="workAssignForm"><label>Worker<select name="staff_code" required>${workerOptions}</select></label><label>Task<select name="task_id" required>${taskOptions}</select></label><label>What should they do<select name="tool" required>${toolOptions}</select></label><label>Reference (a document, file, or note this relates to)<input name="evidence_ref" required placeholder="e.g. latest bank statement, client email" /></label><button type="submit" ${members.length && openTasks.length ? "" : "disabled"}>Assign</button>${!members.length ? '<p class="empty">Hire someone on the My Team screen first.</p>' : ""}${members.length && !openTasks.length ? '<p class="empty">No open tasks waiting to be assigned right now.</p>' : ""}</form>`;
+
+  const workRows = workdesk
+    .map((item) => {
+      const member = (store.awia_virtual_staff_members ?? []).find(
+        (record) => record.agent_code === item.staff_code,
+      );
+      const task = tasks.find((record) => record.id === item.task_id);
+      const draft = outputDrafts.find((record) => record.id === item.output_draft_id);
+      const clientDraft = draft
+        ? clientDeliveryDrafts.find((record) => record.output_draft_id === draft.id)
+        : null;
+      let actionHtml = "";
+      if (item.workdesk_status === "ASSIGNED") {
+        actionHtml = `<button class="secondary small" data-work-produce-draft="${escapeHtml(item.id)}">Get their draft</button>`;
+      } else if (item.workdesk_status === "OUTPUT_DRAFTED" && draft?.status === "DRAFT_REVIEW_REQUIRED") {
+        actionHtml = `<button class="primary small" data-work-approve="${escapeHtml(draft.id)}">Approve</button> <button class="secondary small" data-work-revise="${escapeHtml(draft.id)}">Send back</button>`;
+      } else if (item.workdesk_status === "REVIEWED_FOR_CLIENT_DRAFT" && !clientDraft) {
+        const clientId = awiaClientIdForTask(store, task);
+        actionHtml = `<button class="primary small" data-work-prepare-client="${escapeHtml(draft?.id ?? "")}" ${clientId ? "" : "disabled"}>Prepare for client</button>${clientId ? "" : '<br><small>No client linked to this task yet.</small>'}`;
+      } else if (item.workdesk_status === "REVIEW_ACTION_REQUIRED") {
+        actionHtml = `<span class="pill warning">Sent back -- needs a new draft</span>`;
+      } else if (clientDraft) {
+        actionHtml = `<span class="pill">Ready for delivery</span>`;
+      }
+      return `<tr><td>${escapeHtml(member?.display_name ?? item.staff_code)}</td><td>${escapeHtml(task?.task_type ?? shortId(item.task_id))}</td><td><span class="pill">${escapeHtml(item.workdesk_status)}</span></td><td>${actionHtml}</td></tr>`;
+    })
+    .join("");
+  const workTable = workdesk.length
+    ? `<div class="record-table-wrap"><table class="record-table"><thead><tr><th>Worker</th><th>Task</th><th>Status</th><th></th></tr></thead><tbody>${workRows}</tbody></table></div>`
+    : `<p class="empty">No work assigned yet. Assign a task above once you've hired someone.</p>`;
+
+  const readyRows = clientDeliveryDrafts
+    .map(
+      (draft) =>
+        `<tr><td>${escapeHtml(draft.delivery_title)}</td><td>${escapeHtml(draft.staff_code)}</td><td><span class="pill">Waiting for you to send</span></td></tr>`,
+    )
+    .join("");
+  const readyTable = clientDeliveryDrafts.length
+    ? `<div class="record-table-wrap"><table class="record-table"><thead><tr><th>Deliverable</th><th>Prepared by</th><th>Status</th></tr></thead><tbody>${readyRows}</tbody></table></div>`
+    : `<p class="empty">Nothing ready to send to a client yet.</p>`;
+
+  const host = document.querySelector("#workView");
+  if (!host) return;
+  host.innerHTML = `<section class="panel"><div class="panel-heading"><h2>Work</h2><p>Give your team real tasks, review what they produce, and decide what's ready to go to a client. Nothing reaches a client without your approval.</p></div></section><section class="panel"><div class="panel-heading"><h2>Give Work To Your Team</h2><p>Pick who does it, what task, and what they should do.</p></div>${assignForm}</section><section class="panel"><div class="panel-heading"><h2>In Progress</h2></div>${workTable}</section><section class="panel"><div class="panel-heading"><h2>Ready for Clients</h2></div>${readyTable}</section>`;
+
+  bindWorkControls();
+}
+function bindWorkControls() {
+  if (__workDelegationBound) return;
+  const container = document.querySelector("#workView");
+  if (!container) return;
+  __workDelegationBound = true;
+
+  function workContext() {
+    const scopedStore = lastStore ? scopedStoreForActiveFirm(lastStore) : {};
+    const contract = activeWorkspaceContract(scopedStore);
+    return {
+      store: scopedStore,
+      tenant: contract.tenant,
+      firm: contract.firm,
+      actor:
+        contract.principal ??
+        systemActorForBrowser(contract.tenant?.id, contract.firm?.id),
+    };
+  }
+
+  container.addEventListener("change", (event) => {
+    const staffSelect = event.target.closest(
+      '#workAssignForm select[name="staff_code"]',
+    );
+    if (!staffSelect) return;
+    const form = staffSelect.closest("#workAssignForm");
+    const toolSelect = form?.querySelector('select[name="tool"]');
+    if (!toolSelect) return;
+    const scopedStore = lastStore ? scopedStoreForActiveFirm(lastStore) : {};
+    const previousTool = toolSelect.value;
+    toolSelect.innerHTML = awiaToolOptionsForRoleCode(
+      awiaRoleCodeForStaffCode(scopedStore, staffSelect.value),
+    );
+    if ([...toolSelect.options].some((option) => option.value === previousTool)) {
+      toolSelect.value = previousTool;
+    }
+  });
+
+  container.addEventListener("submit", async (event) => {
+    const form = event.target.closest("#workAssignForm");
+    if (!form) return;
+    event.preventDefault();
+    const ctx = workContext();
+    const fd = new FormData(form);
+    const task = (ctx.store.tasks ?? []).find((item) => item.id === fd.get("task_id"));
+    await runUiCommand({
+      label: "Assign work",
+      form,
+      success: "Task assigned to your team member",
+      action: async () => {
+        const data = await request("/awia/virtual-staff/assign-task", {
+          method: "POST",
+          body: JSON.stringify({
+            tenant_id: ctx.tenant.id,
+            firm_id: ctx.firm.id,
+            staff_code: fd.get("staff_code"),
+            task_id: fd.get("task_id"),
+            client_id: awiaClientIdForTask(ctx.store, task),
+            project_id: task?.project_id,
+            tool: fd.get("tool"),
+            action: fd.get("tool"),
+            evidence_refs: [(fd.get("evidence_ref") ?? "").toString().trim()].filter(Boolean),
+            actor: ctx.actor,
+          }),
+        });
+        await refresh();
+        switchView("work");
+        return data;
+      },
+    });
+  });
+
+  container.addEventListener("click", async (event) => {
+    const produceBtn = event.target.closest("[data-work-produce-draft]");
+    if (produceBtn) {
+      const ctx = workContext();
+      const workdeskItemId = produceBtn.dataset.workProduceDraft;
+      await runUiCommand({
+        label: "Get their draft",
+        button: produceBtn,
+        success: "Draft ready for your review",
+        action: async () => {
+          const data = await request("/awia/virtual-staff/output-draft", {
+            method: "POST",
+            body: JSON.stringify({
+              tenant_id: ctx.tenant.id,
+              firm_id: ctx.firm.id,
+              workdesk_item_id: workdeskItemId,
+              actor: ctx.actor,
+            }),
+          });
+          await refresh();
+          switchView("work");
+          return data;
+        },
+      });
+      return;
+    }
+    const approveBtn = event.target.closest("[data-work-approve]");
+    if (approveBtn) {
+      const ctx = workContext();
+      const outputDraftId = approveBtn.dataset.workApprove;
+      await runUiCommand({
+        label: "Approve draft",
+        button: approveBtn,
+        success: "Approved -- ready to prepare for the client",
+        action: async () => {
+          const data = await request("/awia/virtual-staff/output-review", {
+            method: "POST",
+            body: JSON.stringify({
+              tenant_id: ctx.tenant.id,
+              firm_id: ctx.firm.id,
+              output_draft_id: outputDraftId,
+              review_decision: "APPROVED_FOR_CLIENT_DRAFT",
+              actor: ctx.actor,
+            }),
+          });
+          await refresh();
+          switchView("work");
+          return data;
+        },
+      });
+      return;
+    }
+    const reviseBtn = event.target.closest("[data-work-revise]");
+    if (reviseBtn) {
+      const ctx = workContext();
+      const outputDraftId = reviseBtn.dataset.workRevise;
+      await runUiCommand({
+        label: "Send back for revision",
+        button: reviseBtn,
+        success: "Sent back for revision",
+        action: async () => {
+          const data = await request("/awia/virtual-staff/output-review", {
+            method: "POST",
+            body: JSON.stringify({
+              tenant_id: ctx.tenant.id,
+              firm_id: ctx.firm.id,
+              output_draft_id: outputDraftId,
+              review_decision: "REVISION_REQUIRED",
+              actor: ctx.actor,
+            }),
+          });
+          await refresh();
+          switchView("work");
+          return data;
+        },
+      });
+      return;
+    }
+    const prepareBtn = event.target.closest("[data-work-prepare-client]");
+    if (prepareBtn) {
+      const ctx = workContext();
+      const outputDraftId = prepareBtn.dataset.workPrepareClient;
+      const draft = (ctx.store.awia_staff_output_drafts ?? []).find(
+        (item) => item.id === outputDraftId,
+      );
+      const task = (ctx.store.tasks ?? []).find((item) => item.id === draft?.task_id);
+      const clientId = awiaClientIdForTask(ctx.store, task);
+      await runUiCommand({
+        label: "Prepare for client",
+        button: prepareBtn,
+        success: "Ready to deliver to the client",
+        action: async () => {
+          const data = await request("/awia/virtual-staff/client-delivery-draft", {
+            method: "POST",
+            body: JSON.stringify({
+              tenant_id: ctx.tenant.id,
+              firm_id: ctx.firm.id,
+              output_draft_id: outputDraftId,
+              client_id: clientId,
+              actor: ctx.actor,
+            }),
+          });
+          await refresh();
+          switchView("work");
+          return data;
+        },
+      });
+    }
+  });
+}
 function renderAiWorkforceModule(store) {
   const contract = activeWorkspaceContract(store);
   const allowedTemplateCodes = workerTemplateCodesForContract(contract);
@@ -6635,6 +6929,7 @@ function safeRenderModule(target, title, renderer, store) {
 function renderRecordViews(store) {
   safeRenderModule("#myFirmView", "My Firm", renderMyFirmModule, store);
   safeRenderModule("#myTeamView", "My Team", renderMyTeamModule, store);
+  safeRenderModule("#workView", "Work", renderWorkModule, store);
   safeRenderModule("#clientsView", "Clients", renderClientModule, store);
   safeRenderModule("#intakeView", "Intake", renderIntakeModule, store);
   safeRenderModule(

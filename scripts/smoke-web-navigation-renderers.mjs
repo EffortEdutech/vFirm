@@ -171,6 +171,30 @@ for (const marker of myTeamMarkers) {
 assert(css.includes(".my-team-role-grid"), "My Team role grid CSS missing.");
 assert(new RegExp(`safeRenderModule\\(\\s*"#myTeamView"`).test(app), "My Team view must be guarded by safeRenderModule.");
 
+const workMarkers = [
+  'data-view="work"',
+  'id="view-work"',
+  'id="workView"',
+  "function renderWorkModule(",
+  "function bindWorkControls(",
+  "function awiaRoleCodeForStaffCode(",
+  "function awiaClientIdForTask(",
+  "data-work-produce-draft",
+  "data-work-approve",
+  "data-work-revise",
+  "data-work-prepare-client",
+  "workAssignForm",
+  "/awia/virtual-staff/assign-task",
+  "/awia/virtual-staff/output-draft",
+  "/awia/virtual-staff/output-review",
+  "/awia/virtual-staff/client-delivery-draft"
+];
+for (const marker of workMarkers) {
+  assert(html.includes(marker) || app.includes(marker), `Work screen UI marker missing: ${marker}`);
+}
+assert(new RegExp(`safeRenderModule\\(\\s*"#workView"`).test(app), "Work view must be guarded by safeRenderModule.");
+
+
 console.log(JSON.stringify({
   smoke: "web-navigation-renderers",
   result: "passed",
