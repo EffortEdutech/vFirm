@@ -5,7 +5,7 @@ import pg from "pg";
 import { validateFactoryBlueprintBundle } from "../../../packages/core-domain/src/factory-blueprints.mjs";
 import { evaluatePackBindingCertification } from "../../../packages/core-domain/src/pack-certification.mjs";
 import { awiaVirtualStaffPackageRegistry } from "../../../packages/core-domain/src/awia-virtual-staff-registry.mjs";
-import { provisionPilotVirtualStaff } from "../../../packages/core-domain/src/awia-virtual-staff-provisioning.mjs";
+import { provisionPilotVirtualStaff, validateVirtualStaffProvisioningRun } from "../../../packages/core-domain/src/awia-virtual-staff-provisioning.mjs";
 import { createRuntimeActionRequest, evaluateVirtualStaffRuntimeAction } from "../../../packages/core-domain/src/awia-virtual-staff-authority-gate.mjs";
 import { buildAwiaVirtualStaffEvidencePack } from "../../../packages/core-domain/src/awia-virtual-staff-evidence-gate.mjs";
 import { buildStaffMemoryEntry, buildConversationThread, buildConversationMessage } from "../../../packages/core-domain/src/awia-virtual-staff-memory.mjs";
@@ -4030,6 +4030,87 @@ export async function readAwiaFirmPackageAssignmentRecord(tenant_id, firm_id) {
   const store = await readStore();
   const assignment = (store.awia_firm_package_assignments ?? []).find((record) => record.tenant_id === tenant_id && record.firm_id === firm_id) ?? null;
   return { boundary: "seat_and_role_gating_only_no_payment_no_runtime_authority", assignment, catalogue: listAwiaFirmPackages() };
+}
+
+// Business-owner "hire a virtual worker" flow (HireMe): adds ONE named
+// worker to a firm's existing AWIA team, rather than the whole-roster,
+// one-shot template flow above. Every per-item collection (seats, members,
+// role assignments, package bindings, lifecycle events) is keyed by a
+// deterministic id derived from (firm_id, staff_code), so calling this
+// repeatedly for the same firm safely grows its roster instead of
+// clobbering previously hired staff. The provisioning-run summary row is
+// always recomputed from the firm's full current roster (awiaRunFromStore),
+// never just this one hire's delta, so it stays an accurate team snapshot.
+const AWIA_HIREABLE_ROLE_PACKAGE_IDS = { CFO: "cfo", FAO: "fao", SAO: "sao", OPO: "opo", ARO: "aro" };
+
+function nextAwiaStaffCodeForRole(store, tenant_id, firm_id, role_code) {
+  const existing = (store.awia_staff_role_assignments ?? []).filter((item) => item.tenant_id === tenant_id && item.firm_id === firm_id && item.role_code === role_code);
+  let maxSuffix = 0;
+  for (const assignment of existing) {
+    const match = /^([A-Z]+)-(\d+)$/.exec(assignment.staff_code ?? "");
+    if (match && match[1] === role_code) maxSuffix = Math.max(maxSuffix, Number(match[2]));
+  }
+  return `${role_code}-${String(maxSuffix + 1).padStart(3, "0")}`;
+}
+
+export async function hireAwiaFirmWorkerRecord(body, actor) {
+  const roleCode = body.role_code;
+  const packageId = AWIA_HIREABLE_ROLE_PACKAGE_IDS[roleCode];
+  if (!packageId) invalidState(`AWIA staff hire rejected: role_not_hireable_yet:${roleCode}`);
+  return withStore((store) => {
+    const firm = store.firms.find((record) => record.id === body.firm_id && record.tenant_id === body.tenant_id);
+    if (!firm) throwNotFound("firms", body.firm_id);
+
+    const packageAssignment = (store.awia_firm_package_assignments ?? []).find((record) => record.tenant_id === body.tenant_id && record.firm_id === body.firm_id);
+    if (!packageAssignment) invalidState("AWIA_STAFF_HIRE_REQUIRES_PACKAGE_ASSIGNMENT: assign a subscription package to this firm before hiring AWIA virtual staff.");
+    const packageResolved = resolveAwiaFirmPackage(packageAssignment.package_code);
+    if (!packageResolved.found) invalidState(`AWIA firm package on record is no longer recognized: ${packageResolved.findings.join(", ")}`);
+
+    const existingRoleAssignments = (store.awia_staff_role_assignments ?? []).filter((item) => item.tenant_id === body.tenant_id && item.firm_id === body.firm_id);
+    const proposedStaffSet = [...existingRoleAssignments.map((item) => ({ role_code: item.role_code })), { role_code: roleCode }];
+    const seatGate = evaluateAwiaFirmPackageSeatGate({ package: packageResolved.package, staffSet: proposedStaffSet });
+    if (seatGate.decision !== "ALLOW") invalidState(`AWIA staff hire denied by package gate: ${seatGate.findings.join(", ")}`);
+
+    const staffCode = body.staff_code ?? nextAwiaStaffCodeForRole(store, body.tenant_id, body.firm_id, roleCode);
+    if ((store.awia_virtual_staff_members ?? []).some((item) => item.agent_code === staffCode && item.firm_id === body.firm_id)) {
+      invalidState(`AWIA staff hire rejected: staff_code_already_hired:${staffCode}`);
+    }
+
+    const run = provisionPilotVirtualStaff({
+      tenant_id: body.tenant_id,
+      firm_id: body.firm_id,
+      created_by_actor_id: actor.actor_id,
+      salary_plan_id: body.salary_plan_id ?? "virtual-staff-controlled-pilot-plan",
+      registry: awiaVirtualStaffPackageRegistry,
+      pilotStaff: [{ staff_code: staffCode, package_id: packageId, role_code: roleCode, staff_grade: body.staff_grade ?? "Worker" }]
+    });
+    if (!run.ok) invalidState(`AWIA staff hire rejected: ${run.findings.map((finding) => finding.code).join(", ")}`);
+
+    for (const seat of run.seats) upsertById(store.awia_virtual_staff_seats, awiaRecord(seat, "staff_seat_id"));
+    for (const member of run.members) upsertById(store.awia_virtual_staff_members, { ...awiaRecord(member, "agent_id"), display_name: body.display_name ?? member.display_name });
+    for (const assignment of run.role_assignments) upsertById(store.awia_staff_role_assignments, awiaRecord(assignment, "role_assignment_id"));
+    for (const binding of run.package_bindings) upsertById(store.awia_staff_package_bindings, awiaRecord(binding, "package_binding_id"));
+    for (const event of run.lifecycle_events) upsertById(store.awia_staff_lifecycle_events, awiaRecord(event, "lifecycle_event_id"));
+
+    const fullRun = validateVirtualStaffProvisioningRun(awiaRunFromStore(store, body.tenant_id, body.firm_id), awiaVirtualStaffPackageRegistry);
+    upsertById(store.awia_virtual_staff_provisioning_runs, { ...awiaProvisioningSnapshot(fullRun), package_code: packageAssignment.package_code });
+    const evidencePack = buildAwiaVirtualStaffEvidencePack({ registry: awiaVirtualStaffPackageRegistry, provisioningRun: fullRun });
+    upsertById(store.awia_staff_evidence_packs, { id: evidencePack.evidence_pack_id, ...evidencePack, tenant_id: body.tenant_id, firm_id: body.firm_id, created_at: now() });
+
+    const hiredMember = store.awia_virtual_staff_members.find((item) => item.agent_code === staffCode && item.firm_id === body.firm_id);
+    appendEventAndAudit(store, {
+      event_type: "awia.virtual_staff.hired",
+      actor,
+      tenant_id: body.tenant_id,
+      firm_id: body.firm_id,
+      aggregate_type: "AwiaVirtualStaffMember",
+      aggregate_id: storeBackend === "postgres" ? deterministicUuid(hiredMember.id) : hiredMember.id,
+      payload: { staff_code: staffCode, role_code: roleCode, package_code: packageAssignment.package_code, team_size: fullRun.summary.member_count },
+      summary: `Business owner hired a new AWIA virtual staff member (${roleCode}) into this firm's team.`
+    });
+
+    return { member: hiredMember, staff_code: staffCode, role_code: roleCode, team_size: fullRun.summary.member_count, evidence_pack: evidencePack };
+  });
 }
 
 export async function provisionAwiaVirtualStaffFromTemplateRecord(body, actor) {
