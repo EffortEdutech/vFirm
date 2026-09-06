@@ -121,3 +121,7 @@ New, additive only - no existing OP-H2 behavior changed:
 This is explicitly pre-billing: package assignment and seat/role gating are labels and limits only, matching the AGENTS.md "no live payment movement" boundary. No money moves and no live payment provider is involved.
 
 Evidence: `scripts/smoke-awia-firm-package-seat-gating.mjs` (`npm run check:awia:package-gating`); `scripts/smoke-awia-multi-firm-staff-template-scaling.mjs` extended and re-verified so its pre-existing coverage keeps passing under the new gate; `npm run check:op:h3`, `check:op:h4`, `check:r4:s2`, `check:r4:s4`, `check:r4:s5`, `check:awia:staging-prep` re-confirmed unaffected.
+
+## Addendum (Narrowed to HireMe only, 2026-09-06)
+
+Per ADR-075, the AWIA firm package catalogue introduced above is narrowed to a single package: `HIRE_ME` (no seat cap, no role restriction, business owner names the specific worker(s) to hire). `SOLO_STAND`, `ENT_GROW`, and `CORPO_EXT` are removed, not kept dormant. Everything else in the addendum above (the gate mechanics, the endpoints, the pre-billing boundary, human-operator-only assignment) is unchanged - only the catalogue's contents changed.

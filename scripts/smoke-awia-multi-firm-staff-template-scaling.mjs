@@ -80,10 +80,10 @@ try {
 
   // Phase E-prep: hiring now requires a firm to have an assigned AWIA commercial
   // package first (ADR-073's operator-driven package/seat gating). Assign
-  // CORPO_EXT (6 seats, all roles) to both firms so this pre-existing template
+  // HIRE_ME (no seat cap, all roles -- ADR-075) to both firms so this pre-existing template
   // scaling coverage keeps exercising exactly what it always has.
-  await post("/ops/awia-package-assignment", { tenant_id: tenantA.id, firm_id: firmA.firm.id, package_code: "CORPO_EXT", actor: actorA }, headersA);
-  await post("/ops/awia-package-assignment", { tenant_id: tenantB.id, firm_id: firmB.firm.id, package_code: "CORPO_EXT", actor: actorB }, headersB);
+  await post("/ops/awia-package-assignment", { tenant_id: tenantA.id, firm_id: firmA.firm.id, package_code: "HIRE_ME", actor: actorA }, headersA);
+  await post("/ops/awia-package-assignment", { tenant_id: tenantB.id, firm_id: firmB.firm.id, package_code: "HIRE_ME", actor: actorB }, headersB);
 
   const runA = await post("/awia/virtual-staff/provision-from-template", { tenant_id: tenantA.id, firm_id: firmA.firm.id, template_id: "lean_advisory_practice_v1", actor: actorA }, headersA);
   if (runA.provisioning_run.summary.member_count !== 3) throw new Error(`Expected Firm A lean_advisory_practice_v1 to provision 3 staff, got ${runA.provisioning_run.summary.member_count}.`);

@@ -8,43 +8,26 @@
 // seat count and role limits? Package assignment and gating are pre-billing --
 // see ADR-073 in DECISION_REGISTER.md -- and do not authorize any live payment
 // capture, matching the AGENTS.md "no live payment movement" boundary.
+//
+// ADR-075: the product owner narrowed direction to a single commercial
+// package -- HireMe -- for now. SoloStand, EntGrow, and CorpoExt (built under
+// ADR-074) are removed rather than kept dormant, so the catalogue reflects
+// exactly one real offer: the business owner names the specific AWIA virtual
+// worker(s) they want to hire, with human approval still required on every
+// output. No fixed seat cap or role restriction is enforced at this stage.
 
 export const awiaFirmPackageGateBoundary = "seat_and_role_gating_only_no_payment_no_runtime_authority";
 
 const ALL_ROLES = ["CFO", "FAO", "SAO", "OPO", "ARO"];
 
 export const awiaFirmPackages = {
-  SOLO_STAND: {
-    package_code: "SOLO_STAND",
-    package_name: "SoloStand",
-    max_seats: 1,
-    allowed_roles: ALL_ROLES,
-    custom_worker_selection_required: false,
-    description: "Single AWIA virtual staff seat, any one role."
-  },
-  ENT_GROW: {
-    package_code: "ENT_GROW",
-    package_name: "EntGrow",
-    max_seats: 3,
-    allowed_roles: ["FAO", "SAO", "OPO", "ARO"],
-    custom_worker_selection_required: false,
-    description: "Up to three AWIA virtual staff seats for a growth-stage firm; no CFO seat at this tier."
-  },
-  CORPO_EXT: {
-    package_code: "CORPO_EXT",
-    package_name: "CorpoExt",
-    max_seats: 6,
-    allowed_roles: ALL_ROLES,
-    custom_worker_selection_required: false,
-    description: "Up to six AWIA virtual staff seats across all roles, including CFO."
-  },
   HIRE_ME: {
     package_code: "HIRE_ME",
     package_name: "HireMe",
     max_seats: null,
     allowed_roles: ALL_ROLES,
     custom_worker_selection_required: true,
-    description: "Custom package: the client names the specific virtual worker(s) to hire; no fixed seat cap in this pass."
+    description: "The business owner names the specific AWIA virtual worker(s) to hire. No fixed seat cap or role restriction in this pass; every output still requires human approval."
   }
 };
 
