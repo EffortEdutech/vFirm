@@ -11,6 +11,7 @@ import { buildAwiaVirtualStaffEvidencePack } from "../../../packages/core-domain
 import { buildStaffMemoryEntry, buildConversationThread, buildConversationMessage } from "../../../packages/core-domain/src/awia-virtual-staff-memory.mjs";
 import { evaluateSeatBillingTransition } from "../../../packages/core-domain/src/awia-virtual-staff-payroll.mjs";
 import { resolveAwiaStaffTemplate, listAwiaStaffTemplates } from "../../../packages/core-domain/src/awia-virtual-staff-templates.mjs";
+import { resolveAwiaFirmPackage, evaluateAwiaFirmPackageSeatGate, listAwiaFirmPackages } from "../../../packages/core-domain/src/awia-firm-package-catalogue.mjs";
 
 const { Pool } = pg;
 const root = process.cwd();
@@ -29,6 +30,7 @@ const initialStore = () => ({
   service_skus: [],
   worker_templates: [],
   worker_instances: [],
+  awia_firm_package_assignments: [],
   awia_virtual_staff_provisioning_runs: [],
   awia_virtual_staff_seats: [],
   awia_virtual_staff_members: [],
@@ -3986,6 +3988,50 @@ export async function updateAwiaStaffSeatBillingStatusRecord(body, actor) {
   });
 }
 
+export async function assignAwiaFirmPackageRecord(body, actor) {
+  const resolved = resolveAwiaFirmPackage(body.package_code);
+  if (!resolved.found) invalidState(`AWIA firm package rejected: ${resolved.findings.join(", ")}`);
+  return withStore((store) => {
+    const firm = store.firms.find((record) => record.id === body.firm_id && record.tenant_id === body.tenant_id);
+    if (!firm) throwNotFound("firms", body.firm_id);
+    store.awia_firm_package_assignments = store.awia_firm_package_assignments ?? [];
+    const existing = store.awia_firm_package_assignments.find((record) => record.tenant_id === body.tenant_id && record.firm_id === body.firm_id);
+    const timestamp = now();
+    const fromPackageCode = existing?.package_code ?? null;
+    const record = existing ?? {
+      id: storeBackend === "postgres" ? newUuid() : newId("awia_firm_package_assignment"),
+      tenant_id: body.tenant_id,
+      firm_id: body.firm_id,
+      created_at: timestamp
+    };
+    record.package_code = resolved.package.package_code;
+    record.package_name = resolved.package.package_name;
+    record.max_seats = resolved.package.max_seats;
+    record.allowed_roles = resolved.package.allowed_roles;
+    record.custom_worker_selection_required = resolved.package.custom_worker_selection_required;
+    record.assigned_by_actor_id = actor.actor_id;
+    record.updated_at = timestamp;
+    upsertById(store.awia_firm_package_assignments, record);
+    appendEventAndAudit(store, {
+      event_type: "awia.firm_package.assigned",
+      actor,
+      tenant_id: body.tenant_id,
+      firm_id: body.firm_id,
+      aggregate_type: "AwiaFirmPackageAssignment",
+      aggregate_id: record.id,
+      payload: { from_package_code: fromPackageCode, to_package_code: record.package_code },
+      summary: "Operator assigned an AWIA commercial package to this firm (pre-billing seat/role gating only, no live payment)."
+    });
+    return record;
+  });
+}
+
+export async function readAwiaFirmPackageAssignmentRecord(tenant_id, firm_id) {
+  const store = await readStore();
+  const assignment = (store.awia_firm_package_assignments ?? []).find((record) => record.tenant_id === tenant_id && record.firm_id === firm_id) ?? null;
+  return { boundary: "seat_and_role_gating_only_no_payment_no_runtime_authority", assignment, catalogue: listAwiaFirmPackages() };
+}
+
 export async function provisionAwiaVirtualStaffFromTemplateRecord(body, actor) {
   return withStore((store) => {
     const firm = store.firms.find((record) => record.id === body.firm_id && record.tenant_id === body.tenant_id);
@@ -3994,6 +4040,12 @@ export async function provisionAwiaVirtualStaffFromTemplateRecord(body, actor) {
     if (existingRun) invalidState(`AWIA virtual staff roster already provisioned for firm ${body.firm_id}; use lifecycle commands to manage existing staff.`);
     const resolved = resolveAwiaStaffTemplate(body.template_id);
     if (!resolved.found) invalidState(`AWIA staff template rejected: ${resolved.findings.join(", ")}`);
+    const packageAssignment = (store.awia_firm_package_assignments ?? []).find((record) => record.tenant_id === body.tenant_id && record.firm_id === body.firm_id);
+    if (!packageAssignment) invalidState("AWIA_STAFF_HIRE_REQUIRES_PACKAGE_ASSIGNMENT: assign a subscription package to this firm before hiring AWIA virtual staff.");
+    const packageResolved = resolveAwiaFirmPackage(packageAssignment.package_code);
+    if (!packageResolved.found) invalidState(`AWIA firm package on record is no longer recognized: ${packageResolved.findings.join(", ")}`);
+    const seatGate = evaluateAwiaFirmPackageSeatGate({ package: packageResolved.package, staffSet: resolved.template.staff_set });
+    if (seatGate.decision !== "ALLOW") invalidState(`AWIA staff hire denied by package gate: ${seatGate.findings.join(", ")}`);
     const run = provisionPilotVirtualStaff({
       tenant_id: body.tenant_id,
       firm_id: body.firm_id,
@@ -4002,7 +4054,7 @@ export async function provisionAwiaVirtualStaffFromTemplateRecord(body, actor) {
       registry: awiaVirtualStaffPackageRegistry,
       pilotStaff: resolved.template.staff_set
     });
-    upsertById(store.awia_virtual_staff_provisioning_runs, { ...awiaProvisioningSnapshot(run), template_id: resolved.template.template_id, template_name: resolved.template.name, template_version: resolved.template.version });
+    upsertById(store.awia_virtual_staff_provisioning_runs, { ...awiaProvisioningSnapshot(run), template_id: resolved.template.template_id, template_name: resolved.template.name, template_version: resolved.template.version, package_code: packageAssignment.package_code });
     for (const seat of run.seats) upsertById(store.awia_virtual_staff_seats, { ...awiaRecord(seat, "staff_seat_id"), template_id: resolved.template.template_id });
     for (const member of run.members) upsertById(store.awia_virtual_staff_members, awiaRecord(member, "agent_id"));
     for (const assignment of run.role_assignments) upsertById(store.awia_staff_role_assignments, awiaRecord(assignment, "role_assignment_id"));

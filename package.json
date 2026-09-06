@@ -140,6 +140,7 @@
                     "check:awia:department-dashboards":  "node scripts/smoke-awia-department-dashboards.mjs",
                     "check:awia:payroll-billing":  "node scripts/smoke-awia-payroll-and-seat-billing-polish.mjs",
                     "check:awia:template-scaling":  "node scripts/smoke-awia-multi-firm-staff-template-scaling.mjs",
+                    "check:awia:package-gating":  "node scripts/smoke-awia-firm-package-seat-gating.mjs",
                     "check:awia:staging-prep":  "node scripts/smoke-awia-staging-preparation.mjs"
                 },
     "engines":  {

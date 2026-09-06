@@ -105,3 +105,19 @@ OP-H2 does not implement:
 The next active sprint is:
 
 `OP-H3 - Formwork Pilot Day Rehearsal`
+## Addendum (Operator-driven AWIA package assignment and seat/role gating, 2026-09-06)
+
+Per ADR-073 (Phase E commercial activation deferred to the end of the roadmap; platform/operations work proceeds first) and ADR-074, OP-H2's operator surface gained a new pre-billing capability: an operator can assign one of four named AWIA commercial packages to a firm, and hiring AWIA virtual staff for that firm is now gated against the package's seat count and allowed-role limits.
+
+New, additive only - no existing OP-H2 behavior changed:
+
+- `POST /ops/awia-package-assignment` (`{ tenant_id, firm_id, package_code }`) - assigns/re-assigns a firm's package. Requires a human operator actor (`requireHumanOperationalAuthority`).
+- `GET /ops/awia-package-assignment?tenant_id=...&firm_id=...` - reads a firm's current assignment plus the full package catalogue.
+- Package catalogue (`packages/core-domain/src/awia-firm-package-catalogue.mjs`, pure/deterministic, no payment, no runtime authority): `SOLO_STAND` (1 seat, any role), `ENT_GROW` (3 seats, no CFO), `CORPO_EXT` (6 seats, all roles), `HIRE_ME` (no seat cap in this pass, all roles, client names the specific worker).
+- `POST /awia/virtual-staff/provision-from-template` (the "hire a worker" template-based flow) now requires a firm to have a package assigned first, and rejects a hire that exceeds the package's seat count or includes a role the package disallows.
+- The already-accepted OP-H1 through OP-H6 fixed-roster pilot flow (`POST /awia/virtual-staff/provision-pilot`) is unaffected - it does not go through this gate, so no previously-accepted pilot-day evidence changes.
+- New collection `awia_firm_package_assignments`, tenant/firm scoped, included in the data-protection export manifest like every other AWIA collection.
+
+This is explicitly pre-billing: package assignment and seat/role gating are labels and limits only, matching the AGENTS.md "no live payment movement" boundary. No money moves and no live payment provider is involved.
+
+Evidence: `scripts/smoke-awia-firm-package-seat-gating.mjs` (`npm run check:awia:package-gating`); `scripts/smoke-awia-multi-firm-staff-template-scaling.mjs` extended and re-verified so its pre-existing coverage keeps passing under the new gate; `npm run check:op:h3`, `check:op:h4`, `check:r4:s2`, `check:r4:s4`, `check:r4:s5`, `check:awia:staging-prep` re-confirmed unaffected.
