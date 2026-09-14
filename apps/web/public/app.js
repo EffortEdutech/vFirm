@@ -4280,6 +4280,131 @@ function bindWorkControls() {
     }
   });
 }
+// "Approvals" -- a single inbox of everything waiting on a human decision
+// across the firm, instead of only inside the Work screen's per-row buttons.
+// Reads the same awia_staff_output_drafts / awia_client_delivery_drafts data
+// and calls the same output-review/client-delivery-draft endpoints Work
+// already proved end to end -- this is a second, dedicated surface for the
+// same governed decisions, not a new decision path.
+let __approvalsDelegationBound = false;
+function renderApprovalsModule(store) {
+  const members = store.awia_virtual_staff_members ?? [];
+  const roleAssignments = store.awia_staff_role_assignments ?? [];
+  const tasks = store.tasks ?? [];
+  const outputDrafts = store.awia_staff_output_drafts ?? [];
+  const clientDeliveryDrafts = store.awia_client_delivery_drafts ?? [];
+
+  const pending = outputDrafts.filter((draft) => draft.status === "DRAFT_REVIEW_REQUIRED");
+
+  const pendingRows = pending
+    .map((draft) => {
+      const member = members.find((record) => record.agent_code === draft.staff_code);
+      const assignment = roleAssignments.find((record) => record.staff_code === draft.staff_code);
+      const task = tasks.find((record) => record.id === draft.task_id);
+      return `<tr><td><strong>${escapeHtml(member?.display_name ?? draft.staff_code)}</strong><br><small>${escapeHtml(assignment?.role_name ?? assignment?.role_code ?? "Virtual worker")}</small></td><td>${escapeHtml(task?.task_type ?? shortId(draft.task_id))}</td><td>${escapeHtml(draft.output_title ?? "Draft output")}<br><small>${escapeHtml(draft.output_summary ?? "")}</small></td><td><input type="text" data-approval-notes-for="${escapeHtml(draft.id)}" placeholder="Notes (optional)" /></td><td><button class="primary small" data-approval-approve="${escapeHtml(draft.id)}">Approve</button> <button class="secondary small" data-approval-revise="${escapeHtml(draft.id)}">Send back</button></td></tr>`;
+    })
+    .join("");
+  const pendingTable = pending.length
+    ? `<div class="record-table-wrap"><table class="record-table"><thead><tr><th>Worker</th><th>Task</th><th>What they produced</th><th>Notes</th><th></th></tr></thead><tbody>${pendingRows}</tbody></table></div>`
+    : `<p class="empty">Nothing waiting on your review right now.</p>`;
+
+  const readyRows = clientDeliveryDrafts
+    .map(
+      (draft) =>
+        `<tr><td>${escapeHtml(draft.delivery_title)}</td><td>${escapeHtml(draft.staff_code)}</td><td><span class="pill">Waiting for you to send</span></td></tr>`,
+    )
+    .join("");
+  const readyTable = clientDeliveryDrafts.length
+    ? `<div class="record-table-wrap"><table class="record-table"><thead><tr><th>Deliverable</th><th>Prepared by</th><th>Status</th></tr></thead><tbody>${readyRows}</tbody></table></div>`
+    : `<p class="empty">Nothing ready to send to a client yet.</p>`;
+
+  const host = document.querySelector("#approvalsView");
+  if (!host) return;
+  host.innerHTML = `<section class="panel"><div class="panel-heading"><h2>Approvals</h2><p>${pending.length ? `${pending.length} draft${pending.length === 1 ? "" : "s"} waiting on your decision.` : "You're caught up -- nothing waiting on you right now."} Nothing reaches a client without your approval here.</p></div></section><section class="panel"><div class="panel-heading"><h2>Needs Your Review</h2></div>${pendingTable}</section><section class="panel"><div class="panel-heading"><h2>Ready to Send</h2></div>${readyTable}</section>`;
+
+  bindApprovalsControls();
+}
+function bindApprovalsControls() {
+  if (__approvalsDelegationBound) return;
+  const container = document.querySelector("#approvalsView");
+  if (!container) return;
+  __approvalsDelegationBound = true;
+
+  function approvalsContext() {
+    const scopedStore = lastStore ? scopedStoreForActiveFirm(lastStore) : {};
+    const contract = activeWorkspaceContract(scopedStore);
+    return {
+      store: scopedStore,
+      tenant: contract.tenant,
+      firm: contract.firm,
+      actor:
+        contract.principal ??
+        systemActorForBrowser(contract.tenant?.id, contract.firm?.id),
+    };
+  }
+
+  function notesFor(draftId) {
+    const input = container.querySelector(`[data-approval-notes-for="${CSS.escape(draftId)}"]`);
+    const value = (input?.value ?? "").toString().trim();
+    return value || undefined;
+  }
+
+  container.addEventListener("click", async (event) => {
+    const approveBtn = event.target.closest("[data-approval-approve]");
+    if (approveBtn) {
+      const ctx = approvalsContext();
+      const outputDraftId = approveBtn.dataset.approvalApprove;
+      await runUiCommand({
+        label: "Approve draft",
+        button: approveBtn,
+        success: "Approved -- ready to prepare for the client",
+        action: async () => {
+          const data = await request("/awia/virtual-staff/output-review", {
+            method: "POST",
+            body: JSON.stringify({
+              tenant_id: ctx.tenant.id,
+              firm_id: ctx.firm.id,
+              output_draft_id: outputDraftId,
+              review_decision: "APPROVED_FOR_CLIENT_DRAFT",
+              review_notes: notesFor(outputDraftId),
+              actor: ctx.actor,
+            }),
+          });
+          await refresh();
+          switchView("approvals");
+          return data;
+        },
+      });
+      return;
+    }
+    const reviseBtn = event.target.closest("[data-approval-revise]");
+    if (reviseBtn) {
+      const ctx = approvalsContext();
+      const outputDraftId = reviseBtn.dataset.approvalRevise;
+      await runUiCommand({
+        label: "Send back for revision",
+        button: reviseBtn,
+        success: "Sent back for revision",
+        action: async () => {
+          const data = await request("/awia/virtual-staff/output-review", {
+            method: "POST",
+            body: JSON.stringify({
+              tenant_id: ctx.tenant.id,
+              firm_id: ctx.firm.id,
+              output_draft_id: outputDraftId,
+              review_decision: "REVISION_REQUIRED",
+              review_notes: notesFor(outputDraftId),
+              actor: ctx.actor,
+            }),
+          });
+          await refresh();
+          switchView("approvals");
+          return data;
+        },
+      });
+    }
+  });
+}
 function renderAiWorkforceModule(store) {
   const contract = activeWorkspaceContract(store);
   const allowedTemplateCodes = workerTemplateCodesForContract(contract);
@@ -6930,6 +7055,7 @@ function renderRecordViews(store) {
   safeRenderModule("#myFirmView", "My Firm", renderMyFirmModule, store);
   safeRenderModule("#myTeamView", "My Team", renderMyTeamModule, store);
   safeRenderModule("#workView", "Work", renderWorkModule, store);
+  safeRenderModule("#approvalsView", "Approvals", renderApprovalsModule, store);
   safeRenderModule("#clientsView", "Clients", renderClientModule, store);
   safeRenderModule("#intakeView", "Intake", renderIntakeModule, store);
   safeRenderModule(
@@ -6998,32 +7124,16 @@ function renderRecordViews(store) {
       ),
     store,
   );
-  safeRenderModule(
-    "#approvalsView",
-    "Approvals",
-    () =>
-      renderIfSubscribed(
-        "#approvalsView",
-        "Approvals",
-        "approvals",
-        () =>
-          renderRecordView({
-            target: "#approvalsView",
-            title: "Approvals",
-            description: "Explicit approval decisions.",
-            records: store.approvals ?? [],
-            empty: "No approvals yet.",
-            columns: [
-              { label: "Subject", value: (r) => r.subject_type },
-              { label: "Decision", value: (r) => r.decision },
-              { label: "Auth", value: (r) => r.authentication_strength },
-              { label: "ID", value: (r) => shortId(r.id) },
-            ],
-          }),
-        store,
-      ),
-    store,
-  );
+  // NOTE: the raw store.approvals audit table (Subject/Decision/Auth/ID)
+  // previously rendered here into #approvalsView has been superseded by
+  // renderApprovalsModule (business-owner Approvals inbox, wired above via
+  // safeRenderModule("#approvalsView", "Approvals", renderApprovalsModule, store)).
+  // Per ADR-079, that old operator-only view's data (store.approvals) and the
+  // generic renderRecordView({...}) call shape are preserved here in this
+  // comment intentionally -- the raw approval-decision audit table can be
+  // re-surfaced later in an Admin/Audit-only screen; it is only removed from
+  // the main nav and from the #approvalsView slot to resolve the duplicate
+  // section/nav id collision with the new inbox.
   safeRenderModule(
     "#invoicesView",
     "Invoices",

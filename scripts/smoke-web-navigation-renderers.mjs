@@ -194,6 +194,23 @@ for (const marker of workMarkers) {
 }
 assert(new RegExp(`safeRenderModule\\(\\s*"#workView"`).test(app), "Work view must be guarded by safeRenderModule.");
 
+const approvalsMarkers = [
+  'data-view="approvals"',
+  'id="view-approvals"',
+  'id="approvalsView"',
+  "function renderApprovalsModule(",
+  "function bindApprovalsControls(",
+  "data-approval-approve",
+  "data-approval-revise",
+  "data-approval-notes-for",
+  "Needs Your Review",
+  "Ready to Send"
+];
+for (const marker of approvalsMarkers) {
+  assert(html.includes(marker) || app.includes(marker), `Approvals screen UI marker missing: ${marker}`);
+}
+assert(new RegExp(`safeRenderModule\\(\\s*"#approvalsView"`).test(app), "Approvals view must be guarded by safeRenderModule.");
+
 
 console.log(JSON.stringify({
   smoke: "web-navigation-renderers",
