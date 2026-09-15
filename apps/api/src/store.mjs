@@ -3892,6 +3892,46 @@ export async function prepareAwiaClientDeliveryDraftRecord(body, actor) {
   });
 }
 
+export async function markAwiaClientDeliveryDraftSentRecord(body, actor) {
+  return withStore((store) => {
+    const draft = store.awia_client_delivery_drafts.find((record) => record.id === body.client_delivery_draft_id && record.tenant_id === body.tenant_id && record.firm_id === body.firm_id);
+    if (!draft) throwNotFound("awia_client_delivery_drafts", body.client_delivery_draft_id);
+    if (draft.status !== "CLIENT_DELIVERY_DRAFT_PREPARED") invalidState("Only a prepared client delivery draft can be marked sent.");
+    draft.status = "OWNER_MARKED_SENT";
+    draft.marked_sent_by_actor_id = actor.actor_id;
+    draft.marked_sent_at = now();
+    const item = store.awia_staff_workdesk_items.find((record) => record.id === draft.workdesk_item_id);
+    if (item) {
+      item.workdesk_status = "ARCHIVED_SENT";
+      item.archived_at = now();
+      item.archived_by_actor_id = actor.actor_id;
+      item.updated_at = now();
+    }
+    appendEventAndAudit(store, { event_type: "awia.virtual_staff.client_delivery_draft_marked_sent", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaClientDeliveryDraft", aggregate_id: draft.id, payload: { output_draft_id: draft.output_draft_id, marked_sent_by_actor_id: actor.actor_id }, summary: "Owner recorded that a prepared client delivery draft was delivered outside vFirm; this is a recordkeeping action only, not a system client transmission or final issue action." });
+    return { client_delivery_draft: draft, workdesk_item: item ?? null };
+  });
+}
+
+export async function archiveAwiaStaffWorkdeskItemRecord(body, actor) {
+  return withStore((store) => {
+    const item = store.awia_staff_workdesk_items.find((record) => record.id === body.workdesk_item_id && record.tenant_id === body.tenant_id && record.firm_id === body.firm_id);
+    if (!item) throwNotFound("awia_staff_workdesk_items", body.workdesk_item_id);
+    const output = item.output_draft_id ? store.awia_staff_output_drafts.find((record) => record.id === item.output_draft_id) : null;
+    const isRejectedOutput = output?.status === "REJECTED";
+    const archivableStatuses = new Set(["REVIEW_ACTION_REQUIRED"]);
+    if (!archivableStatuses.has(item.workdesk_status) && !isRejectedOutput) {
+      invalidState("Only a workdesk item stuck at REVIEW_ACTION_REQUIRED, or whose output draft was REJECTED, can be archived.");
+    }
+    item.workdesk_status = "ARCHIVED_DISMISSED";
+    item.archived_at = now();
+    item.archived_by_actor_id = actor.actor_id;
+    item.archived_reason = body.archived_reason ?? (isRejectedOutput ? "output_rejected" : "review_action_dismissed_by_owner");
+    item.updated_at = now();
+    appendEventAndAudit(store, { event_type: "awia.virtual_staff.workdesk_item_archived", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaStaffWorkdeskItem", aggregate_id: item.id, payload: { archived_reason: item.archived_reason }, summary: "Owner archived a dead-end AWIA workdesk item; no re-draft path exists yet for revision-required items (tracked separately)." });
+    return { workdesk_item: item };
+  });
+}
+
 export async function appendAwiaStaffMemoryEntryRecord(body, actor) {
   return withStore((store) => {
     const member = store.awia_virtual_staff_members.find((record) => record.organization_id === body.tenant_id && record.firm_id === body.firm_id && record.agent_code === body.staff_code);

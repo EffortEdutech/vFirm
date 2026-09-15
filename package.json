@@ -143,6 +143,7 @@
                     "check:awia:package-gating":  "node scripts/smoke-awia-firm-package-seat-gating.mjs",
                     "check:awia:hire-a-worker":  "node scripts/smoke-awia-hire-a-worker.mjs",
                     "check:awia:work-assignment":  "node scripts/smoke-awia-work-assignment.mjs",
+                    "check:awia:workdesk-archive":  "node scripts/smoke-awia-workdesk-archive.mjs",
                     "check:awia:staging-prep":  "node scripts/smoke-awia-staging-preparation.mjs"
                 },
     "engines":  {
