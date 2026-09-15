@@ -17,33 +17,34 @@
           </div>
         </div>
         <nav class="workspace-nav" aria-label="Workspace menu">
-          <button class="nav-button active" data-view="dashboard">Dashboard</button>
-          <button class="nav-button" data-view="my-team">My Team</button>
-          <button class="nav-button" data-view="work">Work</button>
-          <button class="nav-button" data-view="approvals">Approvals</button>
-          <button class="nav-button" data-view="my-firm">My Firm</button>
-          <button class="nav-button" data-view="workflow">Workflow</button>
-          <button class="nav-button" data-view="clients">Clients</button>
-          <button class="nav-button" data-view="front-desk">Front Desk</button>
-          <button class="nav-button" data-view="administration">Administration</button>
-          <button class="nav-button" data-view="sales-accounts">Sales & Accounts</button>
-          <button class="nav-button" data-view="technical-delivery">Technical Delivery</button>
-          <button class="nav-button" data-view="intake">Intake</button>
-          <button class="nav-button" data-view="proposals">Proposals</button>
-          <button class="nav-button" data-view="projects">Projects</button>
-          <button class="nav-button" data-view="invoices">Invoices</button>
-          <button class="nav-button" data-view="ai-workforce">AI Workforce</button>
-          <button class="nav-button" data-view="network">Network</button>
-          <button class="nav-button" data-view="ops">Ops</button>
-          <button class="nav-button" data-view="audit">Audit</button>
-          <button class="nav-button" data-view="service-pack">Service Pack</button>
-          <button class="nav-button" data-view="pilot">Pilot</button>
-          <button class="nav-button" data-view="users">Users</button>
-          <button class="nav-button" data-view="support">Support</button>
-          <button class="nav-button" data-view="review-board">Review Board</button>
-          <button class="nav-button" data-view="expansion">Expansion</button>
-          <button class="nav-button" data-view="usage-billing">Usage/Billing</button>
-          <button class="nav-button" data-view="commercial-launch">Commercial Launch</button>
+          <button class="nav-button active" data-view="dashboard" data-workspace="owner">Dashboard</button>
+          <button class="nav-button" data-view="my-team" data-workspace="owner">My Team</button>
+          <button class="nav-button" data-view="work" data-workspace="owner">Work</button>
+          <button class="nav-button" data-view="approvals" data-workspace="owner">Approvals</button>
+          <button class="nav-button" data-view="my-firm" data-workspace="owner">My Firm</button>
+          <button class="nav-button" data-view="clients" data-workspace="owner">Clients</button>
+          <button class="nav-button" data-view="front-desk" data-workspace="owner">Front Desk</button>
+          <button class="nav-button" data-view="intake" data-workspace="owner">Intake</button>
+          <button class="nav-button" data-view="proposals" data-workspace="owner">Proposals</button>
+          <button class="nav-button" data-view="projects" data-workspace="owner">Projects</button>
+          <button class="nav-button" data-view="invoices" data-workspace="owner">Invoices</button>
+          <button class="nav-button" data-view="workflow" data-workspace="admin">Workflow</button>
+          <button class="nav-button" data-view="administration" data-workspace="admin">Administration</button>
+          <button class="nav-button" data-view="sales-accounts" data-workspace="admin">Sales & Accounts</button>
+          <button class="nav-button" data-view="technical-delivery" data-workspace="admin">Technical Delivery</button>
+          <button class="nav-button" data-view="ai-workforce" data-workspace="admin">AI Workforce</button>
+          <button class="nav-button" data-view="network" data-workspace="admin">Network</button>
+          <button class="nav-button" data-view="ops" data-workspace="admin">Ops</button>
+          <button class="nav-button" data-view="audit" data-workspace="admin">Audit</button>
+          <button class="nav-button" data-view="approval-records" data-workspace="admin">Approval Records</button>
+          <button class="nav-button" data-view="service-pack" data-workspace="admin">Service Pack</button>
+          <button class="nav-button" data-view="pilot" data-workspace="admin">Pilot</button>
+          <button class="nav-button" data-view="users" data-workspace="admin">Users</button>
+          <button class="nav-button" data-view="support" data-workspace="admin">Support</button>
+          <button class="nav-button" data-view="review-board" data-workspace="admin">Review Board</button>
+          <button class="nav-button" data-view="expansion" data-workspace="admin">Expansion</button>
+          <button class="nav-button" data-view="usage-billing" data-workspace="admin">Usage/Billing</button>
+          <button class="nav-button" data-view="commercial-launch" data-workspace="admin">Commercial Launch</button>
         </nav>
       </aside>
       <div id="sidebarScrim" class="sidebar-scrim" aria-hidden="true"></div>
@@ -54,6 +55,10 @@
           <div>
             <p class="eyebrow">Virtual Firm Platform</p>
             <h1 id="workspaceShellTitle">Virtual Firm Workspace</h1>
+          </div>
+          <div id="workspaceModeToggle" class="workspace-mode-toggle" role="group" aria-label="Workspace view (not a login -- switches which screens are shown on this device)">
+            <button id="workspaceModeOwner" class="workspace-mode-button active" type="button" data-workspace-mode="owner" title="Owner workspace: My Team, Work, Approvals, Clients, and the rest of running your firm day-to-day.">Owner workspace</button>
+            <button id="workspaceModeAdmin" class="workspace-mode-button" type="button" data-workspace-mode="admin" title="Admin console: platform operations, audit, billing, and engineering tools. Not a login -- anyone with this app open can switch.">Admin console</button>
           </div>
           <div class="status-card compact">
             <span class="label">API</span>
@@ -138,6 +143,7 @@
       <section id="view-network" class="workspace-view"><div id="networkView"></div></section>
       <section id="view-ops" class="workspace-view"><div id="opsView"></div></section>
       <section id="view-audit" class="workspace-view"><div id="auditView"></div></section>
+      <section id="view-approval-records" class="workspace-view"><div id="approvalRecordsView"></div></section>
       <section id="view-service-pack" class="workspace-view"><div id="servicePackView"></div></section>
       <section id="view-pilot" class="workspace-view"><div id="pilotView"></div></section>
       <section id="view-front-desk" class="workspace-view"><div id="frontDeskView"></div></section>

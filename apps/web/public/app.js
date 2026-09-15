@@ -23,6 +23,18 @@ let lastStore = null;
 let state = defaultState();
 const ACTIVE_FIRM_STORAGE_KEY = "vfirm.activeFirmId";
 let activeFirmId = localStorage.getItem(ACTIVE_FIRM_STORAGE_KEY) ?? null;
+// Admin console / Owner workspace split (Phase 2 of the Admin Console / Owner
+// Workspace sprint plan). This is a UI-only view switch -- it decides which
+// nav buttons and screens are shown, nothing more. It is NOT authentication
+// or access control: it does not restrict any API call, and anyone with this
+// app open on this device can switch it. Real login/authorization is a
+// separate, not-yet-built future sprint item (see that plan's section 2.5).
+const WORKSPACE_MODE_STORAGE_KEY = "vfirm.workspaceMode";
+const WORKSPACE_MODE_DEFAULT_VIEW = { owner: "dashboard", admin: "ops" };
+let workspaceMode =
+  localStorage.getItem(WORKSPACE_MODE_STORAGE_KEY) === "admin"
+    ? "admin"
+    : "owner";
 function defaultState() {
   return {
     tenantName: "Demo Tenant",
@@ -7124,16 +7136,36 @@ function renderRecordViews(store) {
       ),
     store,
   );
-  // NOTE: the raw store.approvals audit table (Subject/Decision/Auth/ID)
-  // previously rendered here into #approvalsView has been superseded by
-  // renderApprovalsModule (business-owner Approvals inbox, wired above via
-  // safeRenderModule("#approvalsView", "Approvals", renderApprovalsModule, store)).
-  // Per ADR-079, that old operator-only view's data (store.approvals) and the
-  // generic renderRecordView({...}) call shape are preserved here in this
-  // comment intentionally -- the raw approval-decision audit table can be
-  // re-surfaced later in an Admin/Audit-only screen; it is only removed from
-  // the main nav and from the #approvalsView slot to resolve the duplicate
-  // section/nav id collision with the new inbox.
+  // Per ADR-079/ADR-081: this raw store.approvals audit table (Subject/
+  // Decision/Auth/ID) is the old operator-only view -- distinct from the
+  // business-owner Approvals inbox (renderApprovalsModule, wired above at
+  // #approvalsView). It now lives in the Admin console as "Approval Records".
+  safeRenderModule(
+    "#approvalRecordsView",
+    "Approval Records",
+    () =>
+      renderIfSubscribed(
+        "#approvalRecordsView",
+        "Approval Records",
+        "approvals",
+        () =>
+          renderRecordView({
+            target: "#approvalRecordsView",
+            title: "Approval Records",
+            description: "Explicit approval decisions (operator audit view).",
+            records: store.approvals ?? [],
+            empty: "No approvals yet.",
+            columns: [
+              { label: "Subject", value: (r) => r.subject_type },
+              { label: "Decision", value: (r) => r.decision },
+              { label: "Auth", value: (r) => r.authentication_strength },
+              { label: "ID", value: (r) => shortId(r.id) },
+            ],
+          }),
+        store,
+      ),
+    store,
+  );
   safeRenderModule(
     "#invoicesView",
     "Invoices",
@@ -7296,6 +7328,39 @@ navButtons.forEach((button) =>
     setSidebarOpen(false);
   }),
 );
+// See the WORKSPACE_MODE_STORAGE_KEY comment near the top of this file: this
+// switch is UI-only, never an access-control boundary.
+function applyWorkspaceMode(mode) {
+  workspaceMode = mode === "admin" ? "admin" : "owner";
+  try {
+    localStorage.setItem(WORKSPACE_MODE_STORAGE_KEY, workspaceMode);
+  } catch {}
+  document
+    .querySelector("#workspaceModeOwner")
+    ?.classList.toggle("active", workspaceMode === "owner");
+  document
+    .querySelector("#workspaceModeAdmin")
+    ?.classList.toggle("active", workspaceMode === "admin");
+  navButtons.forEach((button) => {
+    const belongsToMode = (button.dataset.workspace ?? "owner") === workspaceMode;
+    button.hidden = !belongsToMode;
+  });
+  const activeButtonStillVisible = navButtons.some(
+    (button) =>
+      button.dataset.view === currentView &&
+      (button.dataset.workspace ?? "owner") === workspaceMode,
+  );
+  if (!activeButtonStillVisible) {
+    switchView(WORKSPACE_MODE_DEFAULT_VIEW[workspaceMode] ?? "dashboard");
+  }
+}
+document
+  .querySelector("#workspaceModeOwner")
+  ?.addEventListener("click", () => applyWorkspaceMode("owner"));
+document
+  .querySelector("#workspaceModeAdmin")
+  ?.addEventListener("click", () => applyWorkspaceMode("admin"));
+applyWorkspaceMode(workspaceMode);
 workflowSteps.addEventListener("click", async (event) => {
   const button = event.target.closest("button[data-step]");
   if (!button) return;

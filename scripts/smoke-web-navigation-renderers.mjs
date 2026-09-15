@@ -211,6 +211,51 @@ for (const marker of approvalsMarkers) {
 }
 assert(new RegExp(`safeRenderModule\\(\\s*"#approvalsView"`).test(app), "Approvals view must be guarded by safeRenderModule.");
 
+// Phase 2 of the Admin Console / Owner Workspace sprint plan: a UI-only
+// toggle between two nav sets. Every nav-button must declare which workspace
+// it belongs to, both toggle buttons must exist, and the switch logic must
+// be present -- and it must never be described or implemented as a login.
+const workspaceModeMarkers = [
+  'id="workspaceModeToggle"',
+  'id="workspaceModeOwner"',
+  'id="workspaceModeAdmin"',
+  'data-workspace-mode="owner"',
+  'data-workspace-mode="admin"',
+  "function applyWorkspaceMode(",
+  "WORKSPACE_MODE_STORAGE_KEY",
+  "WORKSPACE_MODE_DEFAULT_VIEW"
+];
+for (const marker of workspaceModeMarkers) {
+  assert(html.includes(marker) || app.includes(marker), `Workspace mode toggle marker missing: ${marker}`);
+}
+assert(!html.includes('type="password"') && !/<form[^>]*id="[^"]*login/i.test(html), "Workspace mode switch must stay UI-only, never implemented as a login form.");
+assert(/not a login/i.test(app) || /UI-only/i.test(app), "Workspace mode switch code must document that it is UI-only, not access control.");
+
+const navButtonBlocks = [...html.matchAll(/<button class="nav-button[^>]*data-view="([^"]+)"[^>]*>/g)];
+assert(navButtonBlocks.length === navViews.length, "Every nav button must be matched by the workspace-attribute scan.");
+const OWNER_VIEWS = ["dashboard", "my-team", "work", "approvals", "my-firm", "clients", "front-desk", "intake", "proposals", "projects", "invoices"];
+const ADMIN_VIEWS = ["workflow", "administration", "sales-accounts", "technical-delivery", "ai-workforce", "network", "ops", "audit", "approval-records", "service-pack", "pilot", "users", "support", "review-board", "expansion", "usage-billing", "commercial-launch"];
+for (const match of navButtonBlocks) {
+  const tag = match[0];
+  const view = match[1];
+  const expectedMode = OWNER_VIEWS.includes(view) ? "owner" : ADMIN_VIEWS.includes(view) ? "admin" : null;
+  assert(expectedMode, `Nav view "${view}" is not classified into either OWNER_VIEWS or ADMIN_VIEWS in this smoke test -- update the sprint plan's screen inventory and this test together.`);
+  assert(tag.includes(`data-workspace="${expectedMode}"`), `Nav view "${view}" must be tagged data-workspace="${expectedMode}".`);
+}
+assert(OWNER_VIEWS.length + ADMIN_VIEWS.length === navViews.length, "OWNER_VIEWS + ADMIN_VIEWS must account for every nav view exactly once.");
+
+const approvalRecordsMarkers = [
+  'data-view="approval-records"',
+  'data-workspace="admin"',
+  'id="view-approval-records"',
+  'id="approvalRecordsView"',
+  "Approval Records"
+];
+for (const marker of approvalRecordsMarkers) {
+  assert(html.includes(marker) || app.includes(marker), `Approval Records (re-wired old operator audit table) marker missing: ${marker}`);
+}
+assert(new RegExp(`safeRenderModule\\(\\s*"#approvalRecordsView"`).test(app), "Approval Records view must be guarded by safeRenderModule.");
+assert(html.indexOf('data-view="approval-records"') !== html.indexOf('data-view="approvals"'), "Approval Records and Approvals must remain distinct nav entries.");
 
 console.log(JSON.stringify({
   smoke: "web-navigation-renderers",

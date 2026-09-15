@@ -1,6 +1,6 @@
 # vFirm — Admin Console / Owner Workspace Split — Sprint Plan and Checklist v1.0
 
-Status: Phase 1 Accepted (ADR-080) — Phase 2 pending
+Status: Phase 1 Accepted (ADR-080); Phase 2 Accepted (ADR-081) — Phase 3 pending
 Depends on: ADR-077, ADR-078, ADR-079 (My Team / Work / Approvals)
 Related: `VFIRM_AWIA_HIRE_A_VIRTUAL_WORKER_UNIFIED_SPRINT_PLAN_AND_CHECKLIST_v1.0.md` (Phase E status update names this line of work as next roadmap work, scope confirmed separately per this document)
 
@@ -92,8 +92,8 @@ Both additions get their own end-to-end smoke test in the style of `scripts/smok
 - [x] Phase 1: `OWNER_MARKED_SENT` status + `mark-sent` endpoint implemented and tested
 - [x] Phase 1: `archived_at`/`archive` endpoint for workdesk items implemented and tested
 - [x] Phase 1: new backend smoke test passing, ADR drafted (ADR-080; `npm run check:awia:workdesk-archive`)
-- [ ] Phase 2: Admin console / Owner workspace toggle built (UI-only, clearly labeled)
-- [ ] Phase 2: nav regrouped per section 3, navigation smoke test updated and passing
+- [x] Phase 2: Admin console / Owner workspace toggle built (UI-only, clearly labeled)
+- [x] Phase 2: nav regrouped per section 3, navigation smoke test updated and passing (ADR-081)
 - [ ] Phase 3: Workdesk screen (5 tabs) built, Work/Approvals screens retired
 - [ ] Phase 3: end-to-end Workdesk smoke test passing
 - [ ] Phase 4: all `check:web*` smoke tests re-confirmed passing

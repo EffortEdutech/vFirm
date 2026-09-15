@@ -365,6 +365,10 @@ h1 { font-size: clamp(28px, 4vw, 46px); line-height: 1.05; letter-spacing: -.04e
 }
 
 .workspace-intro-card { padding: 20px; display: grid; gap: 14px; }
+.workspace-mode-toggle { display: flex; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 16px; background: rgba(255,255,255,.96); box-shadow: 0 8px 20px rgba(16,24,40,.08); }
+.workspace-mode-button { border: none; border-radius: 12px; padding: 8px 12px; font-weight: 800; font-size: 12px; background: transparent; color: var(--muted); cursor: pointer; }
+.workspace-mode-button.active { background: var(--accent); color: white; }
+.workspace-mode-button:hover:not(.active) { background: var(--soft); color: var(--accent-dark); }
 .status-card.compact { min-width: 178px; padding: 12px 16px; border-radius: 16px; box-shadow: 0 8px 20px rgba(16,24,40,.08); }
 .status-card.compact strong { font-size: 17px; margin: 3px 0 0; }
 .status-card.compact small { display: none; }
