@@ -743,6 +743,71 @@ export async function createFirmRecord(body) {
 }
 
 
+// Adds a teammate (person + actor + firm_membership) to an EXISTING, already
+// -provisioned firm. createFirmRecord only ever creates a firm together with
+// its first principal; nothing before this covered growing that firm's team
+// after the fact, which real (multi-user) authentication now requires. JSON
+// store only for now -- Postgres parity is a follow-on, same as everywhere
+// else in this file that is JSON-only.
+export async function addFirmMemberRecord(body) {
+  if (storeBackend === "postgres") {
+    const error = new Error("addFirmMemberRecord is not yet implemented for the Postgres backend.");
+    error.status = 501;
+    error.code = "NOT_IMPLEMENTED";
+    throw error;
+  }
+  return withStore((store) => {
+    const firm = store.firms.find((item) => item.id === body.firm_id && item.tenant_id === body.tenant_id);
+    if (!firm) throwNotFound("firms", body.firm_id);
+    const timestamp = now();
+    const person = {
+      id: newId("person"),
+      tenant_id: body.tenant_id,
+      identity_provider_subject: body.identity_provider_subject ?? null,
+      legal_name: body.display_name,
+      preferred_name: body.display_name,
+      contact_refs: [],
+      status: "ACTIVE",
+      created_at: timestamp,
+      updated_at: timestamp,
+      metadata: {}
+    };
+    const actor = {
+      id: newId("actor"),
+      actor_id: null,
+      actor_type: "HUMAN",
+      person_id: person.id,
+      worker_instance_id: null,
+      system_id: null,
+      external_service_id: null,
+      tenant_id: body.tenant_id,
+      firm_id: body.firm_id,
+      display_name: body.display_name,
+      status: "ACTIVE",
+      created_at: timestamp,
+      metadata: {}
+    };
+    actor.actor_id = actor.id;
+    const membership = {
+      id: newId("firm_membership"),
+      tenant_id: body.tenant_id,
+      firm_id: body.firm_id,
+      actor_id: actor.id,
+      person_id: person.id,
+      role: body.role ?? "MEMBER",
+      permissions: body.permissions ?? ["tenant.read", "client.manage", "project.manage"],
+      status: "ACTIVE",
+      created_at: timestamp,
+      updated_at: timestamp
+    };
+    store.persons.push(person);
+    store.actors.push(actor);
+    store.firm_memberships.push(membership);
+    appendEventAndAudit(store, { event_type: "firm_member.added", actor: body.actor ?? systemActor(body.tenant_id, body.firm_id), tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "Actor", aggregate_id: actor.id, payload: actor, summary: "Firm team member added." });
+    return { person, actor, membership };
+  });
+}
+
 export async function createClientRecord(body) {
   if (storeBackend !== "postgres") {
     return withStore((store) => {

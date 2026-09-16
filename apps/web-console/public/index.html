@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>vFirm Console</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar" id="sidebar">
+        <div class="brand">
+          <div class="brand-mark">VF</div>
+          <div class="brand-text"><strong id="brandFirmName">Loading&hellip;</strong><span id="brandFirmSub">Virtual Firm Platform</span></div>
+        </div>
+        <div class="mode-switch">
+          <button class="active" id="modeOwnerBtn" type="button">Owner workspace</button>
+          <button id="modeAdminBtn" type="button">Admin console</button>
+        </div>
+        <div class="nav-scroll" id="navScroll"></div>
+        <div class="sidebar-foot">
+          <div class="foot-avatar" id="footAvatar">&middot;</div>
+          <div class="foot-text"><strong id="footName">&mdash;</strong><span id="footRole">&mdash;</span></div>
+          <button class="btn btn-ghost btn-sm" id="footLogout" type="button" title="Sign out">Sign out</button>
+        </div>
+      </aside>
+
+      <div class="main">
+        <header class="topbar">
+          <div>
+            <div class="eyebrow" id="pageEyebrow">Overview</div>
+            <h1 id="pageTitle">Dashboard</h1>
+            <p id="pageDesc">Where the firm stands right now.</p>
+          </div>
+          <div class="topbar-actions" id="pageActions"></div>
+        </header>
+        <div class="page-scroll"><div class="page" id="pageBody"><div class="empty">Loading&hellip;</div></div></div>
+      </div>
+    </div>
+
+    <script type="module" src="/js/main.js"></script>
+  </body>
+</html>

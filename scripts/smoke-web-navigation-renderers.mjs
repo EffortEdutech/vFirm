@@ -171,45 +171,46 @@ for (const marker of myTeamMarkers) {
 assert(css.includes(".my-team-role-grid"), "My Team role grid CSS missing.");
 assert(new RegExp(`safeRenderModule\\(\\s*"#myTeamView"`).test(app), "My Team view must be guarded by safeRenderModule.");
 
-const workMarkers = [
-  'data-view="work"',
-  'id="view-work"',
-  'id="workView"',
-  "function renderWorkModule(",
-  "function bindWorkControls(",
+// Phase 3 of the Admin Console / Owner Workspace sprint plan (ADR-082):
+// Work and Approvals are retired in favor of one "Workdesk" screen with
+// five tabs (Inbox/Pending/Approval/Outbox/Archived), reusing the same
+// endpoints Work/Approvals already proved plus the two Phase 1 (ADR-080)
+// endpoints for the Outbox -> Archived transitions.
+const workdeskMarkers = [
+  'data-view="workdesk"',
+  'id="view-workdesk"',
+  'id="workdeskView"',
+  "function renderWorkdeskModule(",
+  "function bindWorkdeskControls(",
   "function awiaRoleCodeForStaffCode(",
   "function awiaClientIdForTask(",
-  "data-work-produce-draft",
-  "data-work-approve",
-  "data-work-revise",
-  "data-work-prepare-client",
+  'data-workdesk-tab="inbox"',
+  'data-workdesk-tab="pending"',
+  'data-workdesk-tab="approval"',
+  'data-workdesk-tab="outbox"',
+  'data-workdesk-tab="archived"',
+  "data-workdesk-produce-draft",
+  "data-workdesk-approve",
+  "data-workdesk-revise",
+  "data-workdesk-reject",
+  "data-workdesk-prepare-client",
+  "data-workdesk-mark-sent",
+  "data-workdesk-archive",
+  "data-workdesk-notes-for",
   "workAssignForm",
   "/awia/virtual-staff/assign-task",
   "/awia/virtual-staff/output-draft",
   "/awia/virtual-staff/output-review",
-  "/awia/virtual-staff/client-delivery-draft"
+  "/awia/virtual-staff/client-delivery-draft",
+  "/awia/virtual-staff/client-delivery-draft/mark-sent",
+  "/awia/virtual-staff/workdesk-item/archive"
 ];
-for (const marker of workMarkers) {
-  assert(html.includes(marker) || app.includes(marker), `Work screen UI marker missing: ${marker}`);
+for (const marker of workdeskMarkers) {
+  assert(html.includes(marker) || app.includes(marker), `Workdesk screen UI marker missing: ${marker}`);
 }
-assert(new RegExp(`safeRenderModule\\(\\s*"#workView"`).test(app), "Work view must be guarded by safeRenderModule.");
-
-const approvalsMarkers = [
-  'data-view="approvals"',
-  'id="view-approvals"',
-  'id="approvalsView"',
-  "function renderApprovalsModule(",
-  "function bindApprovalsControls(",
-  "data-approval-approve",
-  "data-approval-revise",
-  "data-approval-notes-for",
-  "Needs Your Review",
-  "Ready to Send"
-];
-for (const marker of approvalsMarkers) {
-  assert(html.includes(marker) || app.includes(marker), `Approvals screen UI marker missing: ${marker}`);
-}
-assert(new RegExp(`safeRenderModule\\(\\s*"#approvalsView"`).test(app), "Approvals view must be guarded by safeRenderModule.");
+assert(new RegExp(`safeRenderModule\\(\\s*"#workdeskView"`).test(app), "Workdesk view must be guarded by safeRenderModule.");
+assert(!app.includes("function renderWorkModule(") && !app.includes("function renderApprovalsModule("), "Work/Approvals renderers must be retired, not left alongside Workdesk.");
+assert(!html.includes('data-view="work"') && !html.includes('data-view="approvals"'), "Work/Approvals nav buttons must be retired, not left alongside Workdesk.");
 
 // Phase 2 of the Admin Console / Owner Workspace sprint plan: a UI-only
 // toggle between two nav sets. Every nav-button must declare which workspace
@@ -233,7 +234,7 @@ assert(/not a login/i.test(app) || /UI-only/i.test(app), "Workspace mode switch 
 
 const navButtonBlocks = [...html.matchAll(/<button class="nav-button[^>]*data-view="([^"]+)"[^>]*>/g)];
 assert(navButtonBlocks.length === navViews.length, "Every nav button must be matched by the workspace-attribute scan.");
-const OWNER_VIEWS = ["dashboard", "my-team", "work", "approvals", "my-firm", "clients", "front-desk", "intake", "proposals", "projects", "invoices"];
+const OWNER_VIEWS = ["dashboard", "my-team", "workdesk", "my-firm", "clients", "front-desk", "intake", "proposals", "projects", "invoices"];
 const ADMIN_VIEWS = ["workflow", "administration", "sales-accounts", "technical-delivery", "ai-workforce", "network", "ops", "audit", "approval-records", "service-pack", "pilot", "users", "support", "review-board", "expansion", "usage-billing", "commercial-launch"];
 for (const match of navButtonBlocks) {
   const tag = match[0];
@@ -255,7 +256,7 @@ for (const marker of approvalRecordsMarkers) {
   assert(html.includes(marker) || app.includes(marker), `Approval Records (re-wired old operator audit table) marker missing: ${marker}`);
 }
 assert(new RegExp(`safeRenderModule\\(\\s*"#approvalRecordsView"`).test(app), "Approval Records view must be guarded by safeRenderModule.");
-assert(html.indexOf('data-view="approval-records"') !== html.indexOf('data-view="approvals"'), "Approval Records and Approvals must remain distinct nav entries.");
+assert(html.indexOf('data-view="approval-records"') !== html.indexOf('data-view="workdesk"'), "Approval Records and Workdesk must remain distinct nav entries.");
 
 console.log(JSON.stringify({
   smoke: "web-navigation-renderers",

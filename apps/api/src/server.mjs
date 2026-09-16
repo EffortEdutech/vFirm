@@ -1,6 +1,8 @@
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { createRemoteJWKSet, jwtVerify } from "jose";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { evaluatePolicy } from "../../../packages/policy-engine/src/index.mjs";
 import { apiContracts } from "../../../packages/core-domain/src/api-contracts.mjs";
 import { formworkServicePack } from "../../../packages/service-packs/src/formwork.mjs";
@@ -14,11 +16,25 @@ import { bindTechnicalSkillsRecord, createDrawingReviewRecord, createCalculation
 import { createNetworkProfessionalProfileRecord, createNetworkFirmProfileRecord, createNetworkCapabilityRecord, createNetworkCredentialRecord, createNetworkTrustSignalRecord } from "./store.mjs";
 import { createNetworkConflictCheckRecord, createNetworkQualificationGateRecord, createSpecialistInvitationRecord } from "./store.mjs";
 import { createCollaborationWorkspaceRecord, grantCollaborationWorkspaceParticipantRecord, revokeCollaborationWorkspaceParticipantRecord, addCollaborationWorkspaceEvidenceRecord, createResponsibilityMatrixRecord, createSpecialistAssignmentRecord, transitionSpecialistAssignmentRecord } from "./store.mjs";
+import { addFirmMemberRecord } from "./store.mjs";
 
 const root = process.cwd();
 const port = Number(process.env.VFIRM_API_PORT ?? 3091);
 const FORMWORK_SERVICE_PACK_ID = "11111111-1111-4111-8111-111111111111";
 const FORMWORK_SERVICE_SKU_ID = "22222222-2222-4222-8222-222222222222";
+
+// Real (Supabase) authentication -- opt-in, additive. When VFIRM_SUPABASE_URL
+// isn't set, none of this activates and every existing dev-header / staging
+// -header code path below is untouched: apps/web, the smoke-test suite, and
+// any client that never sends an Authorization header keep working exactly
+// as before. web-console is the only client that sends a real Supabase
+// bearer token today.
+const SUPABASE_URL = process.env.VFIRM_SUPABASE_URL ?? null;
+const SUPABASE_JWT_ISSUER = SUPABASE_URL ? `${SUPABASE_URL}/auth/v1` : null;
+const supabaseJwks = SUPABASE_URL ? createRemoteJWKSet(new URL(`${SUPABASE_URL}/auth/v1/.well-known/jwks.json`)) : null;
+const supabaseAdmin = SUPABASE_URL && process.env.VFIRM_SUPABASE_SERVICE_ROLE_KEY
+  ? createSupabaseClient(SUPABASE_URL, process.env.VFIRM_SUPABASE_SERVICE_ROLE_KEY, { auth: { autoRefreshToken: false, persistSession: false } })
+  : null;
 const readCollections = new Map([
   ["tenants", "tenants"],
   ["persons", "persons"],
@@ -155,7 +171,7 @@ function corsHeaders(req) {
   return {
     "access-control-allow-origin": allowedOrigins.has(origin) ? origin : "http://127.0.0.1:3090",
     "access-control-allow-methods": "GET,POST,OPTIONS",
-    "access-control-allow-headers": "content-type,x-vfirm-actor-id,x-vfirm-tenant-id,x-vfirm-firm-id,x-vfirm-role,x-vfirm-auth-provider,x-vfirm-user-email,x-vfirm-user-subject,x-vfirm-user-name,x-vfirm-auth-verified",
+    "access-control-allow-headers": "content-type,authorization,x-vfirm-actor-id,x-vfirm-tenant-id,x-vfirm-firm-id,x-vfirm-role,x-vfirm-auth-provider,x-vfirm-user-email,x-vfirm-user-subject,x-vfirm-user-name,x-vfirm-auth-verified",
     "vary": "Origin"
   };
 }
@@ -182,6 +198,17 @@ function headerValue(req, name) {
 }
 
 function devActorFromHeaders(req, tenant_id = null, firm_id = null) {
+  // Real-auth path: set only when this request carried an Authorization:
+  // Bearer token (see resolveSupabaseAuth / the server's request handler).
+  // A request with no such header never reaches this branch, so dev-header
+  // clients (apps/web, smoke tests) are completely unaffected. A request
+  // WITH a bearer token never falls back to trusting client-set headers --
+  // an invalid/expired token means "no actor", full stop.
+  if (req && Object.prototype.hasOwnProperty.call(req, "vfirmSupabaseAuth")) {
+    const auth = req.vfirmSupabaseAuth;
+    if (!auth?.ok || !auth.actor) return null;
+    return { ...auth.actor, tenant_id: auth.actor.tenant_id ?? tenant_id, firm_id: auth.actor.firm_id ?? firm_id };
+  }
   const actor_id = headerValue(req, "x-vfirm-actor-id");
   if (!actor_id) return null;
   return {
@@ -191,6 +218,53 @@ function devActorFromHeaders(req, tenant_id = null, firm_id = null) {
     firm_id: headerValue(req, "x-vfirm-firm-id") ?? firm_id,
     role: headerValue(req, "x-vfirm-role") ?? "principal",
     display_name: "Dev Auth Actor"
+  };
+}
+
+// Verifies a Supabase-issued JWT against the project's own JWKS (no shared
+// secret ever leaves Supabase) and resolves it to a vFirm actor via the
+// pilot_users table -- which already modeled exactly this (email +
+// external_subject + invite lifecycle) before today, just unused.
+async function resolveSupabaseAuth(token) {
+  if (!supabaseJwks) return { ok: false, reason: "SUPABASE_NOT_CONFIGURED" };
+  let payload;
+  try {
+    ({ payload } = await jwtVerify(token, supabaseJwks, { issuer: SUPABASE_JWT_ISSUER }));
+  } catch (error) {
+    return { ok: false, reason: "INVALID_TOKEN" };
+  }
+  const supabase_user_id = payload.sub;
+  const email = String(payload.email ?? "").toLowerCase();
+  const store = await readStore();
+  const pilotUsers = store.pilot_users ?? [];
+  let pilotUser = pilotUsers.find((user) => user.external_subject === supabase_user_id && user.invite_status === "ACTIVE");
+  if (!pilotUser) {
+    const invited = pilotUsers.find((user) => user.email === email && user.invite_status === "INVITED" && !user.external_subject);
+    if (invited) {
+      // First login after being invited (self-serve invite or admin invite) --
+      // bind this now-verified Supabase identity to the invited record.
+      pilotUser = await activatePilotUserRecord({ pilot_user_id: invited.id, tenant_id: invited.tenant_id, external_subject: supabase_user_id });
+    }
+  }
+  if (!pilotUser) {
+    // Verified Supabase session, but not yet linked to any firm -- this is
+    // the "just signed up, needs to create or join a firm" state.
+    return { ok: true, actor: null, supabase_user_id, email };
+  }
+  return {
+    ok: true,
+    supabase_user_id,
+    email,
+    actor: {
+      actor_id: pilotUser.actor_id,
+      actor_type: "HUMAN",
+      tenant_id: pilotUser.tenant_id,
+      firm_id: pilotUser.firm_id,
+      role: pilotUser.pilot_role,
+      display_name: pilotUser.display_name,
+      supabase_user_id,
+      email
+    }
   };
 }
 
@@ -205,8 +279,13 @@ function authProviderConfig() {
     issuer_configured: Boolean(process.env.VFIRM_AUTH_ISSUER),
     jwks_configured: Boolean(process.env.VFIRM_AUTH_JWKS_URL),
     audience_configured: Boolean(process.env.VFIRM_AUTH_AUDIENCE),
-    adapter_status: provider === "staging-header" ? "STAGING_HEADER_ADAPTER" : configured ? "PROVIDER_CONFIG_DECLARED" : "DEV_HEADER_ONLY",
-    supported_providers: ["staging-header", "clerk", "auth0", "supabase", "entra"]
+    adapter_status: supabaseJwks ? "SUPABASE_JWT_VERIFIED" : provider === "staging-header" ? "STAGING_HEADER_ADAPTER" : configured ? "PROVIDER_CONFIG_DECLARED" : "DEV_HEADER_ONLY",
+    supported_providers: ["staging-header", "clerk", "auth0", "supabase", "entra"],
+    // Real, live verification -- independent of VFIRM_AUTH_PROVIDER, which is
+    // otherwise just a config label. Any request carrying a valid Supabase
+    // bearer token is verified whenever this is true, regardless of that var.
+    supabase_configured: Boolean(supabaseJwks),
+    supabase_invite_email_configured: Boolean(supabaseAdmin)
   };
 }
 
@@ -949,6 +1028,92 @@ async function createTenant(body) {
 async function createFirm(body) {
   requireFields(body, ["tenant_id", "name", "principal_name"]);
   return createFirmRecord(body);
+}
+
+// Self-serve signup: a person who has just verified their email with
+// Supabase (has a valid session, no vFirm identity yet) creates their own
+// tenant + firm and becomes its first owner in one step.
+async function signupFirm(body, req) {
+  const auth = req?.vfirmSupabaseAuth;
+  if (!auth?.ok || !auth.supabase_user_id) {
+    const error = new Error("Sign-up requires a verified Supabase session.");
+    error.status = 401;
+    error.code = "AUTH_REQUIRED";
+    throw error;
+  }
+  if (auth.actor) {
+    const error = new Error("This account is already linked to a firm.");
+    error.status = 409;
+    error.code = "ALREADY_ONBOARDED";
+    throw error;
+  }
+  requireFields(body, ["firm_name", "principal_name"]);
+  const tenant = await createTenantRecord({ name: body.tenant_name ?? body.firm_name });
+  const firmResult = await createFirmRecord({ tenant_id: tenant.id, name: body.firm_name, principal_name: body.principal_name });
+  const invited = await invitePilotUserRecord(
+    { tenant_id: tenant.id, firm_id: firmResult.firm.id, actor_id: firmResult.principal_actor.id, email: auth.email, display_name: body.principal_name, pilot_role: "OWNER", auth_provider: "supabase", external_subject: auth.supabase_user_id, invite_status: "INVITED" },
+    firmResult.principal_actor
+  );
+  const activated = await activatePilotUserRecord({ pilot_user_id: invited.id, tenant_id: tenant.id, external_subject: auth.supabase_user_id }, firmResult.principal_actor);
+  return { tenant, firm: firmResult.firm, actor: firmResult.principal_actor, pilot_user: activated };
+}
+
+// Invite a teammate by email to an existing firm. Creates their actor record
+// now (so the firm's roster shows a pending teammate immediately) and, if a
+// Supabase service-role key is configured, sends them a real invite email
+// via Supabase's own auth.admin API -- no email infrastructure of our own.
+async function inviteFirmMember(body, req) {
+  requireFields(body, ["tenant_id", "firm_id", "email"]);
+  const auth = req?.vfirmSupabaseAuth;
+  const actor = auth?.ok ? auth.actor : null;
+  if (!actor) {
+    const error = new Error("Only an authenticated firm member can send invitations.");
+    error.status = 401;
+    error.code = "AUTH_REQUIRED";
+    throw error;
+  }
+  assertActorScope(actor, { tenant_id: body.tenant_id, firm_id: body.firm_id }, "firm invitation");
+  const email = String(body.email).toLowerCase();
+  const displayName = body.display_name ?? email;
+  const added = await addFirmMemberRecord({ tenant_id: body.tenant_id, firm_id: body.firm_id, display_name: displayName, role: body.role ?? "MEMBER", actor });
+  const invited = await invitePilotUserRecord(
+    { tenant_id: body.tenant_id, firm_id: body.firm_id, actor_id: added.actor.id, email, display_name: displayName, pilot_role: body.role ?? "MEMBER", auth_provider: "supabase", invite_status: "INVITED" },
+    actor
+  );
+  let email_sent = false;
+  if (supabaseAdmin) {
+    try {
+      await supabaseAdmin.auth.admin.inviteUserByEmail(email, { data: { tenant_id: body.tenant_id, firm_id: body.firm_id, pilot_user_id: invited.id } });
+      email_sent = true;
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error("[vfirm] Supabase invite email failed", error);
+    }
+  }
+  return { pilot_user: invited, actor: added.actor, email_sent };
+}
+
+async function readAuthMe(req) {
+  const auth = req?.vfirmSupabaseAuth;
+  if (!auth) {
+    const error = new Error("No Authorization header on this request.");
+    error.status = 401;
+    error.code = "AUTH_REQUIRED";
+    throw error;
+  }
+  if (!auth.ok) {
+    const error = new Error("Session token is invalid or expired.");
+    error.status = 401;
+    error.code = "AUTH_INVALID";
+    throw error;
+  }
+  if (!auth.actor) {
+    return { needs_firm: true, supabase_user_id: auth.supabase_user_id, email: auth.email };
+  }
+  const store = await readStore();
+  const tenant = (store.tenants ?? []).find((item) => item.id === auth.actor.tenant_id) ?? null;
+  const firm = (store.firms ?? []).find((item) => item.id === auth.actor.firm_id) ?? null;
+  return { needs_firm: false, actor: auth.actor, tenant, firm };
 }
 
 async function createClient(body, req = null) {
@@ -2860,6 +3025,8 @@ async function prepareQuotationReceivable(body, req = null) {
 const routes = new Map([
   ["POST /tenants", createTenant],
   ["POST /firms", createFirm],
+  ["POST /auth/signup-firm", signupFirm],
+  ["POST /auth/invite", inviteFirmMember],
   ["POST /clients", createClient],
   ["POST /intake-sessions", createIntakeSession],
   ["POST /proposals", createProposal],
@@ -3011,6 +3178,11 @@ const server = createServer(async (req, res) => {
     }
 
     const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
+    const bearerHeader = headerValue(req, "authorization");
+    if (bearerHeader && /^Bearer\s+/i.test(bearerHeader)) {
+      req.vfirmSupabaseAuth = await resolveSupabaseAuth(bearerHeader.replace(/^Bearer\s+/i, "").trim());
+    }
+    if (req.method === "GET" && url.pathname === "/auth/me") return sendJson(req, res, 200, { ok: true, data: await readAuthMe(req) });
     if (req.method === "GET" && url.pathname === "/health") return sendJson(req, res, 200, { ok: true, service: "vfirm-api", phase: "persistent-mvp-command-loop", ...getStoreInfo(), port_family: "309#", api_port: port });
     if (req.method === "GET" && url.pathname === "/contracts") return sendJson(req, res, 200, { ok: true, data: apiContracts });
     if (req.method === "GET" && url.pathname === "/marketplace/governance-lock") return sendJson(req, res, 200, { ok: true, data: readMEGovernanceLock() });

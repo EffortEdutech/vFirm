@@ -150,6 +150,8 @@
                     "node":  "\u003e=22"
                 },
     "dependencies":  {
-                         "pg":  "^8.23.0"
+                         "pg":  "^8.23.0",
+                         "jose":  "^5.9.6",
+                         "@supabase/supabase-js":  "^2.45.4"
                      }
 }

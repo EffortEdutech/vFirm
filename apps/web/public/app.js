@@ -1406,7 +1406,7 @@ const workspaceModuleDefinitions = {
   approvals: {
     module_code: "approvals",
     module_name: "Approvals",
-    default_view: "approvals",
+    default_view: "workdesk",
     worker_template_code: null,
     outcome: "Track explicit human approval gates and prevent silent approval.",
   },
@@ -1606,7 +1606,7 @@ const viewModuleCodes = {
   "sales-accounts": "sales_accounts",
   "technical-delivery": "technical_delivery",
   projects: "projects",
-  approvals: "approvals",
+  workdesk: "approvals",
   invoices: "invoices",
   "ai-workforce": "ai_workforce",
   network: "network",
@@ -3998,15 +3998,20 @@ function bindMyTeamControls() {
     }
   });
 }
-// "Work" -- the business-owner-facing screen where hired workers get real
-// tasks and their drafts move through the human-approval loop. Wired to the
-// same assign-task/output-draft/output-review/client-delivery-draft
-// endpoints already proven by the AI Workforce operator panel, but a
-// worker's role is looked up live from awia_staff_role_assignments (works
-// for any incrementally-hired staff code, e.g. CFO-002 -- unlike that older
-// panel's hardcoded AWIA_STAFF_ROLE_CODE map) and the client for a
-// client-ready draft is resolved from the task's real project/relationship
-// instead of a guessed fallback client.
+// "Workdesk" -- the business-owner-facing single screen, five tabs
+// (Inbox/Pending/Approval/Outbox/Archived), replacing the separate Work and
+// Approvals screens per Phase 3 of the Admin Console / Owner Workspace
+// sprint plan (ADR-082). Wired to the same assign-task/output-draft/
+// output-review/client-delivery-draft endpoints Work and Approvals already
+// proved end to end, plus the two Phase 1 endpoints (ADR-080,
+// mark-sent/archive) for the Outbox -> Archived transitions -- no new
+// decision path or authority is introduced, only a different arrangement of
+// the same governed steps. A worker's role is looked up live from
+// awia_staff_role_assignments (works for any incrementally-hired staff
+// code, e.g. CFO-002 -- unlike the AI Workforce panel's hardcoded
+// AWIA_STAFF_ROLE_CODE map) and the client for a client-ready draft is
+// resolved from the task's real project/relationship instead of a guessed
+// fallback client.
 function awiaRoleCodeForStaffCode(store, staffCode) {
   const assignment = (store.awia_staff_role_assignments ?? []).find(
     (item) => item.staff_code === staffCode,
@@ -4028,21 +4033,58 @@ function awiaClientIdForTask(store, task) {
   );
   return relationship?.client_id ?? null;
 }
-let __workDelegationBound = false;
-function renderWorkModule(store) {
+let __workdeskDelegationBound = false;
+let workdeskActiveTab = "inbox";
+const WORKDESK_TABS = ["inbox", "pending", "approval", "outbox", "archived"];
+function applyWorkdeskActiveTab(container) {
+  if (!container) return;
+  container.querySelectorAll("[data-workdesk-tab]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.workdeskTab === workdeskActiveTab);
+  });
+  container.querySelectorAll("[data-workdesk-panel]").forEach((panel) => {
+    panel.hidden = panel.dataset.workdeskPanel !== workdeskActiveTab;
+  });
+}
+function renderWorkdeskModule(store) {
   const members = (store.awia_virtual_staff_members ?? []).filter(
     (member) => member.lifecycle_status === "ACTIVE",
   );
+  const allMembers = store.awia_virtual_staff_members ?? [];
   const roleAssignments = store.awia_staff_role_assignments ?? [];
   const tasks = store.tasks ?? [];
   const workdesk = store.awia_staff_workdesk_items ?? [];
   const outputDrafts = store.awia_staff_output_drafts ?? [];
-  const outputReviews = store.awia_staff_output_reviews ?? [];
   const clientDeliveryDrafts = store.awia_client_delivery_drafts ?? [];
 
+  // Inbox: real tasks not yet assigned to any hired worker.
   const openTasks = tasks.filter(
     (task) => !workdesk.some((item) => item.task_id === task.id),
   );
+
+  // Pending: assigned, worker still to produce their draft.
+  const pendingItems = workdesk.filter((item) => item.workdesk_status === "ASSIGNED");
+
+  // Approval: draft produced and waiting on the owner's decision, plus
+  // dead-end items stuck after a REVISION_REQUIRED/REJECTED decision --
+  // ADR-078's known re-draft gap means only archiving (dismissing) moves
+  // those forward, so they surface here rather than disappearing.
+  const draftsAwaitingReview = outputDrafts.filter((draft) => draft.status === "DRAFT_REVIEW_REQUIRED");
+  const stuckItems = workdesk.filter((item) => item.workdesk_status === "REVIEW_ACTION_REQUIRED");
+
+  // Outbox: approved and on its way out -- either not yet prepared for the
+  // client, or prepared and waiting for the owner to confirm it was sent.
+  const approvedNotPrepared = workdesk.filter((item) => {
+    if (item.workdesk_status !== "REVIEWED_FOR_CLIENT_DRAFT") return false;
+    return !clientDeliveryDrafts.some((cdd) => cdd.output_draft_id === item.output_draft_id);
+  });
+  const preparedWaitingToSend = clientDeliveryDrafts.filter(
+    (draft) => draft.status === "CLIENT_DELIVERY_DRAFT_PREPARED",
+  );
+
+  // Archived: closed out -- delivered (owner-confirmed via mark-sent) or
+  // dismissed (owner gave up on a stuck item), per ADR-080's two new states.
+  const sentDeliveries = clientDeliveryDrafts.filter((draft) => draft.status === "OWNER_MARKED_SENT");
+  const dismissedItems = workdesk.filter((item) => item.workdesk_status === "ARCHIVED_DISMISSED");
 
   const firstRoleCode = members.length
     ? awiaRoleCodeForStaffCode(store, members[0].agent_code)
@@ -4062,62 +4104,98 @@ function renderWorkModule(store) {
     )
     .join("");
   const toolOptions = awiaToolOptionsForRoleCode(firstRoleCode);
-
   const assignForm = `<form id="workAssignForm"><label>Worker<select name="staff_code" required>${workerOptions}</select></label><label>Task<select name="task_id" required>${taskOptions}</select></label><label>What should they do<select name="tool" required>${toolOptions}</select></label><label>Reference (a document, file, or note this relates to)<input name="evidence_ref" required placeholder="e.g. latest bank statement, client email" /></label><button type="submit" ${members.length && openTasks.length ? "" : "disabled"}>Assign</button>${!members.length ? '<p class="empty">Hire someone on the My Team screen first.</p>' : ""}${members.length && !openTasks.length ? '<p class="empty">No open tasks waiting to be assigned right now.</p>' : ""}</form>`;
+  const inboxNote = openTasks.length
+    ? ""
+    : `<p class="empty">${tasks.length ? "Every task is assigned. Nothing waiting in the Inbox." : "No tasks yet -- open a project to create one."}</p>`;
 
-  const workRows = workdesk
+  const pendingRows = pendingItems
     .map((item) => {
-      const member = (store.awia_virtual_staff_members ?? []).find(
-        (record) => record.agent_code === item.staff_code,
-      );
+      const member = allMembers.find((record) => record.agent_code === item.staff_code);
       const task = tasks.find((record) => record.id === item.task_id);
-      const draft = outputDrafts.find((record) => record.id === item.output_draft_id);
-      const clientDraft = draft
-        ? clientDeliveryDrafts.find((record) => record.output_draft_id === draft.id)
-        : null;
-      let actionHtml = "";
-      if (item.workdesk_status === "ASSIGNED") {
-        actionHtml = `<button class="secondary small" data-work-produce-draft="${escapeHtml(item.id)}">Get their draft</button>`;
-      } else if (item.workdesk_status === "OUTPUT_DRAFTED" && draft?.status === "DRAFT_REVIEW_REQUIRED") {
-        actionHtml = `<button class="primary small" data-work-approve="${escapeHtml(draft.id)}">Approve</button> <button class="secondary small" data-work-revise="${escapeHtml(draft.id)}">Send back</button>`;
-      } else if (item.workdesk_status === "REVIEWED_FOR_CLIENT_DRAFT" && !clientDraft) {
-        const clientId = awiaClientIdForTask(store, task);
-        actionHtml = `<button class="primary small" data-work-prepare-client="${escapeHtml(draft?.id ?? "")}" ${clientId ? "" : "disabled"}>Prepare for client</button>${clientId ? "" : '<br><small>No client linked to this task yet.</small>'}`;
-      } else if (item.workdesk_status === "REVIEW_ACTION_REQUIRED") {
-        actionHtml = `<span class="pill warning">Sent back -- needs a new draft</span>`;
-      } else if (clientDraft) {
-        actionHtml = `<span class="pill">Ready for delivery</span>`;
-      }
-      return `<tr><td>${escapeHtml(member?.display_name ?? item.staff_code)}</td><td>${escapeHtml(task?.task_type ?? shortId(item.task_id))}</td><td><span class="pill">${escapeHtml(item.workdesk_status)}</span></td><td>${actionHtml}</td></tr>`;
+      return `<tr><td>${escapeHtml(member?.display_name ?? item.staff_code)}</td><td>${escapeHtml(task?.task_type ?? shortId(item.task_id))}</td><td><button class="secondary small" data-workdesk-produce-draft="${escapeHtml(item.id)}">Get their draft</button></td></tr>`;
     })
     .join("");
-  const workTable = workdesk.length
-    ? `<div class="record-table-wrap"><table class="record-table"><thead><tr><th>Worker</th><th>Task</th><th>Status</th><th></th></tr></thead><tbody>${workRows}</tbody></table></div>`
-    : `<p class="empty">No work assigned yet. Assign a task above once you've hired someone.</p>`;
+  const pendingTable = pendingItems.length
+    ? `<div class="record-table-wrap"><table class="record-table"><thead><tr><th>Worker</th><th>Task</th><th></th></tr></thead><tbody>${pendingRows}</tbody></table></div>`
+    : `<p class="empty">Nothing in progress right now. Assign a task from the Inbox tab once you've hired someone.</p>`;
 
-  const readyRows = clientDeliveryDrafts
+  const approvalRows = draftsAwaitingReview
+    .map((draft) => {
+      const member = allMembers.find((record) => record.agent_code === draft.staff_code);
+      const assignment = roleAssignments.find((record) => record.staff_code === draft.staff_code);
+      const task = tasks.find((record) => record.id === draft.task_id);
+      return `<tr><td><strong>${escapeHtml(member?.display_name ?? draft.staff_code)}</strong><br><small>${escapeHtml(assignment?.role_name ?? assignment?.role_code ?? "Virtual worker")}</small></td><td>${escapeHtml(task?.task_type ?? shortId(draft.task_id))}</td><td>${escapeHtml(draft.output_title ?? "Draft output")}<br><small>${escapeHtml(draft.output_summary ?? "")}</small></td><td><input type="text" data-workdesk-notes-for="${escapeHtml(draft.id)}" placeholder="Notes (optional)" /></td><td><button class="primary small" data-workdesk-approve="${escapeHtml(draft.id)}">Approve</button> <button class="secondary small" data-workdesk-revise="${escapeHtml(draft.id)}">Send back</button> <button class="secondary small" data-workdesk-reject="${escapeHtml(draft.id)}">Reject</button></td></tr>`;
+    })
+    .join("");
+  const approvalTable = draftsAwaitingReview.length
+    ? `<div class="record-table-wrap"><table class="record-table"><thead><tr><th>Worker</th><th>Task</th><th>What they produced</th><th>Notes</th><th></th></tr></thead><tbody>${approvalRows}</tbody></table></div>`
+    : `<p class="empty">Nothing waiting on your review right now.</p>`;
+  const stuckRows = stuckItems
+    .map((item) => {
+      const member = allMembers.find((record) => record.agent_code === item.staff_code);
+      const task = tasks.find((record) => record.id === item.task_id);
+      const draft = outputDrafts.find((record) => record.id === item.output_draft_id);
+      const reasonLabel = draft?.status === "REJECTED" ? "Rejected -- no re-draft path yet" : "Sent back -- no re-draft path yet";
+      return `<tr><td>${escapeHtml(member?.display_name ?? item.staff_code)}</td><td>${escapeHtml(task?.task_type ?? shortId(item.task_id))}</td><td><span class="pill warning">${escapeHtml(reasonLabel)}</span></td><td><button class="secondary small" data-workdesk-archive="${escapeHtml(item.id)}">Archive (dismiss)</button></td></tr>`;
+    })
+    .join("");
+  const stuckTable = stuckItems.length
+    ? `<div class="record-table-wrap"><table class="record-table"><thead><tr><th>Worker</th><th>Task</th><th>Status</th><th></th></tr></thead><tbody>${stuckRows}</tbody></table></div>`
+    : "";
+
+  const approvedNotPreparedRows = approvedNotPrepared
+    .map((item) => {
+      const task = tasks.find((record) => record.id === item.task_id);
+      const draft = outputDrafts.find((record) => record.id === item.output_draft_id);
+      const clientId = awiaClientIdForTask(store, task);
+      return `<tr><td>${escapeHtml(draft?.output_title ?? "Approved output")}</td><td>${escapeHtml(item.staff_code)}</td><td><button class="primary small" data-workdesk-prepare-client="${escapeHtml(draft?.id ?? "")}" ${clientId ? "" : "disabled"}>Prepare for client</button>${clientId ? "" : '<br><small>No client linked to this task yet.</small>'}</td></tr>`;
+    })
+    .join("");
+  const preparedRows = preparedWaitingToSend
     .map(
       (draft) =>
-        `<tr><td>${escapeHtml(draft.delivery_title)}</td><td>${escapeHtml(draft.staff_code)}</td><td><span class="pill">Waiting for you to send</span></td></tr>`,
+        `<tr><td>${escapeHtml(draft.delivery_title)}</td><td>${escapeHtml(draft.staff_code)}</td><td><button class="primary small" data-workdesk-mark-sent="${escapeHtml(draft.id)}">Mark sent</button></td></tr>`,
     )
     .join("");
-  const readyTable = clientDeliveryDrafts.length
-    ? `<div class="record-table-wrap"><table class="record-table"><thead><tr><th>Deliverable</th><th>Prepared by</th><th>Status</th></tr></thead><tbody>${readyRows}</tbody></table></div>`
+  const outboxTable = approvedNotPrepared.length || preparedWaitingToSend.length
+    ? `${approvedNotPreparedRows ? `<div class="record-table-wrap"><table class="record-table"><thead><tr><th>Deliverable</th><th>Prepared by</th><th></th></tr></thead><tbody>${approvedNotPreparedRows}</tbody></table></div>` : ""}${preparedRows ? `<div class="record-table-wrap"><table class="record-table"><thead><tr><th>Deliverable</th><th>Prepared by</th><th></th></tr></thead><tbody>${preparedRows}</tbody></table></div>` : ""}`
     : `<p class="empty">Nothing ready to send to a client yet.</p>`;
 
-  const host = document.querySelector("#workView");
+  const sentRows = sentDeliveries
+    .map(
+      (draft) =>
+        `<tr><td>${escapeHtml(draft.delivery_title)}</td><td>${escapeHtml(draft.staff_code)}</td><td><span class="pill">Delivered</span></td><td>${escapeHtml(draft.marked_sent_at ?? "")}</td></tr>`,
+    )
+    .join("");
+  const dismissedRows = dismissedItems
+    .map((item) => {
+      const task = tasks.find((record) => record.id === item.task_id);
+      return `<tr><td>${escapeHtml(task?.task_type ?? shortId(item.task_id))}</td><td>${escapeHtml(item.staff_code)}</td><td><span class="pill">Dismissed</span></td><td>${escapeHtml(item.archived_reason ?? "")}</td></tr>`;
+    })
+    .join("");
+  const archivedTable = sentDeliveries.length || dismissedItems.length
+    ? `${sentRows ? `<div class="record-table-wrap"><table class="record-table"><thead><tr><th>Deliverable</th><th>Worker</th><th>Status</th><th>When</th></tr></thead><tbody>${sentRows}</tbody></table></div>` : ""}${dismissedRows ? `<div class="record-table-wrap"><table class="record-table"><thead><tr><th>Task</th><th>Worker</th><th>Status</th><th>Reason</th></tr></thead><tbody>${dismissedRows}</tbody></table></div>` : ""}`
+    : `<p class="empty">Nothing archived yet.</p>`;
+
+  const approvalCount = draftsAwaitingReview.length + stuckItems.length;
+  const outboxCount = approvedNotPrepared.length + preparedWaitingToSend.length;
+  const archivedCount = sentDeliveries.length + dismissedItems.length;
+
+  const host = document.querySelector("#workdeskView");
   if (!host) return;
-  host.innerHTML = `<section class="panel"><div class="panel-heading"><h2>Work</h2><p>Give your team real tasks, review what they produce, and decide what's ready to go to a client. Nothing reaches a client without your approval.</p></div></section><section class="panel"><div class="panel-heading"><h2>Give Work To Your Team</h2><p>Pick who does it, what task, and what they should do.</p></div>${assignForm}</section><section class="panel"><div class="panel-heading"><h2>In Progress</h2></div>${workTable}</section><section class="panel"><div class="panel-heading"><h2>Ready for Clients</h2></div>${readyTable}</section>`;
+  host.innerHTML = `<section class="panel"><div class="panel-heading"><h2>Workdesk</h2><p>Everything moving through your team, from a new task in your Inbox to work Archived once it's out the door. Nothing reaches a client without your approval.</p></div><div class="workdesk-tab-bar" role="tablist"><button type="button" class="workdesk-tab-button" data-workdesk-tab="inbox">Inbox (${openTasks.length})</button><button type="button" class="workdesk-tab-button" data-workdesk-tab="pending">Pending (${pendingItems.length})</button><button type="button" class="workdesk-tab-button" data-workdesk-tab="approval">Approval (${approvalCount})</button><button type="button" class="workdesk-tab-button" data-workdesk-tab="outbox">Outbox (${outboxCount})</button><button type="button" class="workdesk-tab-button" data-workdesk-tab="archived">Archived (${archivedCount})</button></div></section><section class="panel" data-workdesk-panel="inbox"><div class="panel-heading"><h2>Inbox</h2><p>Real tasks waiting to be given to a hired worker.</p></div>${assignForm}${inboxNote}</section><section class="panel" data-workdesk-panel="pending"><div class="panel-heading"><h2>Pending</h2><p>Assigned to a worker; drafting in progress.</p></div>${pendingTable}</section><section class="panel" data-workdesk-panel="approval"><div class="panel-heading"><h2>Approval</h2><p>Waiting on your decision, or stuck after one (no re-draft path yet -- archive to dismiss).</p></div>${approvalTable}${stuckTable}</section><section class="panel" data-workdesk-panel="outbox"><div class="panel-heading"><h2>Outbox</h2><p>Approved and on its way to the client.</p></div>${outboxTable}</section><section class="panel" data-workdesk-panel="archived"><div class="panel-heading"><h2>Archived</h2><p>Closed out -- delivered (owner-confirmed) or dismissed.</p></div>${archivedTable}</section>`;
 
-  bindWorkControls();
+  bindWorkdeskControls();
+  applyWorkdeskActiveTab(host);
 }
-function bindWorkControls() {
-  if (__workDelegationBound) return;
-  const container = document.querySelector("#workView");
+function bindWorkdeskControls() {
+  if (__workdeskDelegationBound) return;
+  const container = document.querySelector("#workdeskView");
   if (!container) return;
-  __workDelegationBound = true;
+  __workdeskDelegationBound = true;
 
-  function workContext() {
+  function workdeskContext() {
     const scopedStore = lastStore ? scopedStoreForActiveFirm(lastStore) : {};
     const contract = activeWorkspaceContract(scopedStore);
     return {
@@ -4128,6 +4206,17 @@ function bindWorkControls() {
         contract.principal ??
         systemActorForBrowser(contract.tenant?.id, contract.firm?.id),
     };
+  }
+
+  function notesFor(draftId) {
+    const input = container.querySelector(`[data-workdesk-notes-for="${CSS.escape(draftId)}"]`);
+    const value = (input?.value ?? "").toString().trim();
+    return value || undefined;
+  }
+
+  function goToTab(tab) {
+    workdeskActiveTab = tab;
+    applyWorkdeskActiveTab(container);
   }
 
   container.addEventListener("change", (event) => {
@@ -4152,7 +4241,7 @@ function bindWorkControls() {
     const form = event.target.closest("#workAssignForm");
     if (!form) return;
     event.preventDefault();
-    const ctx = workContext();
+    const ctx = workdeskContext();
     const fd = new FormData(form);
     const task = (ctx.store.tasks ?? []).find((item) => item.id === fd.get("task_id"));
     await runUiCommand({
@@ -4176,17 +4265,23 @@ function bindWorkControls() {
           }),
         });
         await refresh();
-        switchView("work");
+        switchView("workdesk");
+        goToTab("pending");
         return data;
       },
     });
   });
 
   container.addEventListener("click", async (event) => {
-    const produceBtn = event.target.closest("[data-work-produce-draft]");
+    const tabBtn = event.target.closest("[data-workdesk-tab]");
+    if (tabBtn) {
+      goToTab(tabBtn.dataset.workdeskTab);
+      return;
+    }
+    const produceBtn = event.target.closest("[data-workdesk-produce-draft]");
     if (produceBtn) {
-      const ctx = workContext();
-      const workdeskItemId = produceBtn.dataset.workProduceDraft;
+      const ctx = workdeskContext();
+      const workdeskItemId = produceBtn.dataset.workdeskProduceDraft;
       await runUiCommand({
         label: "Get their draft",
         button: produceBtn,
@@ -4202,16 +4297,17 @@ function bindWorkControls() {
             }),
           });
           await refresh();
-          switchView("work");
+          switchView("workdesk");
+          goToTab("approval");
           return data;
         },
       });
       return;
     }
-    const approveBtn = event.target.closest("[data-work-approve]");
+    const approveBtn = event.target.closest("[data-workdesk-approve]");
     if (approveBtn) {
-      const ctx = workContext();
-      const outputDraftId = approveBtn.dataset.workApprove;
+      const ctx = workdeskContext();
+      const outputDraftId = approveBtn.dataset.workdeskApprove;
       await runUiCommand({
         label: "Approve draft",
         button: approveBtn,
@@ -4224,20 +4320,22 @@ function bindWorkControls() {
               firm_id: ctx.firm.id,
               output_draft_id: outputDraftId,
               review_decision: "APPROVED_FOR_CLIENT_DRAFT",
+              review_notes: notesFor(outputDraftId),
               actor: ctx.actor,
             }),
           });
           await refresh();
-          switchView("work");
+          switchView("workdesk");
+          goToTab("outbox");
           return data;
         },
       });
       return;
     }
-    const reviseBtn = event.target.closest("[data-work-revise]");
+    const reviseBtn = event.target.closest("[data-workdesk-revise]");
     if (reviseBtn) {
-      const ctx = workContext();
-      const outputDraftId = reviseBtn.dataset.workRevise;
+      const ctx = workdeskContext();
+      const outputDraftId = reviseBtn.dataset.workdeskRevise;
       await runUiCommand({
         label: "Send back for revision",
         button: reviseBtn,
@@ -4250,20 +4348,50 @@ function bindWorkControls() {
               firm_id: ctx.firm.id,
               output_draft_id: outputDraftId,
               review_decision: "REVISION_REQUIRED",
+              review_notes: notesFor(outputDraftId),
               actor: ctx.actor,
             }),
           });
           await refresh();
-          switchView("work");
+          switchView("workdesk");
+          goToTab("approval");
           return data;
         },
       });
       return;
     }
-    const prepareBtn = event.target.closest("[data-work-prepare-client]");
+    const rejectBtn = event.target.closest("[data-workdesk-reject]");
+    if (rejectBtn) {
+      const ctx = workdeskContext();
+      const outputDraftId = rejectBtn.dataset.workdeskReject;
+      await runUiCommand({
+        label: "Reject draft",
+        button: rejectBtn,
+        success: "Rejected",
+        action: async () => {
+          const data = await request("/awia/virtual-staff/output-review", {
+            method: "POST",
+            body: JSON.stringify({
+              tenant_id: ctx.tenant.id,
+              firm_id: ctx.firm.id,
+              output_draft_id: outputDraftId,
+              review_decision: "REJECTED",
+              review_notes: notesFor(outputDraftId),
+              actor: ctx.actor,
+            }),
+          });
+          await refresh();
+          switchView("workdesk");
+          goToTab("approval");
+          return data;
+        },
+      });
+      return;
+    }
+    const prepareBtn = event.target.closest("[data-workdesk-prepare-client]");
     if (prepareBtn) {
-      const ctx = workContext();
-      const outputDraftId = prepareBtn.dataset.workPrepareClient;
+      const ctx = workdeskContext();
+      const outputDraftId = prepareBtn.dataset.workdeskPrepareClient;
       const draft = (ctx.store.awia_staff_output_drafts ?? []).find(
         (item) => item.id === outputDraftId,
       );
@@ -4285,132 +4413,60 @@ function bindWorkControls() {
             }),
           });
           await refresh();
-          switchView("work");
-          return data;
-        },
-      });
-    }
-  });
-}
-// "Approvals" -- a single inbox of everything waiting on a human decision
-// across the firm, instead of only inside the Work screen's per-row buttons.
-// Reads the same awia_staff_output_drafts / awia_client_delivery_drafts data
-// and calls the same output-review/client-delivery-draft endpoints Work
-// already proved end to end -- this is a second, dedicated surface for the
-// same governed decisions, not a new decision path.
-let __approvalsDelegationBound = false;
-function renderApprovalsModule(store) {
-  const members = store.awia_virtual_staff_members ?? [];
-  const roleAssignments = store.awia_staff_role_assignments ?? [];
-  const tasks = store.tasks ?? [];
-  const outputDrafts = store.awia_staff_output_drafts ?? [];
-  const clientDeliveryDrafts = store.awia_client_delivery_drafts ?? [];
-
-  const pending = outputDrafts.filter((draft) => draft.status === "DRAFT_REVIEW_REQUIRED");
-
-  const pendingRows = pending
-    .map((draft) => {
-      const member = members.find((record) => record.agent_code === draft.staff_code);
-      const assignment = roleAssignments.find((record) => record.staff_code === draft.staff_code);
-      const task = tasks.find((record) => record.id === draft.task_id);
-      return `<tr><td><strong>${escapeHtml(member?.display_name ?? draft.staff_code)}</strong><br><small>${escapeHtml(assignment?.role_name ?? assignment?.role_code ?? "Virtual worker")}</small></td><td>${escapeHtml(task?.task_type ?? shortId(draft.task_id))}</td><td>${escapeHtml(draft.output_title ?? "Draft output")}<br><small>${escapeHtml(draft.output_summary ?? "")}</small></td><td><input type="text" data-approval-notes-for="${escapeHtml(draft.id)}" placeholder="Notes (optional)" /></td><td><button class="primary small" data-approval-approve="${escapeHtml(draft.id)}">Approve</button> <button class="secondary small" data-approval-revise="${escapeHtml(draft.id)}">Send back</button></td></tr>`;
-    })
-    .join("");
-  const pendingTable = pending.length
-    ? `<div class="record-table-wrap"><table class="record-table"><thead><tr><th>Worker</th><th>Task</th><th>What they produced</th><th>Notes</th><th></th></tr></thead><tbody>${pendingRows}</tbody></table></div>`
-    : `<p class="empty">Nothing waiting on your review right now.</p>`;
-
-  const readyRows = clientDeliveryDrafts
-    .map(
-      (draft) =>
-        `<tr><td>${escapeHtml(draft.delivery_title)}</td><td>${escapeHtml(draft.staff_code)}</td><td><span class="pill">Waiting for you to send</span></td></tr>`,
-    )
-    .join("");
-  const readyTable = clientDeliveryDrafts.length
-    ? `<div class="record-table-wrap"><table class="record-table"><thead><tr><th>Deliverable</th><th>Prepared by</th><th>Status</th></tr></thead><tbody>${readyRows}</tbody></table></div>`
-    : `<p class="empty">Nothing ready to send to a client yet.</p>`;
-
-  const host = document.querySelector("#approvalsView");
-  if (!host) return;
-  host.innerHTML = `<section class="panel"><div class="panel-heading"><h2>Approvals</h2><p>${pending.length ? `${pending.length} draft${pending.length === 1 ? "" : "s"} waiting on your decision.` : "You're caught up -- nothing waiting on you right now."} Nothing reaches a client without your approval here.</p></div></section><section class="panel"><div class="panel-heading"><h2>Needs Your Review</h2></div>${pendingTable}</section><section class="panel"><div class="panel-heading"><h2>Ready to Send</h2></div>${readyTable}</section>`;
-
-  bindApprovalsControls();
-}
-function bindApprovalsControls() {
-  if (__approvalsDelegationBound) return;
-  const container = document.querySelector("#approvalsView");
-  if (!container) return;
-  __approvalsDelegationBound = true;
-
-  function approvalsContext() {
-    const scopedStore = lastStore ? scopedStoreForActiveFirm(lastStore) : {};
-    const contract = activeWorkspaceContract(scopedStore);
-    return {
-      store: scopedStore,
-      tenant: contract.tenant,
-      firm: contract.firm,
-      actor:
-        contract.principal ??
-        systemActorForBrowser(contract.tenant?.id, contract.firm?.id),
-    };
-  }
-
-  function notesFor(draftId) {
-    const input = container.querySelector(`[data-approval-notes-for="${CSS.escape(draftId)}"]`);
-    const value = (input?.value ?? "").toString().trim();
-    return value || undefined;
-  }
-
-  container.addEventListener("click", async (event) => {
-    const approveBtn = event.target.closest("[data-approval-approve]");
-    if (approveBtn) {
-      const ctx = approvalsContext();
-      const outputDraftId = approveBtn.dataset.approvalApprove;
-      await runUiCommand({
-        label: "Approve draft",
-        button: approveBtn,
-        success: "Approved -- ready to prepare for the client",
-        action: async () => {
-          const data = await request("/awia/virtual-staff/output-review", {
-            method: "POST",
-            body: JSON.stringify({
-              tenant_id: ctx.tenant.id,
-              firm_id: ctx.firm.id,
-              output_draft_id: outputDraftId,
-              review_decision: "APPROVED_FOR_CLIENT_DRAFT",
-              review_notes: notesFor(outputDraftId),
-              actor: ctx.actor,
-            }),
-          });
-          await refresh();
-          switchView("approvals");
+          switchView("workdesk");
+          goToTab("outbox");
           return data;
         },
       });
       return;
     }
-    const reviseBtn = event.target.closest("[data-approval-revise]");
-    if (reviseBtn) {
-      const ctx = approvalsContext();
-      const outputDraftId = reviseBtn.dataset.approvalRevise;
+    const markSentBtn = event.target.closest("[data-workdesk-mark-sent]");
+    if (markSentBtn) {
+      const ctx = workdeskContext();
+      const clientDeliveryDraftId = markSentBtn.dataset.workdeskMarkSent;
       await runUiCommand({
-        label: "Send back for revision",
-        button: reviseBtn,
-        success: "Sent back for revision",
+        label: "Mark sent",
+        button: markSentBtn,
+        success: "Recorded as delivered and archived",
         action: async () => {
-          const data = await request("/awia/virtual-staff/output-review", {
+          const data = await request("/awia/virtual-staff/client-delivery-draft/mark-sent", {
             method: "POST",
             body: JSON.stringify({
               tenant_id: ctx.tenant.id,
               firm_id: ctx.firm.id,
-              output_draft_id: outputDraftId,
-              review_decision: "REVISION_REQUIRED",
-              review_notes: notesFor(outputDraftId),
+              client_delivery_draft_id: clientDeliveryDraftId,
               actor: ctx.actor,
             }),
           });
           await refresh();
-          switchView("approvals");
+          switchView("workdesk");
+          goToTab("archived");
+          return data;
+        },
+      });
+      return;
+    }
+    const archiveBtn = event.target.closest("[data-workdesk-archive]");
+    if (archiveBtn) {
+      const ctx = workdeskContext();
+      const workdeskItemId = archiveBtn.dataset.workdeskArchive;
+      await runUiCommand({
+        label: "Archive",
+        button: archiveBtn,
+        success: "Archived",
+        action: async () => {
+          const data = await request("/awia/virtual-staff/workdesk-item/archive", {
+            method: "POST",
+            body: JSON.stringify({
+              tenant_id: ctx.tenant.id,
+              firm_id: ctx.firm.id,
+              workdesk_item_id: workdeskItemId,
+              actor: ctx.actor,
+            }),
+          });
+          await refresh();
+          switchView("workdesk");
+          goToTab("archived");
           return data;
         },
       });
@@ -7066,8 +7122,7 @@ function safeRenderModule(target, title, renderer, store) {
 function renderRecordViews(store) {
   safeRenderModule("#myFirmView", "My Firm", renderMyFirmModule, store);
   safeRenderModule("#myTeamView", "My Team", renderMyTeamModule, store);
-  safeRenderModule("#workView", "Work", renderWorkModule, store);
-  safeRenderModule("#approvalsView", "Approvals", renderApprovalsModule, store);
+  safeRenderModule("#workdeskView", "Workdesk", renderWorkdeskModule, store);
   safeRenderModule("#clientsView", "Clients", renderClientModule, store);
   safeRenderModule("#intakeView", "Intake", renderIntakeModule, store);
   safeRenderModule(
@@ -7136,10 +7191,11 @@ function renderRecordViews(store) {
       ),
     store,
   );
-  // Per ADR-079/ADR-081: this raw store.approvals audit table (Subject/
-  // Decision/Auth/ID) is the old operator-only view -- distinct from the
-  // business-owner Approvals inbox (renderApprovalsModule, wired above at
-  // #approvalsView). It now lives in the Admin console as "Approval Records".
+  // Per ADR-079/ADR-081/ADR-082: this raw store.approvals audit table
+  // (Subject/Decision/Auth/ID) is the old operator-only view -- distinct
+  // from the business-owner's Approval tab inside the Workdesk screen
+  // (renderWorkdeskModule, wired above at #workdeskView). It now lives in
+  // the Admin console as "Approval Records".
   safeRenderModule(
     "#approvalRecordsView",
     "Approval Records",
