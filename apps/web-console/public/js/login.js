@@ -51,6 +51,16 @@ async function afterSessionEstablished() {
   }
 }
 
+document.querySelectorAll(".pw-toggle").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const input = document.getElementById(btn.dataset.toggleFor);
+    if (!input) return;
+    const isHidden = input.type === "password";
+    input.type = isHidden ? "text" : "password";
+    btn.textContent = isHidden ? "Hide" : "Show";
+  });
+});
+
 els.tabSignIn.addEventListener("click", () => {
   els.tabSignIn.classList.add("active");
   els.tabSignUp.classList.remove("active");

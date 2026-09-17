@@ -18,6 +18,10 @@
       .auth-field label{font-size:12.3px; font-weight:600; color:var(--ink-soft);}
       .auth-field input{border:1px solid var(--line-strong); border-radius:7px; padding:9px 11px; font-size:13.5px; background:var(--surface); color:var(--ink); font-family:var(--font-ui);}
       .auth-field input:focus{outline:2px solid var(--accent-soft-line); outline-offset:1px;}
+      .auth-field-pw{position:relative;}
+      .auth-field-pw input{width:100%; box-sizing:border-box; padding-right:56px;}
+      .pw-toggle{position:absolute; right:6px; top:50%; transform:translateY(-50%); border:0; background:transparent; color:var(--ink-soft); font-size:11.5px; font-weight:600; padding:4px 8px; cursor:pointer; border-radius:5px;}
+      .pw-toggle:hover{background:var(--surface-2);}
       .auth-submit{width:100%; justify-content:center; margin-top:4px;}
       .auth-panel{display:none;}
       .auth-panel.active{display:block;}
@@ -44,13 +48,13 @@
 
           <form id="signInForm" class="auth-panel active">
             <div class="auth-field"><label>Email</label><input type="email" id="signInEmail" required autocomplete="email" /></div>
-            <div class="auth-field"><label>Password</label><input type="password" id="signInPassword" required autocomplete="current-password" /></div>
+            <div class="auth-field auth-field-pw"><label>Password</label><input type="password" id="signInPassword" required autocomplete="current-password" /><button type="button" class="pw-toggle" data-toggle-for="signInPassword">Show</button></div>
             <button type="submit" class="btn btn-primary auth-submit">Sign in</button>
           </form>
 
           <form id="signUpForm" class="auth-panel">
             <div class="auth-field"><label>Email</label><input type="email" id="signUpEmail" required autocomplete="email" /></div>
-            <div class="auth-field"><label>Password</label><input type="password" id="signUpPassword" required autocomplete="new-password" minlength="6" /></div>
+            <div class="auth-field auth-field-pw"><label>Password</label><input type="password" id="signUpPassword" required autocomplete="new-password" minlength="6" /><button type="button" class="pw-toggle" data-toggle-for="signUpPassword">Show</button></div>
             <button type="submit" class="btn btn-primary auth-submit">Create account</button>
             <p class="auth-note">If your firm's admin already invited you by email, use the invite link they sent instead of this form.</p>
           </form>
