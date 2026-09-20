@@ -8,7 +8,7 @@ export const defaultToolPolicyByRole = {
   FAO: ["accounts.ap.prepare", "accounts.receivable.prepare", "evidence.bundle.prepare"],
   SAO: ["sales.opportunity.prepare", "proposal.draft.prepare", "customer.communication.draft"],
   OPO: ["project.delivery.coordinate", "workload.summary.prepare", "evidence.bundle.review"],
-  ARO: ["administration.document.register", "administration.deadline.prepare", "evidence.bundle.prepare"]
+  ARO: ["administration.document.register", "administration.deadline.prepare", "evidence.bundle.prepare", "administration.request.triage"]
 };
 
 export const highRiskActions = [

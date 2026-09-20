@@ -179,20 +179,39 @@ export function resolveIdentityFromStore(store) {
   };
 }
 
-// Reference data for the "Hire a worker" panel (My Team). Not fetched live --
-// no GET endpoint exposes it -- so this is transcribed directly from the two
-// source files that define it: only these 5 roles are actually hireable
-// (packages/core-domain/src/awia-firm-package-catalogue.mjs's ALL_ROLES,
-// used by hireAwiaFirmWorker's AWIA_HIREABLE_ROLE_PACKAGE_IDS map in
-// apps/api/src/server.mjs -- CMO/CTO/CIO/CHRO/COO exist in the broader
-// registry but hire-worker rejects them with role_not_hireable_yet). Update
-// this list if those source files change.
+// Reference data for the "Hire a worker" panel (My Team).
+//
+// HM-S1 checklist item 3 (owner-accepted, "vFirm Position-to-Skill Mapping
+// v1.0" doc, ADR-084 candidate): this list is now keyed by client-facing
+// POSITION (job title), transcribed from
+// packages/core-domain/src/awia-virtual-staff-position-catalogue.mjs, not by
+// raw role code. `role_code` is kept on every entry as the underlying
+// capability reference only -- it is what actually gets sent to
+// POST /awia/virtual-staff/hire-worker (apps/api/src/server.mjs's
+// AWIA_HIREABLE_ROLE_PACKAGE_IDS map still only recognizes CFO/FAO/SAO/OPO/ARO;
+// CMO/CTO/CIO/CHRO/COO still reject with role_not_hireable_yet) -- it is not
+// meant to be shown to the client as the label anymore. `position_id` is set
+// for the 5 starter positions from the mapping doc; CFO has no position_id
+// because it isn't part of that 5-position mapping and is kept hireable
+// as-is per the checklist item's own instruction to keep existing role codes
+// as the underlying capability reference. Update this list if the position
+// catalogue file changes.
+//
+// Known HM-S1 gap, carried forward to checklist item 4/5: General Clerk and
+// HR Administrator both resolve to role_code "ARO" -- the hire-worker API
+// has no position-level field yet, so hiring either one today provisions an
+// indistinguishable ARO seat server-side. hireAwiaFirmWorkerRecord already
+// accepts an optional body.display_name override (apps/api/src/store.mjs),
+// so passing the job title through as display_name is the lowest-risk way
+// to preserve which position was actually hired without a server schema
+// change -- left for item 4 (UI wiring), not done here.
 export const HIREABLE_ROLES = [
   { role_code: "CFO", role_name: "Chief Finance Officer", default_staff_grade: "Executive" },
-  { role_code: "FAO", role_name: "Finance Administration Officer", default_staff_grade: "Worker" },
-  { role_code: "SAO", role_name: "Sales and Customer Operations Officer", default_staff_grade: "Worker" },
-  { role_code: "OPO", role_name: "Operations and Project Delivery Officer", default_staff_grade: "Manager" },
-  { role_code: "ARO", role_name: "Administration and Resources Officer", default_staff_grade: "Worker" },
+  { position_id: "general_clerk", role_code: "ARO", role_name: "General Clerk", default_staff_grade: "Worker" },
+  { position_id: "bookkeeper", role_code: "FAO", role_name: "Bookkeeper", default_staff_grade: "Worker" },
+  { position_id: "sales_coordinator", role_code: "SAO", role_name: "Sales Coordinator", default_staff_grade: "Worker" },
+  { position_id: "ops_coordinator", role_code: "OPO", role_name: "Ops Coordinator", default_staff_grade: "Manager" },
+  { position_id: "hr_administrator", role_code: "ARO", role_name: "HR Administrator", default_staff_grade: "Worker" },
 ];
 
 // The only commercial package right now (packages/core-domain/src/awia-firm-package-catalogue.mjs,

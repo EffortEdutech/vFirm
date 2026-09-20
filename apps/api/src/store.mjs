@@ -742,6 +742,97 @@ export async function createFirmRecord(body) {
   }
 }
 
+// HM-S3 item 5 support (2026-09-18). Deletes a firm ONLY if it was created by
+// the automated clean-onboarding smoke test. Refuses to run against any firm
+// whose name does not start with TEST_FIRM_NAME_PREFIX, so this can never be
+// pointed at a real firm even if called with the wrong ids -- name check is
+// enforced here (in the store), not just at the route, as defense in depth.
+// Scoped to exactly the tables createTenantRecord / createFirmRecord /
+// invitePilotUserRecord / activatePilotUserRecord write to for a brand-new
+// signup; nothing else. Not a general-purpose tenant/firm deletion capability.
+const TEST_FIRM_NAME_PREFIX = "HM-S3 Smoke Test Firm";
+
+function assertPurgeableTestFirmName(name) {
+  if (!name || !name.startsWith(TEST_FIRM_NAME_PREFIX)) {
+    const error = new Error(`Refusing to purge firm "${name ?? ""}": only firms named with the "${TEST_FIRM_NAME_PREFIX}" prefix (created by the HM-S3 clean-onboarding smoke test) can be purged.`);
+    error.status = 403;
+    error.code = "TEST_FIRM_PURGE_NAME_MISMATCH";
+    throw error;
+  }
+}
+
+export async function purgeTestFirmRecord(body) {
+  requireFields(body, ["tenant_id", "firm_id"]);
+  const tenantId = body.tenant_id;
+  const firmId = body.firm_id;
+
+  if (storeBackend !== "postgres") {
+    return withStore((store) => {
+      const firm = store.firms.find((item) => item.id === firmId && item.tenant_id === tenantId);
+      if (!firm) throwNotFound("firms", firmId);
+      assertPurgeableTestFirmName(firm.name);
+      store.pilot_users = store.pilot_users.filter((item) => item.tenant_id !== tenantId);
+      store.professional_authorities = store.professional_authorities.filter((item) => item.tenant_id !== tenantId);
+      store.professional_profiles = store.professional_profiles.filter((item) => item.tenant_id !== tenantId);
+      store.firm_memberships = store.firm_memberships.filter((item) => item.firm_id !== firmId);
+      store.firms = store.firms.filter((item) => item.id !== firmId);
+      store.actors = store.actors.filter((item) => item.tenant_id !== tenantId);
+      store.persons = store.persons.filter((item) => item.tenant_id !== tenantId);
+      store.event_log = (store.event_log ?? []).filter((item) => item.tenant_id !== tenantId);
+      store.audit_events = (store.audit_events ?? []).filter((item) => item.tenant_id !== tenantId);
+      store.tenants = store.tenants.filter((item) => item.id !== tenantId);
+      return { purged: true, tenant_id: tenantId, firm_id: firmId };
+    });
+  }
+
+  const client = await getPool().connect();
+  try {
+    await client.query("begin");
+    const firmResult = await client.query("select name from firms where id = $1 and tenant_id = $2", [firmId, tenantId]);
+    if (firmResult.rowCount === 0) throwNotFound("firms", firmId);
+    assertPurgeableTestFirmName(firmResult.rows[0].name);
+    await client.query("delete from pilot_users where tenant_id = $1", [tenantId]);
+    await client.query("delete from policy_decisions where tenant_id = $1", [tenantId]);
+    await client.query("delete from event_log where tenant_id = $1", [tenantId]);
+    await client.query("delete from audit_events where tenant_id = $1", [tenantId]);
+    await client.query("delete from professional_authorities where tenant_id = $1", [tenantId]);
+    await client.query("delete from professional_profiles where tenant_id = $1", [tenantId]);
+    await client.query("delete from firm_memberships where firm_id = $1", [firmId]);
+    // Discovered via HM-S3 item 7's verification run (2026-09-20): a test firm that
+    // hired any AWIA virtual staff (via provision-from-template or single hire) left
+    // rows in these relational tables (migration 0024_awia_virtual_staff_persistence.sql),
+    // and the firm delete below violated their firm_id FK because nothing purged them
+    // first. Item 5's original test never hired staff, so this never surfaced before.
+    await client.query("delete from awia_virtual_staff_provisioning_runs where firm_id = $1", [firmId]);
+    await client.query("delete from awia_virtual_staff_seats where firm_id = $1", [firmId]);
+    await client.query("delete from awia_virtual_staff_members where firm_id = $1", [firmId]);
+    await client.query("delete from awia_staff_role_assignments where firm_id = $1", [firmId]);
+    await client.query("delete from awia_staff_package_bindings where firm_id = $1", [firmId]);
+    await client.query("delete from awia_staff_lifecycle_events where firm_id = $1", [firmId]);
+    await client.query("delete from awia_staff_authority_decisions where firm_id = $1", [firmId]);
+    await client.query("delete from awia_staff_evidence_packs where firm_id = $1", [firmId]);
+    await client.query("delete from awia_staff_task_readiness_records where firm_id = $1", [firmId]);
+    await client.query("delete from awia_staff_workdesk_items where firm_id = $1", [firmId]);
+    await client.query("delete from awia_staff_output_drafts where firm_id = $1", [firmId]);
+    await client.query("delete from awia_staff_output_reviews where firm_id = $1", [firmId]);
+    await client.query("delete from awia_client_delivery_drafts where firm_id = $1", [firmId]);
+    await client.query("delete from awia_staff_memory_entries where firm_id = $1", [firmId]);
+    await client.query("delete from awia_staff_conversation_threads where firm_id = $1", [firmId]);
+    await client.query("delete from awia_staff_conversation_messages where firm_id = $1", [firmId]);
+    await client.query("delete from awia_staff_seat_billing_events where firm_id = $1", [firmId]);
+    await client.query("delete from firms where id = $1", [firmId]);
+    await client.query("delete from actors where tenant_id = $1", [tenantId]);
+    await client.query("delete from persons where tenant_id = $1", [tenantId]);
+    await client.query("delete from tenants where id = $1", [tenantId]);
+    await client.query("commit");
+    return { purged: true, tenant_id: tenantId, firm_id: firmId };
+  } catch (error) {
+    await client.query("rollback");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
 
 // Adds a teammate (person + actor + firm_membership) to an EXISTING, already
 // -provisioned firm. createFirmRecord only ever creates a firm together with
@@ -3858,6 +3949,7 @@ export async function produceAwiaStaffOutputDraftRecord(body, actor) {
       output_title: body.output_title ?? `${item.staff_code} draft output`,
       output_summary: body.output_summary ?? item.assignment_summary,
       output_ref: body.output_ref ?? `awia://draft-output/${item.id}`,
+      output_payload: body.output_payload ?? null,
       evidence_refs: body.evidence_refs ?? item.evidence_refs ?? [],
       status: "DRAFT_REVIEW_REQUIRED",
       requires_human_review: true,
@@ -4148,14 +4240,41 @@ export async function readAwiaFirmPackageAssignmentRecord(tenant_id, firm_id) {
 // never just this one hire's delta, so it stays an accurate team snapshot.
 const AWIA_HIREABLE_ROLE_PACKAGE_IDS = { CFO: "cfo", FAO: "fao", SAO: "sao", OPO: "opo", ARO: "aro" };
 
-function nextAwiaStaffCodeForRole(store, tenant_id, firm_id, role_code) {
+function maxAwiaStaffCodeSuffixForRole(store, tenant_id, firm_id, role_code) {
   const existing = (store.awia_staff_role_assignments ?? []).filter((item) => item.tenant_id === tenant_id && item.firm_id === firm_id && item.role_code === role_code);
   let maxSuffix = 0;
   for (const assignment of existing) {
     const match = /^([A-Z]+)-(\d+)$/.exec(assignment.staff_code ?? "");
     if (match && match[1] === role_code) maxSuffix = Math.max(maxSuffix, Number(match[2]));
   }
-  return `${role_code}-${String(maxSuffix + 1).padStart(3, "0")}`;
+  return maxSuffix;
+}
+
+function nextAwiaStaffCodeForRole(store, tenant_id, firm_id, role_code) {
+  return `${role_code}-${String(maxAwiaStaffCodeSuffixForRole(store, tenant_id, firm_id, role_code) + 1).padStart(3, "0")}`;
+}
+
+// HM-S3 item 7 -- generates staff codes for a whole roster (e.g. a
+// template's staff_set) in one pass, using the same per-firm incremental
+// generator as single hiring (nextAwiaStaffCodeForRole / ROLE-NNN) so
+// every code minted here is recognized by that generator afterward.
+// Previously, bulk-template hiring used the staff_code literals hardcoded
+// in the template definition; some of those (FAO-AP-001, FAO-REV-001,
+// DATA-001 with role_code "FAO") didn't match the ROLE-NNN shape, so a
+// later single hire of the same role couldn't see them when computing its
+// own next number, silently breaking the incrementing sequence. Seeds each
+// role's counter from the firm's existing role assignments, then
+// increments in-memory for every subsequent entry of the same role within
+// this same roster, so multiple entries of one role in a single template
+// get distinct, sequential codes.
+function generateAwiaStaffCodesForRoster(store, tenant_id, firm_id, staffSet) {
+  const counters = {};
+  return staffSet.map((entry) => {
+    const roleCode = entry.role_code;
+    if (!(roleCode in counters)) counters[roleCode] = maxAwiaStaffCodeSuffixForRole(store, tenant_id, firm_id, roleCode);
+    counters[roleCode] += 1;
+    return { ...entry, staff_code: `${roleCode}-${String(counters[roleCode]).padStart(3, "0")}` };
+  });
 }
 
 export async function hireAwiaFirmWorkerRecord(body, actor) {
@@ -4232,13 +4351,17 @@ export async function provisionAwiaVirtualStaffFromTemplateRecord(body, actor) {
     if (!packageResolved.found) invalidState(`AWIA firm package on record is no longer recognized: ${packageResolved.findings.join(", ")}`);
     const seatGate = evaluateAwiaFirmPackageSeatGate({ package: packageResolved.package, staffSet: resolved.template.staff_set });
     if (seatGate.decision !== "ALLOW") invalidState(`AWIA staff hire denied by package gate: ${seatGate.findings.join(", ")}`);
+    // HM-S3 item 7: generate staff codes for this roster the same way single
+    // hiring does, instead of using the template's hardcoded staff_code
+    // literals -- see generateAwiaStaffCodesForRoster for why.
+    const pilotStaff = generateAwiaStaffCodesForRoster(store, body.tenant_id, body.firm_id, resolved.template.staff_set);
     const run = provisionPilotVirtualStaff({
       tenant_id: body.tenant_id,
       firm_id: body.firm_id,
       created_by_actor_id: actor.actor_id,
       salary_plan_id: body.salary_plan_id ?? "virtual-staff-controlled-pilot-plan",
       registry: awiaVirtualStaffPackageRegistry,
-      pilotStaff: resolved.template.staff_set
+      pilotStaff
     });
     upsertById(store.awia_virtual_staff_provisioning_runs, { ...awiaProvisioningSnapshot(run), template_id: resolved.template.template_id, template_name: resolved.template.name, template_version: resolved.template.version, package_code: packageAssignment.package_code });
     for (const seat of run.seats) upsertById(store.awia_virtual_staff_seats, { ...awiaRecord(seat, "staff_seat_id"), template_id: resolved.template.template_id });

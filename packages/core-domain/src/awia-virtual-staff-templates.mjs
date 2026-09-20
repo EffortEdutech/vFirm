@@ -17,7 +17,7 @@ export const awiaStaffTemplates = {
   formwork_engineering_standard_v1: {
     template_id: "formwork_engineering_standard_v1",
     name: "Formwork Engineering Standard Roster",
-    description: "The original 8-role controlled pilot roster (CFO, FAO x3, SAO, OPO, ARO, DATA) used for the Amanah Formwork Pilot Firm and NHL Global Solution.",
+    description: "The original 8-role controlled pilot roster (CFO, FAO x3, SAO, OPO, ARO, DATA) validated on the first two firms provisioned before multi-firm template scaling.",
     version: "1.0",
     staff_set: firstPilotStaffSet
   },

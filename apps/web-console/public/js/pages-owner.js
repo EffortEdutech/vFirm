@@ -105,6 +105,32 @@ export async function mountDashboard(root) {
 // first (hireAwiaFirmWorkerRecord, store.mjs, throws
 // AWIA_STAFF_HIRE_REQUIRES_PACKAGE_ASSIGNMENT without one), so this checks
 // getFirmPackageAssignment() before offering role cards.
+// HM-S1 checklist item 4: My Team's role-code language, replaced with job
+// titles everywhere client-facing. HIREABLE_ROLES (api.js) is the source of
+// truth for role_code -> job title, but role_code "ARO" is genuinely
+// ambiguous (General Clerk and HR Administrator both hire onto it -- the
+// known gap recorded against checklist item 3). Resolve that ambiguity from
+// the worker's own display_name where possible (set to the job title at
+// hire time by the fix below); fall back to a non-code-bearing generic
+// label ("Administration") only for pre-existing ARO hires from before this
+// fix, rather than ever showing the raw role_code to the client.
+const JOB_TITLES_BY_ROLE_CODE = HIREABLE_ROLES.reduce((byCode, role) => {
+  (byCode[role.role_code] ??= []).push(role.role_name);
+  return byCode;
+}, {});
+
+function jobTitleForRoleAssignment(assignment, worker) {
+  const roleCode = assignment?.role_code;
+  const candidates = JOB_TITLES_BY_ROLE_CODE[roleCode] ?? [];
+  if (candidates.length === 1) return candidates[0];
+  if (candidates.length > 1) {
+    const matched = candidates.find((title) => worker?.display_name === title);
+    if (matched) return matched;
+    return "Administration"; // ambiguous ARO seat hired before this fix; never show the raw code
+  }
+  return assignment?.role_name ?? "—";
+}
+
 export async function mountTeam(root) {
   root.innerHTML = loading();
   try {
@@ -117,7 +143,7 @@ export async function mountTeam(root) {
       const assignment = roles.find((r) => r.staff_code === w.agent_code);
       return {
         name: w.display_name ?? w.agent_code,
-        role: assignment?.role_name ?? assignment?.role_code ?? "—",
+        role: jobTitleForRoleAssignment(assignment, w),
         grade: w.staff_grade ?? "—",
         status: (w.lifecycle_status ?? "unknown").toLowerCase(),
         staff_code: w.agent_code,
@@ -140,13 +166,13 @@ export async function mountTeam(root) {
 
     const hirePanel = hasPackage
       ? panel("Hire a worker", `
-          <p class="field-note">HireMe package active — choose a role to add to this firm's team.</p>
+          <p class="field-note">HireMe package active — choose a position to add to this firm's team.</p>
           <div class="role-cards">
             ${HIREABLE_ROLES.map((role) => `
               <div class="role-card">
                 <div class="role-card-title">${escapeHtml(role.role_name)}</div>
-                <div class="field-note">${escapeHtml(role.role_code)} &middot; ${escapeHtml(role.default_staff_grade)}</div>
-                <button class="btn-sm" data-action="hire" data-role-code="${escapeHtml(role.role_code)}" type="button">Hire</button>
+                <div class="field-note">${escapeHtml(role.default_staff_grade)}</div>
+                <button class="btn-sm" data-action="hire" data-role-code="${escapeHtml(role.role_code)}" data-job-title="${escapeHtml(role.role_name)}" type="button">Hire</button>
               </div>
             `).join("")}
           </div>
@@ -177,7 +203,7 @@ export async function mountTeam(root) {
     try {
       if (action === "pause") await api.updateStaffLifecycle({ staff_code: btn.dataset.staffCode, to_state: "PAUSED" });
       if (action === "activate") await api.updateStaffLifecycle({ staff_code: btn.dataset.staffCode, to_state: "ACTIVE" });
-      if (action === "hire") await api.hireWorker({ role_code: btn.dataset.roleCode });
+      if (action === "hire") await api.hireWorker({ role_code: btn.dataset.roleCode, display_name: btn.dataset.jobTitle });
       if (action === "enable-hiring") await api.enableHiring({ package_code: AWIA_HIRE_PACKAGE_CODE });
       await mountTeam(root);
     } catch (err) {
@@ -195,7 +221,29 @@ const WORKDESK_TABS = [
   { id: "archived", label: "Archived" },
 ];
 
+// HM-S2 item 5: fixed against the REAL AWIA workdesk_status values
+// (confirmed by reading assignAwiaVirtualStaffTaskRecord /
+// produceAwiaStaffOutputDraftRecord / reviewAwiaStaffOutputDraftRecord /
+// prepareAwiaClientDeliveryDraftRecord / markAwiaClientDeliveryDraftSentRecord
+// in store.mjs). The previous version read fields (item.status/title/
+// client_name/due_at, draft.status "stuck"/"awaiting_review") that do not
+// exist on the real schema, so no real AWIA workdesk item -- including the
+// HM-S2 ARO-01 pilot's -- could ever classify or render correctly. A
+// non-AWIA/legacy task-shaped item (no workdesk_status field) still falls
+// back to the prior generic heuristic unchanged.
 function classifyWorkdeskItem(item, drafts, deliveries) {
+  if (item.workdesk_status !== undefined) {
+    switch (item.workdesk_status) {
+      case "ASSIGNED": return "pending";
+      case "OUTPUT_DRAFTED": return "approval";
+      case "REVIEW_ACTION_REQUIRED": return "approval";
+      case "REVIEWED_FOR_CLIENT_DRAFT": return "outbox";
+      case "CLIENT_DELIVERY_DRAFT_PREPARED": return "outbox";
+      case "ARCHIVED_SENT": return "archived";
+      case "ARCHIVED_DISMISSED": return "archived";
+      default: return "inbox";
+    }
+  }
   const draft = drafts.find((d) => d.workdesk_item_id === item.id || d.task_id === item.id);
   const delivery = deliveries.find((d) => d.workdesk_item_id === item.id || d.task_id === item.id);
   if (item.archived || item.status === "archived") return "archived";
@@ -209,6 +257,21 @@ function classifyWorkdeskItem(item, drafts, deliveries) {
   return "inbox";
 }
 
+// Compact preview of a real output_payload (e.g. ARO-01's triage result:
+// {category, priority, routed_to, ...}) so the firm owner sees the actual
+// skill output at a glance, not just a summary string. Generic by design --
+// falls back to the first few keys for any future skill's payload shape
+// rather than hardcoding ARO-01's fields only.
+function summarizeOutputPayload(payload) {
+  if (!payload || typeof payload !== "object") return null;
+  if (payload.category && payload.priority && payload.routed_to) {
+    return `${payload.category} · ${payload.priority} → ${payload.routed_to}`;
+  }
+  const keys = Object.keys(payload).slice(0, 3);
+  if (!keys.length) return null;
+  return keys.map((k) => `${k}: ${payload[k]}`).join(", ");
+}
+
 export async function mountWorkdesk(root) {
   let activeTab = "inbox";
 
@@ -216,23 +279,41 @@ export async function mountWorkdesk(root) {
     root.innerHTML = loading();
     try {
       const store = await api.getStore();
+      const isAwia = Array.isArray(store.awia_staff_workdesk_items);
       const items = store.awia_staff_workdesk_items ?? store.tasks ?? [];
       const drafts = store.awia_staff_output_drafts ?? [];
       const deliveries = store.awia_client_delivery_drafts ?? [];
+      const members = store.awia_virtual_staff_members ?? [];
+      const roles = store.awia_staff_role_assignments ?? [];
       const buckets = { inbox: [], pending: [], approval: [], outbox: [], archived: [] };
       for (const item of items) buckets[classifyWorkdeskItem(item, drafts, deliveries)].push(item);
 
       const rows = buckets[activeTab] ?? [];
-      const body = table(
-        [
-          { key: "title", label: "Item", render: (r) => r.title ?? r.description ?? r.id },
-          { key: "client", label: "Client", render: (r) => r.client_name ?? r.client_id ?? "—" },
-          { key: "status", label: "Status", render: (r) => statusPill(r.status ?? activeTab) },
-          { key: "due", label: "Due", render: (r) => fmtDate(r.due_at ?? r.due_date) },
-        ],
-        rows,
-        (r) => r.id
-      );
+      const columns = isAwia
+        ? [
+            { key: "item", label: "Item", render: (r) => r.assignment_summary ?? r.id },
+            { key: "assigned_to", label: "Assigned To", render: (r) => {
+                const member = members.find((m) => m.agent_code === r.staff_code);
+                const assignment = roles.find((role) => role.staff_code === r.staff_code);
+                return jobTitleForRoleAssignment(assignment, member) + (member?.display_name ? ` (${escapeHtml(member.display_name)})` : "");
+              } },
+            { key: "output", label: "Output", render: (r) => {
+                const draft = drafts.find((d) => d.workdesk_item_id === r.id);
+                if (!draft) return "—";
+                const payloadPreview = summarizeOutputPayload(draft.output_payload);
+                const summary = escapeHtml(draft.output_summary ?? "—");
+                return payloadPreview ? `${summary}<br><span class="field-note">${escapeHtml(payloadPreview)}</span>` : summary;
+              } },
+            { key: "status", label: "Status", render: (r) => statusPill(r.workdesk_status ?? activeTab) },
+            { key: "assigned_at", label: "Assigned", render: (r) => fmtDate(r.assigned_at) },
+          ]
+        : [
+            { key: "title", label: "Item", render: (r) => r.title ?? r.description ?? r.id },
+            { key: "client", label: "Client", render: (r) => r.client_name ?? r.client_id ?? "—" },
+            { key: "status", label: "Status", render: (r) => statusPill(r.status ?? activeTab) },
+            { key: "due", label: "Due", render: (r) => fmtDate(r.due_at ?? r.due_date) },
+          ];
+      const body = table(columns, rows, (r) => r.id);
 
       root.innerHTML = `
         ${tabBar(WORKDESK_TABS.map((t) => ({ ...t, count: buckets[t.id].length })), activeTab, "tab")}

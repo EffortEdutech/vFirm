@@ -8,7 +8,7 @@ import { apiContracts } from "../../../packages/core-domain/src/api-contracts.mj
 import { formworkServicePack } from "../../../packages/service-packs/src/formwork.mjs";
 import { buildAwiaStaffDepartmentDashboard } from "../../../packages/core-domain/src/awia-virtual-staff-department-dashboard.mjs";
 import { buildAwiaFirmPayrollSummary } from "../../../packages/core-domain/src/awia-virtual-staff-payroll.mjs";
-import { acceptProposalRecord, approveProposalRecord, createClientRecord, completeTaskRecord, createDeliverableDraftRecord, createEvidenceBundleRecord, createFirmRecord, createIntakeSessionRecord, createInvoiceRecord, createMarketplaceListingRecord, updateMarketplaceListingStatusRecord, createDirectoryReviewBoardDecisionRecord, createPrivateDirectoryEnquiryRecord, createDirectoryEnquiryCollaborationRequestRecord, createQualificationRenewalReviewRecord, createCapacityOfferRecord, createCollaborationRequestRecord, createObservatorySnapshotRecord, createPolicyDecisionRecord, createProposalRecord, createTenantRecord, findValidProfessionalAuthority, invitePilotUserRecord, activatePilotUserRecord, revokePilotUserRecord, suspendPilotUserRecord, createSupportCaseRecord, updateSupportCaseRecord, createPilotIncidentRecord, updatePilotIncidentRecord, createPilotFeedbackRecord, createPilotAcceptanceReviewRecord, createPilotImprovementItemRecord, updatePilotImprovementItemRecord, createPilotReportPackRecord, createStakeholderReviewBoardRecord, createStakeholderReviewDecisionRecord, createPilotExpansionCohortRecord, updatePilotExpansionCohortRecord, activatePrivatePilotCohortRecord, createTenantOnboardingPlanRecord, updateTenantOnboardingPlanRecord, createReleaseCandidateGateRecord, createTenantPilotControlRecord, recordTenantUsageEventRecord, createBillingReadinessReviewRecord, createPaymentProviderConfigRecord, createSubscriptionPackageRecord, createCommercialLaunchControlRecord, issueDeliverableRecord, issueInvoiceRecord, produceTaskOutputRecord, provisionWorkerInstanceRecord, recordPaymentStatusRecord, requestToolInvocationRecord, reviewDeliverableRecord, activateWorkerInstanceRecord, assignTaskToWorkerRecord, startTaskRecord, getStoreInfo, newId, now, openProjectDeliveryRecord, provisionAwiaVirtualStaffPilotRecord, updateAwiaVirtualStaffLifecycleRecord, evaluateAwiaVirtualStaffTaskReadinessRecord, assignAwiaVirtualStaffTaskRecord, produceAwiaStaffOutputDraftRecord, reviewAwiaStaffOutputDraftRecord, prepareAwiaClientDeliveryDraftRecord, markAwiaClientDeliveryDraftSentRecord, archiveAwiaStaffWorkdeskItemRecord, appendAwiaStaffMemoryEntryRecord, openAwiaStaffConversationThreadRecord, postAwiaStaffConversationMessageRecord, updateAwiaStaffSeatBillingStatusRecord, provisionAwiaVirtualStaffFromTemplateRecord, readAwiaStaffTemplateCatalogueRecord, assignAwiaFirmPackageRecord, readAwiaFirmPackageAssignmentRecord, hireAwiaFirmWorkerRecord, readStore, requireFields, systemActor, withStore } from "./store.mjs";
+import { acceptProposalRecord, approveProposalRecord, createClientRecord, completeTaskRecord, createDeliverableDraftRecord, createEvidenceBundleRecord, createFirmRecord, createIntakeSessionRecord, createInvoiceRecord, createMarketplaceListingRecord, updateMarketplaceListingStatusRecord, createDirectoryReviewBoardDecisionRecord, createPrivateDirectoryEnquiryRecord, createDirectoryEnquiryCollaborationRequestRecord, createQualificationRenewalReviewRecord, createCapacityOfferRecord, createCollaborationRequestRecord, createObservatorySnapshotRecord, createPolicyDecisionRecord, createProposalRecord, createTenantRecord, findValidProfessionalAuthority, invitePilotUserRecord, activatePilotUserRecord, revokePilotUserRecord, suspendPilotUserRecord, createSupportCaseRecord, updateSupportCaseRecord, createPilotIncidentRecord, updatePilotIncidentRecord, createPilotFeedbackRecord, createPilotAcceptanceReviewRecord, createPilotImprovementItemRecord, updatePilotImprovementItemRecord, createPilotReportPackRecord, createStakeholderReviewBoardRecord, createStakeholderReviewDecisionRecord, createPilotExpansionCohortRecord, updatePilotExpansionCohortRecord, activatePrivatePilotCohortRecord, createTenantOnboardingPlanRecord, updateTenantOnboardingPlanRecord, createReleaseCandidateGateRecord, createTenantPilotControlRecord, recordTenantUsageEventRecord, createBillingReadinessReviewRecord, createPaymentProviderConfigRecord, createSubscriptionPackageRecord, createCommercialLaunchControlRecord, issueDeliverableRecord, issueInvoiceRecord, produceTaskOutputRecord, provisionWorkerInstanceRecord, recordPaymentStatusRecord, requestToolInvocationRecord, reviewDeliverableRecord, activateWorkerInstanceRecord, assignTaskToWorkerRecord, startTaskRecord, getStoreInfo, newId, now, openProjectDeliveryRecord, provisionAwiaVirtualStaffPilotRecord, updateAwiaVirtualStaffLifecycleRecord, evaluateAwiaVirtualStaffTaskReadinessRecord, assignAwiaVirtualStaffTaskRecord, produceAwiaStaffOutputDraftRecord, reviewAwiaStaffOutputDraftRecord, prepareAwiaClientDeliveryDraftRecord, markAwiaClientDeliveryDraftSentRecord, archiveAwiaStaffWorkdeskItemRecord, appendAwiaStaffMemoryEntryRecord, openAwiaStaffConversationThreadRecord, postAwiaStaffConversationMessageRecord, updateAwiaStaffSeatBillingStatusRecord, provisionAwiaVirtualStaffFromTemplateRecord, readAwiaStaffTemplateCatalogueRecord, assignAwiaFirmPackageRecord, readAwiaFirmPackageAssignmentRecord, hireAwiaFirmWorkerRecord, purgeTestFirmRecord, readStore, requireFields, systemActor, withStore } from "./store.mjs";
 import { createFrontDeskEnquiryRecord, qualifyFrontDeskEnquiryRecord, createClientCommunicationDraftRecord, handoffFrontDeskEnquiryRecord } from "./store.mjs";
 import { bindAdministrationSkillsRecord, createCorrespondenceRecord, registerDocumentRecord, addDocumentRevisionRecord, createAdministrativeDeadlineRecord, completeAdministrativeDeadlineRecord, createTransmittalDraftRecord } from "./store.mjs";
 import { bindCommercialSkillsRecord, createSalesPipelineRecord, updateSalesPipelineRecord, dispatchProposalRecord, createExpenseRecord, approveExpenseRecord, createReceivableFollowUpRecord, readCashSnapshot } from "./store.mjs";
@@ -1900,8 +1900,33 @@ async function createObservatorySnapshot(body, req = null) {
   return createObservatorySnapshotRecord(body, actor);
 }
 
+async function purgeTestFirm(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id"]);
+  if (process.env.VFIRM_ALLOW_TEST_FIRM_PURGE !== "true") {
+    const error = new Error(
+      "Test-firm purge (POST /internal/purge-test-firm) is locked down by default: it permanently deletes a firm and its records. Set VFIRM_ALLOW_TEST_FIRM_PURGE=true to deliberately enable it, e.g. while running the HM-S3 clean-onboarding smoke test."
+    );
+    error.status = 403;
+    error.code = "TEST_FIRM_PURGE_LOCKED";
+    throw error;
+  }
+  return purgeTestFirmRecord(body);
+}
+
+function legacyPilotProvisioningLocked(message) {
+  const error = new Error(message);
+  error.status = 403;
+  error.code = "LEGACY_PILOT_PROVISIONING_LOCKED";
+  throw error;
+}
+
 async function provisionAwiaVirtualStaffPilot(body, req = null) {
   requireFields(body, ["tenant_id", "firm_id"]);
+  if (process.env.VFIRM_ALLOW_LEGACY_PILOT_PROVISION !== "true") {
+    legacyPilotProvisioningLocked(
+      "Legacy fixed-roster pilot provisioning (POST /awia/virtual-staff/provision-pilot) is locked down per HM-S3 item 4 (2026-09-18): this ungated escape hatch is no longer allowed to inject a legacy-style roster into any firm. Set VFIRM_ALLOW_LEGACY_PILOT_PROVISION=true to deliberately re-enable it for a genuine future pilot exercise."
+    );
+  }
   const actor = actorFromBody(body, req, body.tenant_id, body.firm_id);
   return provisionAwiaVirtualStaffPilotRecord(body, actor);
 }
@@ -3067,6 +3092,7 @@ const routes = new Map([
   ["POST /ops/awia-package-assignment", assignAwiaFirmPackage],
   ["POST /awia/virtual-staff/hire-worker", hireAwiaFirmWorker],
   ["POST /awia/virtual-staff/provision-pilot", provisionAwiaVirtualStaffPilot],
+  ["POST /internal/purge-test-firm", purgeTestFirm],
   ["POST /awia/virtual-staff/lifecycle", updateAwiaVirtualStaffLifecycle],
   ["POST /awia/virtual-staff/task-readiness", evaluateAwiaVirtualStaffTaskReadiness],
   ["POST /awia/virtual-staff/assign-task", assignAwiaVirtualStaffTask],
@@ -3232,7 +3258,13 @@ const server = createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/database/schema") { const schema = await readFile(join(root, "infra/database/schema.sql"), "utf8"); return sendJson(req, res, 200, { ok: true, data: { path: "infra/database/schema.sql", bytes: schema.length } }); }
     if (req.method === "GET" && url.pathname === "/mvp/store") return sendJson(req, res, 200, { ok: true, data: await readStore() });
     if (req.method === "GET") { const resource = await readResource(req, url); if (resource) return sendJson(req, res, resource.status, resource.body); }
-    if (req.method === "POST" && url.pathname === "/mvp/reset") { const { resetStore } = await import("./store.mjs"); return sendJson(req, res, 200, { ok: true, data: await resetStore() }); }
+    if (req.method === "POST" && url.pathname === "/mvp/reset") {
+      if (process.env.VFIRM_ALLOW_FULL_STORE_RESET !== "true") {
+        return sendJson(req, res, 403, { ok: false, error: { code: "FULL_STORE_RESET_LOCKED", message: "POST /mvp/reset is locked down (found and gated 2026-09-18): it wipes the entire database with no auth check. Set VFIRM_ALLOW_FULL_STORE_RESET=true to deliberately re-enable it for a genuine dev/test reset." } });
+      }
+      const { resetStore } = await import("./store.mjs");
+      return sendJson(req, res, 200, { ok: true, data: await resetStore() });
+    }
     if (req.method === "POST" && url.pathname === "/policy/evaluate") { const input = await readJson(req); const decision = evaluatePolicy(input); const policyDecision = await createPolicyDecisionRecord(input, decision); return sendJson(req, res, 200, { ok: true, data: decision, policy_decision_id: policyDecision?.id ?? null, audit_event_id: null, correlation_id: input?.correlation_id ?? null }); }
     const handler = routes.get(`${req.method} ${url.pathname}`);
     if (handler) return sendJson(req, res, 201, { ok: true, data: await handler(await readJson(req), req) });
