@@ -5328,8 +5328,18 @@ function stripRelationalCollections(store) {
     pilot_handoff_records: [],
     work_packages: [],
     tasks: [],
+    // HM-S6 Phase 2 item 1 (found during full-coverage audit of stripRelationalCollections against
+    // every initialStore() key): these 3 already have real Postgres tables (documents/document_versions
+    // written by registerDocumentRecord/addDocumentRevisionRecord, payment_statuses by
+    // recordPaymentStatusRecord -- all direct SQL, not via this blob), so they belong stripped here
+    // exactly like every other relational collection above. Missing this was not a data-loss bug (reads
+    // always overwrite the blob's copy with the real table's contents via readRelationalStore), just
+    // needless duplication into app_state.data on every save.
+    documents: [],
+    document_versions: [],
     evidence_bundles: [],
     invoices: [],
+    payment_statuses: [],
     policy_decisions: [],
     event_log: [],
     audit_events: []

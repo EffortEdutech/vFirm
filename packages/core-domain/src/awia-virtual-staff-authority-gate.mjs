@@ -5,10 +5,10 @@ export const runtimeGateBoundary = "deterministic_authority_gate_no_autonomous_r
 
 export const defaultToolPolicyByRole = {
   CFO: ["finance.analysis.prepare", "finance.governance.review", "evidence.bundle.review"],
-  FAO: ["accounts.ap.prepare", "accounts.receivable.prepare", "evidence.bundle.prepare"],
-  SAO: ["sales.opportunity.prepare", "proposal.draft.prepare", "customer.communication.draft"],
-  OPO: ["project.delivery.coordinate", "workload.summary.prepare", "evidence.bundle.review"],
-  ARO: ["administration.document.register", "administration.deadline.prepare", "evidence.bundle.prepare", "administration.request.triage"]
+  FAO: ["accounts.ap.prepare", "accounts.receivable.prepare", "evidence.bundle.prepare", "accounts.reconciliation.prepare"],
+  SAO: ["sales.opportunity.prepare", "proposal.draft.prepare", "customer.communication.draft", "sales.lead.qualify.prepare"],
+  OPO: ["project.delivery.coordinate", "workload.summary.prepare", "evidence.bundle.review", "workload.assignment.prepare"],
+  ARO: ["administration.document.register", "administration.deadline.prepare", "evidence.bundle.prepare", "administration.request.triage", "administration.employee.onboarding"]
 };
 
 export const highRiskActions = [

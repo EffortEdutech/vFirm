@@ -27,6 +27,10 @@ const STATUS_TONE = {
   active: "moss", ready: "moss", sent: "moss", delivered: "moss", approved: "moss", ok: "moss", healthy: "moss",
   paused: "amber", pending: "amber", drafting: "amber", awaiting: "amber", in_progress: "amber", review: "amber",
   blocked: "rose", failed: "rose", error: "rose", rejected: "rose", stuck: "rose", overdue: "rose",
+  // HM-S4 item 7: a Class A skill's pending firm-owner approval decision is a
+  // distinct wait, not an ordinary review -- gets its own tone rather than
+  // falling through to "default" like an unrecognized status would.
+  class_a_approval_pending: "amber", class_a_approved: "moss", class_a_denied: "rose",
 };
 
 export function statusPill(status) {

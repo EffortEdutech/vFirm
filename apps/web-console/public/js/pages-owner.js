@@ -14,7 +14,7 @@
 // render through the generic inspector() (see ui.js + README) since those
 // collections are empty in the live store and their shapes are unconfirmed.
 
-import { api, HIREABLE_ROLES, AWIA_HIRE_PACKAGE_CODE } from "./api.js";
+import { api, HIREABLE_ROLES, AWIA_HIRE_PACKAGE_CODE, scopeStoreToCurrentFirm } from "./api.js";
 import { panel, table, statRow, tabBar, statusPill, empty, errorBox, inspector, fmtDate, escapeHtml } from "./ui.js";
 
 function loading() {
@@ -24,7 +24,10 @@ function loading() {
 async function withStore(root, render) {
   root.innerHTML = loading();
   try {
-    const store = await api.getStore();
+    // Cross-tenant leak fix (2026-09-21): getStore() returns the WHOLE
+    // database (see api.js's scopeStoreToCurrentFirm() for why) -- never
+    // render it straight into a firm's own page.
+    const store = scopeStoreToCurrentFirm(await api.getStore());
     root.innerHTML = render(store);
   } catch (err) {
     root.innerHTML = errorBox(err, "this page");
@@ -134,12 +137,39 @@ function jobTitleForRoleAssignment(assignment, worker) {
 export async function mountTeam(root) {
   root.innerHTML = loading();
   try {
-    const [store, packageResult] = await Promise.all([api.getStore(), api.getFirmPackageAssignment()]);
+    // Cross-tenant leak fix (2026-09-21): see api.js's scopeStoreToCurrentFirm().
+    const [rawStore, packageResult] = await Promise.all([api.getStore(), api.getFirmPackageAssignment()]);
+    const store = scopeStoreToCurrentFirm(rawStore);
     const workers = store.awia_virtual_staff_members ?? [];
     const roles = store.awia_staff_role_assignments ?? [];
     const hasPackage = Boolean(packageResult?.assignment);
 
-    const rows = workers.map((w) => {
+    // "Remove a worker" (2026-09-21): there is no hard-delete path for a
+    // single AWIA staff member anywhere in this codebase, and this fix does
+    // not add one -- RETIRED is an existing, already-tested lifecycle state
+    // (updateAwiaVirtualStaffLifecycleRecord, store.mjs) that was simply
+    // never exposed as a button. A retired worker keeps its full audit
+    // history (lifecycle events, past output drafts, etc.) but drops out of
+    // the active roster and the "Total hired" count below, same as how the
+    // product owner would expect "removed" to look without actually losing
+    // any record.
+    const activeWorkers = workers.filter((w) => w.lifecycle_status !== "RETIRED");
+    const retiredCount = workers.length - activeWorkers.length;
+
+    // Hire-guardrail fix (2026-09-22): mirrors the server-side duplicate-
+    // occupancy check added to hireAwiaFirmWorkerRecord (store.mjs) so the
+    // Hire button is disabled and labelled BEFORE a request ever goes out,
+    // instead of the firm owner only finding out after an error alert. A
+    // RETIRED occupant does not count -- retiring frees the seat back up.
+    const occupiedPositionIds = new Set(activeWorkers.filter((w) => w.position_id).map((w) => w.position_id));
+    const occupiedRoleCodesWithoutPosition = new Set(
+      activeWorkers
+        .filter((w) => !w.position_id)
+        .map((w) => roles.find((r) => r.staff_code === w.agent_code)?.role_code)
+        .filter(Boolean)
+    );
+
+    const rows = activeWorkers.map((w) => {
       const assignment = roles.find((r) => r.staff_code === w.agent_code);
       return {
         name: w.display_name ?? w.agent_code,
@@ -158,6 +188,7 @@ export async function mountTeam(root) {
         { key: "actions", label: "", render: (r) => `
           <button class="btn-sm" data-action="pause" data-staff-code="${escapeHtml(r.staff_code)}" type="button" ${r.status === "paused" ? "disabled" : ""}>Pause</button>
           <button class="btn-sm" data-action="activate" data-staff-code="${escapeHtml(r.staff_code)}" type="button" ${r.status === "active" ? "disabled" : ""}>Reactivate</button>
+          <button class="btn-sm" data-action="retire" data-staff-code="${escapeHtml(r.staff_code)}" data-worker-name="${escapeHtml(r.name)}" type="button">Retire</button>
         ` },
       ],
       rows,
@@ -168,13 +199,17 @@ export async function mountTeam(root) {
       ? panel("Hire a worker", `
           <p class="field-note">HireMe package active — choose a position to add to this firm's team.</p>
           <div class="role-cards">
-            ${HIREABLE_ROLES.map((role) => `
+            ${HIREABLE_ROLES.map((role) => {
+              const isOccupied = role.position_id ? occupiedPositionIds.has(role.position_id) : occupiedRoleCodesWithoutPosition.has(role.role_code);
+              return `
               <div class="role-card">
                 <div class="role-card-title">${escapeHtml(role.role_name)}</div>
                 <div class="field-note">${escapeHtml(role.default_staff_grade)}</div>
-                <button class="btn-sm" data-action="hire" data-role-code="${escapeHtml(role.role_code)}" data-job-title="${escapeHtml(role.role_name)}" type="button">Hire</button>
+                ${isOccupied ? `<div class="field-note">Already hired — retire the current ${escapeHtml(role.role_name)} first to hire another.</div>` : ""}
+                <button class="btn-sm" data-action="hire" data-role-code="${escapeHtml(role.role_code)}" data-job-title="${escapeHtml(role.role_name)}" data-position-id="${escapeHtml(role.position_id ?? "")}" type="button" ${isOccupied ? "disabled" : ""}>Hire</button>
               </div>
-            `).join("")}
+            `;
+            }).join("")}
           </div>
         `)
       : panel("Hire a worker", `
@@ -184,9 +219,10 @@ export async function mountTeam(root) {
 
     root.innerHTML = `
       ${statRow([
-        { value: workers.length, label: "Total hired" },
-        { value: workers.filter((w) => w.lifecycle_status === "ACTIVE").length, label: "Active" },
-        { value: workers.filter((w) => w.lifecycle_status === "PAUSED").length, label: "Paused" },
+        { value: activeWorkers.length, label: "Total hired" },
+        { value: activeWorkers.filter((w) => w.lifecycle_status === "ACTIVE").length, label: "Active" },
+        { value: activeWorkers.filter((w) => w.lifecycle_status === "PAUSED").length, label: "Paused" },
+        { value: retiredCount, label: "Retired" },
       ])}
       ${panel("Your team", rosterBody)}
       ${hirePanel}
@@ -200,13 +236,47 @@ export async function mountTeam(root) {
     const btn = event.target.closest("button[data-action]");
     if (!btn) return;
     const action = btn.dataset.action;
+    if (action === "retire") {
+      // A retire is one-way from this UI (no "un-retire" button, matching
+      // the fact that this is the "remove a worker" action) -- confirm
+      // before sending it, the same guardrail this fix was requested
+      // alongside (the product owner had no such check before hiring a
+      // duplicate General Clerk). Checked before any loading state is
+      // applied so a Cancel leaves the page exactly as it was.
+      const confirmed = window.confirm(`Retire ${btn.dataset.workerName ?? btn.dataset.staffCode}? This removes them from the active roster and cannot be undone from here.`);
+      if (!confirmed) return;
+    }
+
+    // Processing indicator (2026-09-22): previously nothing changed on
+    // screen between the click and mountTeam()'s re-render completing, so
+    // a slow database round trip (see the architectural whole-store
+    // load/save performance issue) looked identical to the page being
+    // hung -- reported directly by the product owner. Disable every
+    // action button on the page (prevents a double-submit mid-flight) and
+    // swap the clicked button's own label to an in-progress verb; success
+    // re-renders the whole page via mountTeam() anyway, and failure
+    // restores every button's original label/disabled state so the page
+    // never gets stuck disabled.
+    const inProgressLabel = { pause: "Pausing…", activate: "Reactivating…", retire: "Retiring…", hire: "Hiring…", "enable-hiring": "Enabling…" }[action];
+    const originalButtonStates = new Map();
+    for (const b of root.querySelectorAll("button[data-action]")) {
+      originalButtonStates.set(b, { text: b.textContent, disabled: b.disabled });
+      b.disabled = true;
+    }
+    if (inProgressLabel) btn.textContent = inProgressLabel;
+
     try {
       if (action === "pause") await api.updateStaffLifecycle({ staff_code: btn.dataset.staffCode, to_state: "PAUSED" });
       if (action === "activate") await api.updateStaffLifecycle({ staff_code: btn.dataset.staffCode, to_state: "ACTIVE" });
-      if (action === "hire") await api.hireWorker({ role_code: btn.dataset.roleCode, display_name: btn.dataset.jobTitle });
+      if (action === "retire") await api.updateStaffLifecycle({ staff_code: btn.dataset.staffCode, to_state: "RETIRED" });
+      if (action === "hire") await api.hireWorker({ role_code: btn.dataset.roleCode, display_name: btn.dataset.jobTitle, position_id: btn.dataset.positionId || undefined });
       if (action === "enable-hiring") await api.enableHiring({ package_code: AWIA_HIRE_PACKAGE_CODE });
       await mountTeam(root);
     } catch (err) {
+      for (const [b, original] of originalButtonStates) {
+        b.textContent = original.text;
+        b.disabled = original.disabled;
+      }
       alert(`Action failed: ${err.message}`);
     }
   });
@@ -257,19 +327,58 @@ function classifyWorkdeskItem(item, drafts, deliveries) {
   return "inbox";
 }
 
-// Compact preview of a real output_payload (e.g. ARO-01's triage result:
-// {category, priority, routed_to, ...}) so the firm owner sees the actual
-// skill output at a glance, not just a summary string. Generic by design --
-// falls back to the first few keys for any future skill's payload shape
-// rather than hardcoding ARO-01's fields only.
+// Compact preview of a real output_payload so the firm owner sees the actual
+// skill output at a glance, not just a summary string. HM-S4 item 7: extended
+// to recognize each of the four new pilots' real output_payload shapes
+// (confirmed by reading their core-domain modules directly), alongside the
+// original HM-S2 ARO-01 shape. Still generic by design -- falls back to the
+// first few keys for any future skill's payload shape rather than
+// hardcoding only the shapes known today.
 function summarizeOutputPayload(payload) {
   if (!payload || typeof payload !== "object") return null;
+  // ARO-01 (HM-S2): {category, priority, routed_to, ...}
   if (payload.category && payload.priority && payload.routed_to) {
     return `${payload.category} · ${payload.priority} → ${payload.routed_to}`;
+  }
+  // FAO-11 Account Reconciliation (HM-S4 item 3): {reconciled, variance_total, matched, mismatches, ...}
+  if (typeof payload.reconciled === "boolean" && payload.variance_total !== undefined) {
+    const matchedCount = Array.isArray(payload.matched) ? payload.matched.length : 0;
+    const mismatchCount = Array.isArray(payload.mismatches) ? payload.mismatches.length : 0;
+    return `${payload.reconciled ? "Reconciled" : "Not reconciled"} · variance ${payload.variance_total} · ${matchedCount} matched, ${mismatchCount} mismatched`;
+  }
+  // SAO-03 Lead Qualification & Scoring (HM-S4 item 4): {score, tier, ...}
+  if (typeof payload.score === "number" && payload.tier) {
+    return `${payload.tier} · score ${payload.score}/100`;
+  }
+  // OPO-09 Task & Capacity Assignment (HM-S4 item 5): {capacity_status, assigned_queue_id, ...}
+  if (payload.capacity_status && payload.assigned_queue_id) {
+    return `${payload.capacity_status} → ${payload.assigned_queue_id}`;
+  }
+  // ARO-10 Employee Onboarding Administration (HM-S4 item 6, Class A): {status, missing_documents, sod_conflict, ...}
+  // Never renders the new hire's name -- the payload itself never carries one.
+  if (payload.status && Array.isArray(payload.missing_documents)) {
+    return payload.sod_conflict
+      ? `${payload.status} · SOD conflict flagged`
+      : `${payload.status} · ${payload.missing_documents.length} document(s) outstanding`;
   }
   const keys = Object.keys(payload).slice(0, 3);
   if (!keys.length) return null;
   return keys.map((k) => `${k}: ${payload[k]}`).join(", ");
+}
+
+// HM-S4 item 7: a Class A skill (e.g. ARO-10) blocks on a distinct
+// firm-owner approval decision (HM-S4 item 2's evaluateClassAApprovalGate(),
+// via output_draft.class_a_approval_required / class_a_approval_status)
+// before an ordinary output review can even be attempted -- a materially
+// different wait than "needs review". Surface that as its own status label
+// rather than folding it into the ordinary OUTPUT_DRAFTED /
+// REVIEW_ACTION_REQUIRED pill, so the firm owner can tell at a glance which
+// action is actually required.
+function workdeskStatusLabel(item, draft) {
+  if (draft?.class_a_approval_required && draft.class_a_approval_status === "PENDING") {
+    return "CLASS_A_APPROVAL_PENDING";
+  }
+  return item.workdesk_status ?? "unknown";
 }
 
 export async function mountWorkdesk(root) {
@@ -278,7 +387,8 @@ export async function mountWorkdesk(root) {
   async function render() {
     root.innerHTML = loading();
     try {
-      const store = await api.getStore();
+      // Cross-tenant leak fix (2026-09-21): see api.js's scopeStoreToCurrentFirm().
+      const store = scopeStoreToCurrentFirm(await api.getStore());
       const isAwia = Array.isArray(store.awia_staff_workdesk_items);
       const items = store.awia_staff_workdesk_items ?? store.tasks ?? [];
       const drafts = store.awia_staff_output_drafts ?? [];
@@ -304,7 +414,10 @@ export async function mountWorkdesk(root) {
                 const summary = escapeHtml(draft.output_summary ?? "—");
                 return payloadPreview ? `${summary}<br><span class="field-note">${escapeHtml(payloadPreview)}</span>` : summary;
               } },
-            { key: "status", label: "Status", render: (r) => statusPill(r.workdesk_status ?? activeTab) },
+            { key: "status", label: "Status", render: (r) => {
+                const draft = drafts.find((d) => d.workdesk_item_id === r.id);
+                return statusPill(workdeskStatusLabel(r, draft));
+              } },
             { key: "assigned_at", label: "Assigned", render: (r) => fmtDate(r.assigned_at) },
           ]
         : [
@@ -352,9 +465,11 @@ export async function mountProjects(root) {
 // ---------------------------------------------------------------- Finance
 export async function mountFinance(root) {
   root.innerHTML = loading();
+  // Cross-tenant leak fix (2026-09-21): see api.js's scopeStoreToCurrentFirm().
   const [cash, storeResult] = await Promise.allSettled([api.getCashSnapshot(), api.getStore()]);
-  const invoices = storeResult.status === "fulfilled" ? storeResult.value.invoices ?? [] : [];
-  const expenses = storeResult.status === "fulfilled" ? storeResult.value.expenses ?? [] : [];
+  const scopedStore = storeResult.status === "fulfilled" ? scopeStoreToCurrentFirm(storeResult.value) : null;
+  const invoices = scopedStore?.invoices ?? [];
+  const expenses = scopedStore?.expenses ?? [];
   root.innerHTML = `
     ${panel("Cash snapshot", cash.status === "fulfilled" ? inspector(cash.value) : errorBox(cash.reason, "cash snapshot"))}
     ${panel("Invoices", inspector(invoices))}

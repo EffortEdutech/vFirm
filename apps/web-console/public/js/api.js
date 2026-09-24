@@ -179,6 +179,38 @@ export function resolveIdentityFromStore(store) {
   };
 }
 
+// SECURITY FIX (post-HM-S4, 2026-09-21): GET /mvp/store is deliberately a
+// full, unscoped whole-database dump (see packages/core-domain/src/
+// api-contracts.mjs: "Compatibility full-store read for local development
+// fallback", policyRequired: false). That's legitimate for
+// resolveIdentityFromStore() below (called once at boot, before any firm is
+// known) and for the dev/test scripts that read it directly. It is NOT
+// legitimate for a logged-in firm's own console pages to render straight off
+// -- doing so was a real cross-tenant data leak: My Team, Workdesk, Sales,
+// Projects and Finance all called api.getStore() and rendered its collections
+// as if they belonged to the current firm, when in fact every other firm's
+// AWIA staff, clients, projects, invoices etc. were mixed in too (invisible
+// while only one real firm existed in the store; became visible once HM-S3
+// put multiple real firms in one shared live database). Every content page
+// must filter through this before rendering.
+//
+// A record is "firm-scoped" if it carries a firm_id field at all; only those
+// records are filtered down to the current firm. Arrays whose records don't
+// carry firm_id (firms, tenants themselves) are left untouched -- they are
+// reference/identity data, not a specific firm's own data, and filtering
+// them would break nothing that reads them today but is deliberately not
+// the mission of this function.
+export function scopeStoreToCurrentFirm(store) {
+  if (!identity?.firm_id || !store || typeof store !== "object") return store;
+  const scoped = {};
+  for (const [key, value] of Object.entries(store)) {
+    if (!Array.isArray(value)) { scoped[key] = value; continue; }
+    const isFirmScoped = value.some((item) => item && typeof item === "object" && "firm_id" in item);
+    scoped[key] = isFirmScoped ? value.filter((item) => item?.firm_id === identity.firm_id) : value;
+  }
+  return scoped;
+}
+
 // Reference data for the "Hire a worker" panel (My Team).
 //
 // HM-S1 checklist item 3 (owner-accepted, "vFirm Position-to-Skill Mapping
@@ -197,14 +229,14 @@ export function resolveIdentityFromStore(store) {
 // as the underlying capability reference. Update this list if the position
 // catalogue file changes.
 //
-// Known HM-S1 gap, carried forward to checklist item 4/5: General Clerk and
-// HR Administrator both resolve to role_code "ARO" -- the hire-worker API
-// has no position-level field yet, so hiring either one today provisions an
-// indistinguishable ARO seat server-side. hireAwiaFirmWorkerRecord already
-// accepts an optional body.display_name override (apps/api/src/store.mjs),
-// so passing the job title through as display_name is the lowest-risk way
-// to preserve which position was actually hired without a server schema
-// change -- left for item 4 (UI wiring), not done here.
+// HM-S1 gap CLOSED in HM-S4 item 2 (2026-09-20): the hire-worker API now
+// accepts and persists a real body.position_id (hireAwiaFirmWorkerRecord,
+// apps/api/src/store.mjs), validated against the position catalogue and
+// stored on the staff member record. The "Hire" button below now sends
+// position_id from this table, so General Clerk and HR Administrator --
+// both role_code "ARO" -- are finally distinguishable server-side, not just
+// in this display list. display_name is still sent as before (cosmetic
+// only); position_id is the real field authority checks now key off.
 export const HIREABLE_ROLES = [
   { role_code: "CFO", role_name: "Chief Finance Officer", default_staff_grade: "Executive" },
   { position_id: "general_clerk", role_code: "ARO", role_name: "General Clerk", default_staff_grade: "Worker" },
