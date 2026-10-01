@@ -31,12 +31,12 @@ export async function getClient(id) {
   return rows[0] ?? null;
 }
 
-export async function createClient(record) {
-  return insertRow("clients", CLIENTS_COLUMNS, record);
+export async function createClient(record, client = null) {
+  return insertRow("clients", CLIENTS_COLUMNS, record, client);
 }
 
-export async function updateClient(id, patch) {
-  return updateRowById("clients", CLIENTS_COLUMNS, id, patch);
+export async function updateClient(id, patch, client = null) {
+  return updateRowById("clients", CLIENTS_COLUMNS, id, patch, client);
 }
 
 // --- firm_client_relationships ---
@@ -55,12 +55,12 @@ export async function getFirmClientRelationship(id) {
   return rows[0] ?? null;
 }
 
-export async function createFirmClientRelationship(record) {
-  return insertRow("firm_client_relationships", FIRM_CLIENT_RELATIONSHIPS_COLUMNS, record);
+export async function createFirmClientRelationship(record, client = null) {
+  return insertRow("firm_client_relationships", FIRM_CLIENT_RELATIONSHIPS_COLUMNS, record, client);
 }
 
-export async function updateFirmClientRelationship(id, patch) {
-  return updateRowById("firm_client_relationships", FIRM_CLIENT_RELATIONSHIPS_COLUMNS, id, patch);
+export async function updateFirmClientRelationship(id, patch, client = null) {
+  return updateRowById("firm_client_relationships", FIRM_CLIENT_RELATIONSHIPS_COLUMNS, id, patch, client);
 }
 
 // --- front_desk_enquiries ---
@@ -127,8 +127,8 @@ export async function getLead(id) {
   return rows[0] ?? null;
 }
 
-export async function createLead(record) {
-  return insertRow("leads", LEADS_COLUMNS, record);
+export async function createLead(record, client = null) {
+  return insertRow("leads", LEADS_COLUMNS, record, client);
 }
 
 export async function updateLead(id, patch) {
@@ -151,8 +151,8 @@ export async function getIntakeSession(id) {
   return rows[0] ?? null;
 }
 
-export async function createIntakeSession(record) {
-  return insertRow("intake_sessions", INTAKE_SESSIONS_COLUMNS, record);
+export async function createIntakeSession(record, client = null) {
+  return insertRow("intake_sessions", INTAKE_SESSIONS_COLUMNS, record, client);
 }
 
 export async function updateIntakeSession(id, patch) {
@@ -223,8 +223,8 @@ export async function getProposal(id) {
   return rows[0] ?? null;
 }
 
-export async function createProposal(record) {
-  return insertRow("proposals", PROPOSALS_COLUMNS, record);
+export async function createProposal(record, client = null) {
+  return insertRow("proposals", PROPOSALS_COLUMNS, record, client);
 }
 
 export async function updateProposal(id, patch) {
@@ -247,8 +247,8 @@ export async function getPriceBuildUp(id) {
   return rows[0] ?? null;
 }
 
-export async function createPriceBuildUp(record) {
-  return insertRow("price_build_ups", PRICE_BUILD_UPS_COLUMNS, record);
+export async function createPriceBuildUp(record, client = null) {
+  return insertRow("price_build_ups", PRICE_BUILD_UPS_COLUMNS, record, client);
 }
 
 export async function updatePriceBuildUp(id, patch) {

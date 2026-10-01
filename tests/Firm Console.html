@@ -1,0 +1,1048 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Firm Console</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  /* ============ TOKENS ============ */
+  :root{
+    --canvas:#eef1ef;
+    --surface:#ffffff;
+    --surface-2:#f5f7f5;
+    --ink:#141a19;
+    --ink-soft:#4d5b58;
+    --ink-faint:#7c8a86;
+    --line:#d9e0dc;
+    --line-strong:#c2cbc6;
+    --accent:#1f6f6b;
+    --accent-ink:#ffffff;
+    --accent-soft:#e2f0ee;
+    --accent-soft-line:#bcdcd8;
+    --moss:#3f7d4a;
+    --moss-soft:#e5f1e6;
+    --amber:#a3711c;
+    --amber-soft:#f7ecd8;
+    --rose:#b5423a;
+    --rose-soft:#f8e6e3;
+    --shadow:0 1px 2px rgba(20,26,25,.06), 0 6px 20px -12px rgba(20,26,25,.18);
+    --radius:10px;
+    --sidebar-w:272px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --canvas:#121716;
+      --surface:#1a201f;
+      --surface-2:#1f2625;
+      --ink:#e8ece9;
+      --ink-soft:#a9b5b0;
+      --ink-faint:#78857f;
+      --line:#2b3432;
+      --line-strong:#3a453f;
+      --accent:#57bab2;
+      --accent-ink:#08211f;
+      --accent-soft:#1c2f2d;
+      --accent-soft-line:#2c4644;
+      --moss:#6fbf7c;
+      --moss-soft:#1c2b1f;
+      --amber:#dba64b;
+      --amber-soft:#332a19;
+      --rose:#e0847c;
+      --rose-soft:#332120;
+      --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
+    }
+  }
+  :root[data-theme="dark"]{
+    --canvas:#121716;
+    --surface:#1a201f;
+    --surface-2:#1f2625;
+    --ink:#e8ece9;
+    --ink-soft:#a9b5b0;
+    --ink-faint:#78857f;
+    --line:#2b3432;
+    --line-strong:#3a453f;
+    --accent:#57bab2;
+    --accent-ink:#08211f;
+    --accent-soft:#1c2f2d;
+    --accent-soft-line:#2c4644;
+    --moss:#6fbf7c;
+    --moss-soft:#1c2b1f;
+    --amber:#dba64b;
+    --amber-soft:#332a19;
+    --rose:#e0847c;
+    --rose-soft:#332120;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
+  }
+
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:var(--canvas);
+    color:var(--ink);
+    font-family:'IBM Plex Sans',system-ui,-apple-system,sans-serif;
+    font-size:14px;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3{text-wrap:balance; margin:0; font-weight:600; letter-spacing:-0.01em;}
+  .mono{font-family:'IBM Plex Mono',ui-monospace,monospace; font-variant-numeric:tabular-nums;}
+  button{font-family:inherit; font-size:inherit;}
+  a{color:inherit;}
+  ::selection{background:var(--accent-soft);}
+
+  /* ============ SHELL ============ */
+  .shell{display:flex; min-height:100%;}
+
+  .sidebar{
+    width:var(--sidebar-w); flex:none;
+    background:var(--surface);
+    border-right:1px solid var(--line);
+    display:flex; flex-direction:column;
+    height:100vh; position:sticky; top:0;
+  }
+  .brand{
+    display:flex; align-items:center; gap:10px;
+    padding:20px 20px 16px;
+  }
+  .brand-mark{
+    width:34px; height:34px; border-radius:8px;
+    background:var(--ink); color:var(--canvas);
+    display:flex; align-items:center; justify-content:center;
+    font-family:'IBM Plex Mono'; font-weight:600; font-size:13px; letter-spacing:.02em;
+    flex:none;
+  }
+  .brand-text strong{display:block; font-size:14.5px; font-weight:600;}
+  .brand-text span{display:block; font-size:11.5px; color:var(--ink-faint); margin-top:1px;}
+
+  .mode-switch{
+    margin:2px 16px 14px; padding:3px;
+    background:var(--surface-2); border:1px solid var(--line);
+    border-radius:9px; display:flex; gap:2px;
+  }
+  .mode-switch button{
+    flex:1; border:0; background:transparent; color:var(--ink-soft);
+    padding:7px 8px; border-radius:6px; cursor:pointer; font-size:12.5px; font-weight:500;
+    transition:background .15s, color .15s;
+  }
+  .mode-switch button.active{background:var(--surface); color:var(--ink); box-shadow:var(--shadow);}
+
+  .nav-scroll{flex:1; overflow-y:auto; padding:4px 12px 16px;}
+  .nav-group{margin-top:16px;}
+  .nav-group:first-child{margin-top:2px;}
+  .nav-group-label{
+    font-size:10.5px; font-weight:600; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--ink-faint); padding:0 10px 6px;
+  }
+  .nav-item{
+    display:flex; align-items:center; gap:10px; width:100%;
+    padding:8px 10px; margin-bottom:1px;
+    background:transparent; border:0; border-radius:7px;
+    color:var(--ink-soft); cursor:pointer; text-align:left; font-size:13.3px; font-weight:500;
+    transition:background .12s, color .12s;
+  }
+  .nav-item:hover{background:var(--surface-2); color:var(--ink);}
+  .nav-item.active{background:var(--accent-soft); color:var(--accent);}
+  .nav-item .ic{width:16px; height:16px; flex:none; opacity:.85;}
+  .nav-item .count{
+    margin-left:auto; font-family:'IBM Plex Mono'; font-size:11px;
+    color:var(--ink-faint); background:var(--surface-2); border:1px solid var(--line);
+    padding:1px 6px; border-radius:20px;
+  }
+  .nav-item.active .count{color:var(--accent); background:var(--surface); border-color:var(--accent-soft-line);}
+
+  .sidebar-foot{
+    border-top:1px solid var(--line); padding:12px 16px 16px;
+    display:flex; align-items:center; gap:9px;
+  }
+  .foot-avatar{
+    width:30px; height:30px; border-radius:50%; flex:none;
+    background:var(--accent-soft); color:var(--accent);
+    display:flex; align-items:center; justify-content:center; font-weight:600; font-size:12.5px;
+  }
+  .foot-text strong{display:block; font-size:12.8px;}
+  .foot-text span{display:block; font-size:11px; color:var(--ink-faint);}
+
+  /* ============ MAIN ============ */
+  .main{flex:1; min-width:0; display:flex; flex-direction:column; height:100vh; overflow:hidden;}
+
+  .topbar{
+    flex:none; display:flex; align-items:flex-start; justify-content:space-between; gap:16px;
+    padding:22px 32px 18px; border-bottom:1px solid var(--line); background:var(--canvas);
+  }
+  .topbar .eyebrow{font-size:11.5px; color:var(--ink-faint); font-weight:600; letter-spacing:.05em; text-transform:uppercase; margin-bottom:4px;}
+  .topbar h1{font-size:22px;}
+  .topbar p{margin:5px 0 0; color:var(--ink-soft); font-size:13.3px; max-width:56ch;}
+  .topbar-actions{display:flex; gap:8px; flex:none; padding-top:2px;}
+
+  .btn{
+    display:inline-flex; align-items:center; gap:6px; border-radius:7px; border:1px solid transparent;
+    padding:8px 14px; font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap;
+    transition:filter .12s, background .12s;
+  }
+  .btn-primary{background:var(--accent); color:var(--accent-ink);}
+  .btn-primary:hover{filter:brightness(1.06);}
+  .btn-ghost{background:var(--surface); color:var(--ink); border-color:var(--line-strong);}
+  .btn-ghost:hover{background:var(--surface-2);}
+  .btn-sm{padding:5px 10px; font-size:12.3px; border-radius:6px;}
+  .btn-quiet{background:transparent; color:var(--ink-soft); border-color:var(--line);}
+  .btn-quiet:hover{background:var(--surface-2); color:var(--ink);}
+
+  .page-scroll{flex:1; overflow-y:auto;}
+  .page{max-width:1180px; margin:0 auto; padding:26px 32px 64px; display:flex; flex-direction:column; gap:26px;}
+
+  /* ============ TABS ============ */
+  .tabbar{display:flex; gap:2px; border-bottom:1px solid var(--line); margin-bottom:-1px;}
+  .tab{
+    background:transparent; border:0; border-bottom:2px solid transparent;
+    padding:10px 4px; margin-right:22px; color:var(--ink-faint); font-weight:600; font-size:13.3px;
+    cursor:pointer; display:flex; align-items:center; gap:7px;
+  }
+  .tab:hover{color:var(--ink-soft);}
+  .tab.active{color:var(--ink); border-bottom-color:var(--accent);}
+  .tab .badge{
+    font-family:'IBM Plex Mono'; font-size:11px; background:var(--surface-2); color:var(--ink-faint);
+    border:1px solid var(--line); padding:0 6px; border-radius:20px; line-height:1.6;
+  }
+  .tab.active .badge{background:var(--accent-soft); color:var(--accent); border-color:var(--accent-soft-line);}
+  .tab.attn .badge{background:var(--amber-soft); color:var(--amber); border-color:transparent;}
+
+  /* ============ PRIMITIVES ============ */
+  .section{display:flex; flex-direction:column; gap:12px;}
+  .section-head{display:flex; align-items:baseline; justify-content:space-between; gap:12px;}
+  .section-head h2{font-size:15.5px;}
+  .section-head p{margin:2px 0 0; font-size:12.6px; color:var(--ink-faint);}
+  .section-head .link{font-size:12.6px; font-weight:600; color:var(--accent); background:none; border:0; cursor:pointer;}
+
+  .stat-row{display:grid; grid-template-columns:repeat(4,1fr); gap:12px;}
+  .stat{
+    background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
+    padding:16px 16px 14px; display:flex; flex-direction:column; gap:8px;
+  }
+  .stat .k{font-size:11.8px; color:var(--ink-faint); font-weight:600;}
+  .stat .v{font-family:'IBM Plex Mono'; font-size:25px; font-weight:600; letter-spacing:-.01em;}
+  .stat .d{font-size:11.6px; color:var(--ink-faint); display:flex; align-items:center; gap:5px;}
+  .dot{width:6px; height:6px; border-radius:50%; flex:none;}
+  .dot.moss{background:var(--moss);} .dot.amber{background:var(--amber);} .dot.rose{background:var(--rose);} .dot.ink{background:var(--ink-faint);}
+
+  .panel{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); overflow:hidden;}
+  .panel-pad{padding:16px 18px;}
+
+  .list{display:flex; flex-direction:column;}
+  .list-row{
+    display:flex; align-items:center; gap:14px; padding:13px 18px; border-bottom:1px solid var(--line);
+  }
+  .list-row:last-child{border-bottom:0;}
+  .list-row .who{width:30px;height:30px;border-radius:50%;flex:none;background:var(--surface-2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:11.5px;color:var(--ink-soft);}
+  .list-row .main{flex:1; min-width:0;}
+  .list-row .main .t1{font-size:13.3px; font-weight:600;}
+  .list-row .main .t2{font-size:12.3px; color:var(--ink-faint); margin-top:1px;}
+  .list-row .t1 span{font-weight:500; color:var(--ink-soft);}
+  .list-row .side{flex:none; display:flex; align-items:center; gap:8px;}
+
+  table{width:100%; border-collapse:collapse;}
+  th{
+    text-align:left; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.05em;
+    color:var(--ink-faint); padding:10px 18px; border-bottom:1px solid var(--line); background:var(--surface-2);
+  }
+  td{padding:12px 18px; border-bottom:1px solid var(--line); font-size:13.2px; vertical-align:middle;}
+  tbody tr:last-child td{border-bottom:0;}
+  tbody tr:hover{background:var(--surface-2);}
+  td.num, th.num{text-align:right; font-family:'IBM Plex Mono';}
+  .cell-primary{font-weight:600;}
+  .cell-sub{font-size:11.8px; color:var(--ink-faint); margin-top:1px;}
+
+  .pill{
+    display:inline-flex; align-items:center; gap:5px; font-size:11.3px; font-weight:600;
+    padding:3px 9px 3px 7px; border-radius:20px; white-space:nowrap;
+  }
+  .pill.moss{background:var(--moss-soft); color:var(--moss);}
+  .pill.amber{background:var(--amber-soft); color:var(--amber);}
+  .pill.rose{background:var(--rose-soft); color:var(--rose);}
+  .pill.ink{background:var(--surface-2); color:var(--ink-soft); border:1px solid var(--line);}
+  .pill .dot{width:5px; height:5px;}
+
+  .role-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:14px;}
+  .role-card{
+    background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
+    padding:16px; display:flex; flex-direction:column; gap:10px;
+  }
+  .role-card .rtag{font-size:11px; font-weight:600; color:var(--accent); text-transform:uppercase; letter-spacing:.04em;}
+  .role-card h3{font-size:15px;}
+  .role-card p{margin:0; font-size:12.6px; color:var(--ink-soft); flex:1;}
+  .role-card .rfoot{display:flex; align-items:center; justify-content:space-between; padding-top:6px; border-top:1px solid var(--line);}
+  .role-card .rfoot .cost{font-family:'IBM Plex Mono'; font-size:12.6px; color:var(--ink-faint);}
+
+  .empty{padding:32px 18px; text-align:center; color:var(--ink-faint); font-size:13px;}
+
+  .two-col{display:grid; grid-template-columns:1.3fr 1fr; gap:16px; align-items:start;}
+
+  .field-note{
+    display:flex; gap:10px; align-items:flex-start; background:var(--accent-soft); border:1px solid var(--accent-soft-line);
+    border-radius:var(--radius); padding:12px 14px; font-size:12.6px; color:var(--ink-soft);
+  }
+  .field-note strong{color:var(--ink);}
+
+  .toggle-row{display:flex; align-items:center; justify-content:space-between; padding:13px 18px; border-bottom:1px solid var(--line);}
+  .toggle-row:last-child{border-bottom:0;}
+  .toggle-row .t1{font-size:13.2px; font-weight:600;}
+  .toggle-row .t2{font-size:12px; color:var(--ink-faint); margin-top:1px;}
+  .switch{width:36px; height:20px; border-radius:20px; background:var(--line-strong); position:relative; cursor:pointer; flex:none; border:0;}
+  .switch.on{background:var(--accent);}
+  .switch::after{content:""; position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%; background:var(--surface); transition:left .15s;}
+  .switch.on::after{left:18px;}
+
+  .kv-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:0;}
+  .kv{padding:13px 18px; border-bottom:1px solid var(--line); border-right:1px solid var(--line);}
+  .kv:nth-child(2n){border-right:0;}
+  .kv .k{font-size:11px; color:var(--ink-faint); font-weight:600; text-transform:uppercase; letter-spacing:.04em;}
+  .kv .v{font-size:13.4px; margin-top:3px; font-weight:500;}
+
+  .scope-banner{
+    display:flex; gap:11px; align-items:flex-start; background:var(--surface-2); border:1px dashed var(--line-strong);
+    border-radius:var(--radius); padding:14px 16px; font-size:12.6px; color:var(--ink-soft); margin-bottom:4px;
+  }
+  .scope-banner strong{color:var(--ink); display:block; margin-bottom:2px; font-size:13px;}
+
+  @media (max-width: 860px){
+    .sidebar{position:fixed; z-index:20; transform:translateX(-100%); transition:transform .18s;}
+    .sidebar.open{transform:translateX(0);}
+    .stat-row{grid-template-columns:repeat(2,1fr);}
+    .role-grid{grid-template-columns:1fr;}
+    .two-col{grid-template-columns:1fr;}
+    .kv-grid{grid-template-columns:1fr;}
+    .kv{border-right:0;}
+    .page{padding:20px 16px 48px;}
+    .topbar{padding:16px;}
+  }
+</style>
+
+<div class="shell">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-mark">VF</div>
+      <div class="brand-text"><strong>Amanah Formwork</strong><span>Pilot Firm &middot; Virtual Firm Platform</span></div>
+    </div>
+    <div class="mode-switch">
+      <button class="active" id="modeOwnerBtn" onclick="setMode('owner')">Owner workspace</button>
+      <button id="modeAdminBtn" onclick="setMode('admin')">Admin console</button>
+    </div>
+    <div class="nav-scroll" id="navScroll"></div>
+    <div class="sidebar-foot">
+      <div class="foot-avatar">ID</div>
+      <div class="foot-text"><strong>Ir. Demo Principal</strong><span>Principal &middot; Owner</span></div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow" id="pageEyebrow">Overview</div>
+        <h1 id="pageTitle">Dashboard</h1>
+        <p id="pageDesc">Where the firm stands right now.</p>
+      </div>
+      <div class="topbar-actions" id="pageActions"></div>
+    </header>
+    <div class="page-scroll"><div class="page" id="pageBody"></div></div>
+  </div>
+</div>
+
+<script>
+/* ---------------------------------------------------------------
+   MOCK FIRM DATA -- stands in for the real /store payload
+--------------------------------------------------------------- */
+const WORKERS = [
+  {code:'FD-101', name:'Suraya', role:'Front Desk Coordinator', status:'active', hired:'12 Jun 2026', tasks:6, approvalRate:96, turnaround:'3.1h'},
+  {code:'PW-204', name:'Haziq', role:'Proposal Writer', status:'active', hired:'12 Jun 2026', tasks:4, approvalRate:88, turnaround:'6.4h'},
+  {code:'BK-118', name:'Mei Ling', role:'Bookkeeper', status:'active', hired:'19 Jun 2026', tasks:9, approvalRate:100, turnaround:'1.8h'},
+  {code:'PC-142', name:'Arif', role:'Project Coordinator', status:'paused', hired:'2 Jul 2026', tasks:2, approvalRate:75, turnaround:'8.0h'},
+  {code:'QR-160', name:'Devi', role:'Quality Reviewer', status:'active', hired:'2 Jul 2026', tasks:5, approvalRate:100, turnaround:'2.5h'},
+];
+const ROLE_CATALOGUE = [
+  {tag:'Sales', name:'Front Desk Coordinator', desc:'Logs new enquiries, qualifies them against your intake rules, and routes anything real to your pipeline.', cost:'RM 180/mo'},
+  {tag:'Sales', name:'Proposal Writer', desc:'Drafts scoped proposals from your rate card and past jobs. Every draft waits for your sign-off before it is sent.', cost:'RM 220/mo'},
+  {tag:'Finance', name:'Bookkeeper', desc:'Raises invoices, chases overdue receivables, and reconciles expenses against your bank feed.', cost:'RM 200/mo'},
+  {tag:'Delivery', name:'Project Coordinator', desc:'Tracks milestones across active jobs and flags anything slipping before the client notices.', cost:'RM 210/mo'},
+  {tag:'Quality', name:'Quality Reviewer', desc:'A second pass on technical drafts against your Formwork Engineering Practice Pack rules.', cost:'RM 240/mo'},
+  {tag:'Delivery', name:'Site Documentation Clerk', desc:'Turns site photos and BOQ sheets into structured document register entries.', cost:'RM 190/mo'},
+];
+const CLIENTS = [
+  {name:'NHL Global Solution', status:'active', projects:2, ltv:'RM 41,200', since:'Mar 2026'},
+  {name:'Amanah Formwork Pilot Firm', status:'active', projects:1, ltv:'RM 12,500', since:'Jan 2026'},
+  {name:'Bina Jaya Resources', status:'prospect', projects:0, ltv:'&mdash;', since:'This week'},
+];
+const PIPELINE = [
+  {client:'Bina Jaya Resources', stage:'Qualifying', owner:'Suraya', value:'RM 9,000', updated:'Today'},
+  {client:'Kelana Structural Sdn Bhd', stage:'New enquiry', owner:'Suraya', value:'RM &mdash;', updated:'Yesterday'},
+  {client:'NHL Global Solution', stage:'Proposal sent', owner:'Haziq', value:'RM 15,600', updated:'2 days ago'},
+];
+const PROPOSALS = [
+  {client:'NHL Global Solution', title:'Basement Wall Formwork Package', value:'RM 15,600', status:'sent'},
+  {client:'Amanah Formwork Pilot Firm', title:'Temporary Works Design Review', value:'RM 8,200', status:'won'},
+  {client:'Kelana Structural Sdn Bhd', title:'Formwork Advisory Retainer', value:'RM 4,500', status:'draft'},
+];
+const PROJECTS = {
+  active:[
+    {name:'Basement Wall Formwork Package', client:'NHL Global Solution', worker:'Arif &middot; Project Coordinator', milestone:'Design pack review &mdash; due 22 Sep', health:'ontrack'},
+    {name:'Temporary Works Design Review', client:'Amanah Formwork Pilot Firm', worker:'Devi &middot; Quality Reviewer', milestone:'QA sign-off &mdash; due 18 Sep', health:'attn'},
+  ],
+  planning:[
+    {name:'Formwork Advisory Retainer', client:'Kelana Structural Sdn Bhd', worker:'Unassigned', milestone:'Awaiting scope confirmation', health:'ontrack'},
+  ],
+  completed:[
+    {name:'Site Hoarding Package &mdash; Phase 1', client:'Amanah Formwork Pilot Firm', worker:'Arif &middot; Project Coordinator', milestone:'Delivered 30 Aug 2026', health:'done'},
+  ],
+};
+const INVOICES = [
+  {client:'NHL Global Solution', ref:'INV-2026-014', amount:'RM 15,600', status:'sent', due:'25 Sep 2026'},
+  {client:'Amanah Formwork Pilot Firm', ref:'INV-2026-011', amount:'RM 8,200', status:'paid', due:'02 Sep 2026'},
+  {client:'NHL Global Solution', ref:'INV-2026-007', amount:'RM 2,800', status:'overdue', due:'30 Aug 2026'},
+];
+const EXPENSES = [
+  {desc:'Site visit &mdash; mileage & tolls', category:'Travel', amount:'RM 96', date:'10 Sep 2026'},
+  {desc:'Formwork Practice Pack &mdash; annual renewal', category:'Software', amount:'RM 1,200', date:'01 Sep 2026'},
+];
+
+/* ---------------------------------------------------------------
+   MOCK PLATFORM DATA -- Admin console (vFirm operator, not one firm)
+--------------------------------------------------------------- */
+const ADMIN_FIRMS = [
+  {name:'Amanah Formwork Pilot Firm', type:'Formwork Engineering / Temporary Works', principal:'Ir. Demo Principal', seats:'5 / 5', status:'active', since:'14 Jan 2026'},
+  {name:'NHL Global Solution', type:'BOQ / Image Quotation (NHL-Q)', principal:'En. Hafiz Rahman', seats:'3 / 4', status:'active', since:'03 Mar 2026'},
+];
+const ADMIN_TENANTS = [
+  {name:'Effort Studio Holdings', firms:2, region:'Malaysia (MY)', plan:'Controlled multi-firm pilot'},
+];
+const ADMIN_MODULES = [
+  {name:'Front Desk Coordinator', firms:2, seats:2},
+  {name:'Proposal Writer', firms:2, seats:2},
+  {name:'Bookkeeper', firms:1, seats:1},
+  {name:'Project Coordinator', firms:2, seats:2},
+  {name:'Quality Reviewer', firms:1, seats:1},
+];
+const ADMIN_USERS = [
+  {name:'Ir. Demo Principal', firm:'Amanah Formwork Pilot Firm', role:'Owner / Principal', status:'active'},
+  {name:'En. Hafiz Rahman', firm:'NHL Global Solution', role:'Owner / Principal', status:'active'},
+  {name:'Siti (Platform Ops)', firm:'vFirm Platform', role:'Platform Admin', status:'active'},
+];
+const ADMIN_ROLES = [
+  {role:'Owner', can:'Hire and pause workers, approve all outputs, view firm finances.'},
+  {role:'Platform Admin', can:'Provision firms, manage worker seats, view the audit trail across every tenant.'},
+  {role:'Support', can:'View tickets and firm status. No approval or financial access.'},
+];
+const ADMIN_SUPPORT = [
+  {subject:'Login issue after password reset', firm:'Amanah Formwork Pilot Firm', status:'open', age:'2h'},
+  {subject:'Question about Bookkeeper invoice numbering', firm:'NHL Global Solution', status:'pending', age:'1d'},
+  {subject:'Requested a 6th worker seat', firm:'Amanah Formwork Pilot Firm', status:'resolved', age:'3d'},
+];
+const ADMIN_SERVICES = [
+  {name:'API', status:'ok', detail:'127.0.0.1:3091 &middot; p50 118ms'},
+  {name:'Worker Runtime', status:'ok', detail:'5 active AWIA sessions'},
+  {name:'Postgres', status:'ok', detail:'Migration 0024 applied'},
+  {name:'Event Bus / Audit Log', status:'ok', detail:'0 dropped events since TD-009 close'},
+];
+const ADMIN_WORKFLOW_RUNS = [
+  {name:'Guided MVP Workflow &mdash; Demo Loop', firm:'Amanah Formwork Pilot Firm', status:'done', when:'Today, 09:14'},
+  {name:'AWIA output-review cycle', firm:'NHL Global Solution', status:'done', when:'Yesterday'},
+  {name:'awia-package-assignment (HIRE_ME)', firm:'Amanah Formwork Pilot Firm', status:'done', when:'12 Jun 2026'},
+];
+const ADMIN_NETWORK = [];
+const ADMIN_PACKS = [
+  {name:'Formwork Engineering / Temporary Works Practice Pack', status:'deployed', firms:2, engine:'Deterministic &mdash; QA rules v1.0'},
+  {name:'BOQ / Image Quotation Pack (NHL-Q)', status:'deployed', firms:1, engine:'NHL-Q1&ndash;NHL-Q6, controlled pilot'},
+  {name:'Legal Correspondence Pack (Malaysian agencies)', status:'planned', firms:0, engine:'Release 2 candidate'},
+];
+const ADMIN_RELEASES = [
+  {name:'Release 1 &mdash; MVP loop', status:'accepted', note:'Stage 1&ndash;20 complete'},
+  {name:'Release 4 &mdash; staging / private pilot controls', status:'accepted', note:'R4-S1&ndash;S6, extended for AWIA staff'},
+  {name:'Release 2 &mdash; candidate backlog', status:'pending', note:'Not yet scoped as blocker or approved expansion'},
+];
+const ADMIN_AUDIT = [
+  {who:'Ir. Demo Principal', action:'Approved output draft for Basement Wall Formwork Package', firm:'Amanah Formwork Pilot Firm', when:'Today, 11:02'},
+  {who:'Haziq (Proposal Writer)', action:'Submitted proposal draft for review', firm:'Amanah Formwork Pilot Firm', when:'Today, 09:40'},
+  {who:'System', action:'Provisioned AWIA pilot staff', firm:'NHL Global Solution', when:'06 Sep 2026'},
+];
+const ADMIN_APPROVALS = [
+  {deliverable:'Basement Wall Formwork Package &mdash; proposal', professional:'Ir. Demo Principal', credential:'BEM Registered Engineer', status:'approved'},
+  {deliverable:'Temporary Works Design Review &mdash; QA pack', professional:'Ir. Demo Principal', credential:'BEM Registered Engineer', status:'sent-back'},
+];
+const ADMIN_REVIEW_BOARD = [
+  {item:'NHL-Q workflow acceptance', status:'pending', note:'Requires an explicit product-owner decision &mdash; no silent acceptance allowed.'},
+  {item:'AUTHORIZE_AWIA_STAFF_MEMORY_AND_CONVERSATION_WORKSPACE', status:'approved', note:'Completed 06 Sep 2026.'},
+  {item:'Commercial activation for AWIA staff seats (Phase E)', status:'pending', note:'Needs a product-owner payment-provider decision.'},
+];
+const ADMIN_PLATFORM_PIPELINE = [
+  {firm:'Kelana Structural Consultancy', stage:'Discovery call', value:'Est. 4 seats'},
+  {firm:'Bina Jaya Resources', stage:'Pilot proposal sent', value:'Est. 3 seats'},
+];
+const ADMIN_RECEIVABLES = [
+  {firm:'Amanah Formwork Pilot Firm', amount:'RM 1,010', status:'paid', due:'01 Sep 2026'},
+  {firm:'NHL Global Solution', amount:'RM 848', status:'overdue', due:'25 Aug 2026'},
+];
+const ADMIN_PACK_CATALOGUE = [
+  {name:'Formwork Engineering / Temporary Works Practice Pack', price:'RM 350/mo per firm', firms:2},
+  {name:'BOQ / Image Quotation Pack (NHL-Q)', price:'RM 280/mo per firm', firms:1},
+  {name:'Legal Correspondence Pack', price:'Planned &mdash; Release 2', firms:0},
+];
+const ADMIN_LAUNCH_CHECKLIST = [
+  {item:'AWIA controlled local pilot acceptance lock', status:'done'},
+  {item:'Multi-firm pilot operations (OP-H1&ndash;H6)', status:'done'},
+  {item:'Release 4 staging / private pilot', status:'done'},
+  {item:'Commercial activation (payment-provider decision)', status:'pending'},
+  {item:'Public marketplace launch', status:'blocked', note:'Out of scope until the trusted specialist network exists (Phase 5).'},
+];
+const ADMIN_EXPANSION = [
+  {bundle:'AUTHORIZE_AWIA_STAFF_MEMORY_AND_CONVERSATION_WORKSPACE', status:'completed'},
+  {bundle:'AUTHORIZE_AWIA_DEPARTMENT_DASHBOARDS', status:'completed'},
+  {bundle:'AUTHORIZE_AWIA_PAYROLL_AND_SEAT_BILLING_POLISH', status:'completed'},
+  {bundle:'AUTHORIZE_AWIA_MULTI_FIRM_STAFF_TEMPLATE_SCALING', status:'completed'},
+  {bundle:'AUTHORIZE_AWIA_STAGING_PREPARATION', status:'attn', note:'Concluded NOT_READY &mdash; tracked as TD-009 (closed 06 Sep 2026).'},
+];
+const ADMIN_PILOT_GATES = [
+  {code:'ACCEPT_NHL_Q_CONTROLLED_LOCAL_PRIVATE_PILOT', status:'accepted', when:'05 Sep 2026'},
+  {code:'AWIA_CONTROLLED_LOCAL_PILOT_ACCEPTANCE_LOCK', status:'accepted', when:'05 Sep 2026'},
+  {code:'GO_FOR_CONTROLLED_MULTI_FIRM_PILOT_OPERATIONS_ACCEPTANCE (OP-H6)', status:'accepted', when:'06 Sep 2026'},
+];
+
+/* ---------------------------------------------------------------
+   NAVIGATION MAP
+--------------------------------------------------------------- */
+const ICONS = {
+  home:'<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 11.5 12 5l8 6.5"/><path d="M6 10v9h12v-9"/></svg>',
+  team:'<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3"/><path d="M3.5 19c.7-3.2 3-5 5.5-5s4.8 1.8 5.5 5"/><circle cx="17" cy="9" r="2.3"/><path d="M15.8 12.2c2 .2 3.6 1.8 4.1 4.3"/></svg>',
+  desk:'<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="5" width="17" height="11" rx="1.5"/><path d="M8 19h8M12 16v3"/></svg>',
+  sales:'<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19V5M4 19h16M8 15l3-4 3 2 4-6"/></svg>',
+  proj:'<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4.5" width="16" height="15" rx="1.5"/><path d="M4 9.5h16M9 4.5v-1M15 4.5v-1"/></svg>',
+  cash:'<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="6.5" width="18" height="11" rx="1.8"/><circle cx="12" cy="12" r="2.4"/></svg>',
+  firm:'<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 20V8l7-4 7 4v12"/><path d="M9 20v-6h6v6"/></svg>',
+  plat:'<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="4" width="17" height="12" rx="1.5"/><path d="M8 20h8M12 16v4"/></svg>',
+  ops:'<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M12 3v2.5M12 18.5V21M21 12h-2.5M5.5 12H3M18 6l-1.7 1.7M7.7 16.3 6 18M18 18l-1.7-1.7M7.7 7.7 6 6"/></svg>',
+  shield:'<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3.5 5 6v6c0 4.4 3 7.6 7 8.5 4-.9 7-4.1 7-8.5V6l-7-2.5Z"/></svg>',
+  megaphone:'<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 10.5v3l3 .6v3.9l3 1V14.4l9 1.8V8.8L7 10.6v-3z"/></svg>',
+};
+
+const OWNER_NAV = [
+  {label:'Overview', items:[{id:'dashboard', label:'Dashboard', icon:'home'}]},
+  {label:'Workforce', items:[{id:'team', label:'My Team', icon:'team', count:()=>WORKERS.length}]},
+  {label:'Work', items:[{id:'workdesk', label:'Workdesk', icon:'desk', count:()=>2, attn:true}]},
+  {label:'Clients & Sales', items:[{id:'sales', label:'Clients & Sales', icon:'sales', count:()=>PIPELINE.length}]},
+  {label:'Delivery', items:[{id:'projects', label:'Projects', icon:'proj', count:()=>PROJECTS.active.length}]},
+  {label:'Finance', items:[{id:'finance', label:'Finance', icon:'cash', count:()=>1, attn:true}]},
+  {label:'Firm', items:[{id:'firmsettings', label:'Firm Settings', icon:'firm'}]},
+];
+const ADMIN_NAV = [
+  {label:'Platform', items:[
+    {id:'admin-firms', label:'Firms & Tenants', icon:'plat', count:()=>ADMIN_FIRMS.length},
+    {id:'admin-users', label:'Users & Access', icon:'team', count:()=>ADMIN_SUPPORT.filter(function(s){return s.status==='open';}).length, attn:true},
+  ]},
+  {label:'Operations', items:[
+    {id:'admin-ops', label:'Ops Console', icon:'ops'},
+    {id:'admin-technical', label:'Technical Delivery', icon:'proj'},
+  ]},
+  {label:'Governance', items:[
+    {id:'admin-audit', label:'Audit & Compliance', icon:'shield', count:()=>ADMIN_REVIEW_BOARD.filter(function(r){return r.status==='pending';}).length, attn:true},
+  ]},
+  {label:'Commercial', items:[
+    {id:'admin-salesaccounts', label:'Sales & Accounts', icon:'sales', count:()=>ADMIN_RECEIVABLES.filter(function(r){return r.status==='overdue';}).length, attn:true},
+    {id:'admin-billing', label:'Service Packs & Billing', icon:'cash'},
+    {id:'admin-growth', label:'Growth', icon:'megaphone'},
+  ]},
+  {label:'Diagnostics', items:[
+    {id:'admin-engineering', label:'Engineering Console', icon:'team'},
+  ]},
+];
+
+const PAGE_META = {
+  dashboard:{eyebrow:'Overview', title:'Dashboard', desc:'Where the firm stands right now.'},
+  team:{eyebrow:'Workforce', title:'My Team', desc:'Hire, direct, and review the virtual staff running parts of your firm.'},
+  workdesk:{eyebrow:'Work', title:'Workdesk', desc:'Every task moving through your team, from a new request to work archived once it is out the door.'},
+  sales:{eyebrow:'Clients & Sales', title:'Clients & Sales', desc:'New enquiries, proposals in flight, and everyone you have ever worked with.'},
+  projects:{eyebrow:'Delivery', title:'Projects', desc:'What your firm is actively delivering, planning, or has closed out.'},
+  finance:{eyebrow:'Finance', title:'Finance', desc:'Invoices, expenses, and what running this firm costs you.'},
+  firmsettings:{eyebrow:'Firm', title:'Firm Settings', desc:'Your firm\'s profile, subscription, and platform preferences.'},
+  'admin-firms':{eyebrow:'Platform', title:'Firms & Tenants', desc:'Every firm workspace running on vFirm, and the tenant structure underneath them.'},
+  'admin-users':{eyebrow:'Platform', title:'Users & Access', desc:'Who has access across the platform, what they can do, and open support requests.'},
+  'admin-ops':{eyebrow:'Operations', title:'Ops Console', desc:'Live system health and the automated workflow runs behind every firm.'},
+  'admin-technical':{eyebrow:'Operations', title:'Technical Delivery', desc:'Practice Packs in production and the release train that shipped them.'},
+  'admin-audit':{eyebrow:'Governance', title:'Audit & Compliance', desc:'Every material action, who authorized it, and what is still waiting on a governance decision.'},
+  'admin-salesaccounts':{eyebrow:'Commercial', title:'Sales & Accounts', desc:'Firms considering vFirm, and what every onboarded firm owes on its subscription.'},
+  'admin-billing':{eyebrow:'Commercial', title:'Service Packs & Billing', desc:'What you sell, what it costs, and how revenue breaks down across firms.'},
+  'admin-growth':{eyebrow:'Commercial', title:'Growth', desc:'Commercial launch readiness and approved expansion bundles.'},
+  'admin-engineering':{eyebrow:'Diagnostics', title:'Engineering Console', desc:'Low-level AWIA endpoints and the pilot decision gates behind this release.'},
+};
+
+let state = {mode:'owner', page:'dashboard', tabs:{
+  team:'roster', workdesk:'inbox', sales:'pipeline', projects:'active', finance:'invoices', firmsettings:'profile',
+  'admin-firms':'firms', 'admin-users':'users', 'admin-ops':'health', 'admin-technical':'packs',
+  'admin-audit':'trail', 'admin-salesaccounts':'pipeline', 'admin-billing':'catalogue',
+  'admin-growth':'launch', 'admin-engineering':'raw',
+}};
+
+/* ---------------------------------------------------------------
+   RENDER HELPERS
+--------------------------------------------------------------- */
+function pill(kind, text){
+  const dotClass = {moss:'moss', amber:'amber', rose:'rose', ink:'ink'}[kind] || 'ink';
+  return `<span class="pill ${kind}"><span class="dot ${dotClass}"></span>${text}</span>`;
+}
+function statusPill(status){
+  const map = {
+    active:['moss','Active'], paused:['ink','Paused'], prospect:['amber','Prospect'],
+    sent:['amber','Sent'], paid:['moss','Paid'], overdue:['rose','Overdue'], draft:['ink','Draft'],
+    won:['moss','Won'], ontrack:['moss','On track'], attn:['amber','Needs attention'], done:['ink','Delivered'],
+    pending:['amber','Pending'], accepted:['moss','Accepted'], approved:['moss','Approved'], blocked:['rose','Blocked'],
+    ok:['moss','Operational'], 'sent-back':['rose','Sent back'], deployed:['moss','Deployed'], planned:['ink','Planned'],
+    completed:['moss','Completed'], open:['rose','Open'], resolved:['moss','Resolved'],
+  };
+  const pair = map[status] || ['ink', status];
+  return pill(pair[0], pair[1]);
+}
+function initials(name){ return name.split(' ').map(function(w){return w[0];}).slice(0,2).join('').toUpperCase(); }
+
+function tabBar(pageId, tabs){
+  return '<div class="tabbar">' + tabs.map(function(t){
+    return '<button class="tab ' + (state.tabs[pageId]===t.id?'active':'') + ' ' + (t.attn?'attn':'') + '" onclick="setTab(\'' + pageId + '\',\'' + t.id + '\')">' +
+      t.label + (t.count!==undefined?'<span class="badge">'+t.count+'</span>':'') +
+      '</button>';
+  }).join('') + '</div>';
+}
+function setTab(pageId, tabId){ state.tabs[pageId] = tabId; renderPage(); }
+function setMode(mode){
+  state.mode = mode; state.page = mode==='owner' ? 'dashboard' : 'admin-firms';
+  document.getElementById('modeOwnerBtn').classList.toggle('active', mode==='owner');
+  document.getElementById('modeAdminBtn').classList.toggle('active', mode==='admin');
+  renderNav(); renderPage();
+}
+function setPage(id){ state.page = id; renderNav(); renderPage(); document.querySelector('.page-scroll').scrollTop = 0; }
+
+function renderNav(){
+  const groups = state.mode==='owner' ? OWNER_NAV : ADMIN_NAV;
+  document.getElementById('navScroll').innerHTML = groups.map(function(g){
+    return '<div class="nav-group"><div class="nav-group-label">' + g.label + '</div>' +
+      g.items.map(function(it){
+        const count = it.count ? (typeof it.count==='function'?it.count():it.count) : null;
+        return '<button class="nav-item ' + (state.page===it.id?'active':'') + '" onclick="setPage(\'' + it.id + '\')">' +
+          ICONS[it.icon] + '<span>' + it.label + '</span>' +
+          (count!==null?'<span class="count">'+count+'</span>':'') +
+          '</button>';
+      }).join('') + '</div>';
+  }).join('');
+}
+
+/* ---------------------------------------------------------------
+   PAGE BODIES
+--------------------------------------------------------------- */
+function pageDashboard(){
+  return `
+  <section class="section">
+    <div class="stat-row">
+      <div class="stat"><span class="k">Active workers</span><span class="v">${WORKERS.filter(function(w){return w.status==='active';}).length}</span><span class="d"><span class="dot moss"></span>of ${WORKERS.length} hired</span></div>
+      <div class="stat"><span class="k">Open in Workdesk</span><span class="v">7</span><span class="d"><span class="dot ink"></span>across all stages</span></div>
+      <div class="stat"><span class="k">Awaiting your approval</span><span class="v">2</span><span class="d"><span class="dot amber"></span>needs a decision today</span></div>
+      <div class="stat"><span class="k">Outstanding invoices</span><span class="v">RM 18,400</span><span class="d"><span class="dot rose"></span>1 overdue</span></div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-head"><h2>Needs your attention</h2><p>Ranked by what's waiting on you longest.</p></div>
+    <div class="panel">
+      <div class="list">
+        <div class="list-row">
+          <div class="who">HQ</div>
+          <div class="main"><div class="t1">Haziq's proposal draft is ready &mdash; <span>Basement Wall Formwork Package</span></div><div class="t2">Proposal Writer &middot; submitted 2h ago</div></div>
+          <div class="side">${pill('amber','Approval')}<button class="btn btn-ghost btn-sm" onclick="setPage('workdesk')">Review</button></div>
+        </div>
+        <div class="list-row">
+          <div class="who">DV</div>
+          <div class="main"><div class="t1">Devi's QA review is stuck &mdash; <span>Temporary Works Design Review</span></div><div class="t2">Quality Reviewer &middot; sent back 1 day ago, no re-draft path yet</div></div>
+          <div class="side">${pill('rose','Stuck')}<button class="btn btn-ghost btn-sm" onclick="setPage('workdesk')">Resolve</button></div>
+        </div>
+        <div class="list-row">
+          <div class="who">NH</div>
+          <div class="main"><div class="t1">NHL Global Solution invoice is overdue &mdash; <span>INV-2026-007 &middot; RM 2,800</span></div><div class="t2">Due 30 Aug 2026</div></div>
+          <div class="side">${pill('rose','Overdue')}<button class="btn btn-ghost btn-sm" onclick="setPage('finance')">Chase</button></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="two-col">
+    <div class="section">
+      <div class="section-head"><h2>Your workforce</h2><button class="link" onclick="setPage('team')">Manage team &rarr;</button></div>
+      <div class="panel"><div class="list">
+        ${WORKERS.map(function(w){
+          return '<div class="list-row"><div class="who">' + initials(w.name) + '</div><div class="main"><div class="t1">' + w.name + ' <span>&middot; ' + w.role + '</span></div><div class="t2">' + w.tasks + ' tasks this week &middot; ' + w.approvalRate + '% approval rate</div></div><div class="side">' + statusPill(w.status) + '</div></div>';
+        }).join('')}
+      </div></div>
+    </div>
+    <div class="section">
+      <div class="section-head"><h2>Recent activity</h2></div>
+      <div class="panel"><div class="list">
+        <div class="list-row"><div class="who">MI</div><div class="main"><div class="t1">Mei Ling raised INV-2026-014</div><div class="t2">2h ago</div></div></div>
+        <div class="list-row"><div class="who">HQ</div><div class="main"><div class="t1">Haziq submitted a proposal draft</div><div class="t2">2h ago</div></div></div>
+        <div class="list-row"><div class="who">SU</div><div class="main"><div class="t1">Suraya qualified Bina Jaya Resources</div><div class="t2">Yesterday</div></div></div>
+        <div class="list-row"><div class="who">ID</div><div class="main"><div class="t1">You approved the Design Review QA pack</div><div class="t2">2 days ago</div></div></div>
+      </div></div>
+    </div>
+  </section>`;
+}
+
+function pageTeam(){
+  const tab = state.tabs.team;
+  let body;
+  if(tab==='roster'){
+    body = '<div class="panel"><table><thead><tr><th>Worker</th><th>Role</th><th>Status</th><th>Hired</th><th class="num">Tasks / wk</th><th></th></tr></thead><tbody>' +
+      WORKERS.map(function(w){
+        return '<tr><td class="cell-primary">' + w.name + '<div class="cell-sub mono">' + w.code + '</div></td><td>' + w.role + '</td><td>' + statusPill(w.status) + '</td><td>' + w.hired + '</td><td class="num">' + w.tasks + '</td><td>' + (w.status==='active' ? '<button class="btn btn-ghost btn-sm">Pause</button>' : '<button class="btn btn-ghost btn-sm">Reactivate</button>') + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+  } else if(tab==='hire'){
+    body = '<div class="field-note"><strong>Hiring adds a monthly seat to your subscription.</strong> Every new hire starts paused &mdash; you switch them on from Roster once you have reviewed their first task.</div><div class="role-grid">' +
+      ROLE_CATALOGUE.map(function(r){
+        return '<div class="role-card"><span class="rtag">' + r.tag + '</span><h3>' + r.name + '</h3><p>' + r.desc + '</p><div class="rfoot"><span class="cost mono">' + r.cost + '</span><button class="btn btn-primary btn-sm">Hire</button></div></div>';
+      }).join('') + '</div>';
+  } else {
+    body = '<div class="panel"><table><thead><tr><th>Worker</th><th class="num">Completed</th><th class="num">Approval rate</th><th class="num">Avg turnaround</th></tr></thead><tbody>' +
+      WORKERS.map(function(w){
+        return '<tr><td class="cell-primary">' + w.name + '<div class="cell-sub">' + w.role + '</div></td><td class="num">' + w.tasks + '</td><td class="num">' + w.approvalRate + '%</td><td class="num">' + w.turnaround + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+  }
+  return tabBar('team',[
+    {id:'roster', label:'Roster', count:WORKERS.length},
+    {id:'hire', label:'Hire'},
+    {id:'performance', label:'Performance'},
+  ]) + '<div class="section">' + body + '</div>';
+}
+
+function pageWorkdesk(){
+  const tab = state.tabs.workdesk;
+  let body;
+  if(tab==='inbox'){
+    body = '<div class="panel panel-pad"><div class="field-note" style="margin-bottom:14px"><strong>2 open tasks</strong> are waiting to be handed to someone on your team.</div><table><thead><tr><th>Task</th><th>Project</th><th></th></tr></thead><tbody>' +
+      '<tr><td class="cell-primary">Prepare cost breakdown</td><td>Basement Wall Formwork Package</td><td><button class="btn btn-primary btn-sm">Assign</button></td></tr>' +
+      '<tr><td class="cell-primary">Draft site documentation register</td><td>Temporary Works Design Review</td><td><button class="btn btn-primary btn-sm">Assign</button></td></tr>' +
+      '</tbody></table></div>';
+  } else if(tab==='pending'){
+    body = '<div class="panel"><table><thead><tr><th>Worker</th><th>Task</th><th></th></tr></thead><tbody>' +
+      '<tr><td>Arif &middot; Project Coordinator</td><td>Milestone tracker update</td><td><button class="btn btn-ghost btn-sm">Check in</button></td></tr>' +
+      '</tbody></table></div>';
+  } else if(tab==='approval'){
+    body = '<div class="panel"><table><thead><tr><th>Worker</th><th>Task</th><th>What they produced</th><th>Notes</th><th></th></tr></thead><tbody>' +
+      '<tr><td class="cell-primary">Haziq<div class="cell-sub">Proposal Writer</div></td><td>Basement Wall Formwork Package</td><td>Proposal draft, RM 15,600<div class="cell-sub">Scoped from the Formwork rate card</div></td><td><input placeholder="Optional note" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:6px 8px;font-size:12.6px;background:var(--surface);color:var(--ink)"/></td><td style="white-space:nowrap"><button class="btn btn-primary btn-sm">Approve</button> <button class="btn btn-ghost btn-sm">Send back</button></td></tr>' +
+      '</tbody></table><table style="border-top:1px solid var(--line)"><thead><tr><th>Worker</th><th>Task</th><th>Status</th><th></th></tr></thead><tbody>' +
+      '<tr><td>Devi &middot; Quality Reviewer</td><td>Temporary Works Design Review</td><td>' + pill('rose','Sent back &mdash; no re-draft path yet') + '</td><td><button class="btn btn-ghost btn-sm">Archive (dismiss)</button></td></tr>' +
+      '</tbody></table></div>';
+  } else if(tab==='outbox'){
+    body = '<div class="panel"><table><thead><tr><th>Deliverable</th><th>Prepared by</th><th></th></tr></thead><tbody>' +
+      '<tr><td class="cell-primary">Design Review QA pack</td><td>Devi</td><td><button class="btn btn-primary btn-sm">Prepare for client</button></td></tr>' +
+      '</tbody></table></div>';
+  } else {
+    body = '<div class="panel"><table><thead><tr><th>Deliverable</th><th>Worker</th><th>Status</th><th>When</th></tr></thead><tbody>' +
+      '<tr><td class="cell-primary">Site Hoarding Package &mdash; Phase 1</td><td>Arif</td><td>' + pill('moss','Delivered') + '</td><td>30 Aug 2026</td></tr>' +
+      '</tbody></table></div>';
+  }
+  return tabBar('workdesk',[
+    {id:'inbox', label:'Inbox', count:2},
+    {id:'pending', label:'Pending', count:1},
+    {id:'approval', label:'Approval', count:2, attn:true},
+    {id:'outbox', label:'Outbox', count:1},
+    {id:'archived', label:'Archived', count:1},
+  ]) + '<div class="section">' + body + '</div>';
+}
+
+function pageSales(){
+  const tab = state.tabs.sales;
+  let body;
+  if(tab==='pipeline'){
+    body = '<div class="panel"><table><thead><tr><th>Prospect</th><th>Stage</th><th>Owner</th><th class="num">Value</th><th>Updated</th></tr></thead><tbody>' +
+      PIPELINE.map(function(p){ return '<tr><td class="cell-primary">' + p.client + '</td><td>' + pill('ink',p.stage) + '</td><td>' + p.owner + '</td><td class="num">' + p.value + '</td><td>' + p.updated + '</td></tr>'; }).join('') +
+      '</tbody></table></div>';
+  } else if(tab==='proposals'){
+    body = '<div class="panel"><table><thead><tr><th>Proposal</th><th>Client</th><th class="num">Value</th><th>Status</th></tr></thead><tbody>' +
+      PROPOSALS.map(function(p){ return '<tr><td class="cell-primary">' + p.title + '</td><td>' + p.client + '</td><td class="num">' + p.value + '</td><td>' + statusPill(p.status) + '</td></tr>'; }).join('') +
+      '</tbody></table></div>';
+  } else {
+    body = '<div class="panel"><table><thead><tr><th>Client</th><th>Status</th><th class="num">Projects</th><th class="num">Lifetime value</th><th>Client since</th></tr></thead><tbody>' +
+      CLIENTS.map(function(c){ return '<tr><td class="cell-primary">' + c.name + '</td><td>' + statusPill(c.status) + '</td><td class="num">' + c.projects + '</td><td class="num">' + c.ltv + '</td><td>' + c.since + '</td></tr>'; }).join('') +
+      '</tbody></table></div>';
+  }
+  return tabBar('sales',[
+    {id:'pipeline', label:'Pipeline', count:PIPELINE.length},
+    {id:'proposals', label:'Proposals', count:PROPOSALS.length},
+    {id:'directory', label:'Directory', count:CLIENTS.length},
+  ]) + '<div class="section">' + body + '</div>';
+}
+
+function pageProjects(){
+  const tab = state.tabs.projects;
+  const rows = PROJECTS[tab] || [];
+  const body = rows.length ? ('<div class="panel"><table><thead><tr><th>Project</th><th>Client</th><th>Worker</th><th>Next milestone</th><th></th></tr></thead><tbody>' +
+      rows.map(function(p){ return '<tr><td class="cell-primary">' + p.name + '</td><td>' + p.client + '</td><td>' + p.worker + '</td><td>' + p.milestone + '</td><td>' + statusPill(p.health) + '</td></tr>'; }).join('') +
+      '</tbody></table></div>') : '<div class="panel"><div class="empty">Nothing here yet.</div></div>';
+  return tabBar('projects',[
+    {id:'active', label:'Active', count:PROJECTS.active.length},
+    {id:'planning', label:'Planning', count:PROJECTS.planning.length},
+    {id:'completed', label:'Completed', count:PROJECTS.completed.length},
+  ]) + '<div class="section">' + body + '</div>';
+}
+
+function pageFinance(){
+  const tab = state.tabs.finance;
+  let body;
+  if(tab==='invoices'){
+    body = '<div class="panel"><table><thead><tr><th>Invoice</th><th>Client</th><th class="num">Amount</th><th>Status</th><th>Due</th></tr></thead><tbody>' +
+      INVOICES.map(function(i){ return '<tr><td class="cell-primary mono">' + i.ref + '</td><td>' + i.client + '</td><td class="num">' + i.amount + '</td><td>' + statusPill(i.status) + '</td><td>' + i.due + '</td></tr>'; }).join('') +
+      '</tbody></table></div>';
+  } else if(tab==='expenses'){
+    body = '<div class="panel"><table><thead><tr><th>Expense</th><th>Category</th><th class="num">Amount</th><th>Date</th></tr></thead><tbody>' +
+      EXPENSES.map(function(e){ return '<tr><td class="cell-primary">' + e.desc + '</td><td>' + e.category + '</td><td class="num">' + e.amount + '</td><td>' + e.date + '</td></tr>'; }).join('') +
+      '</tbody></table></div>';
+  } else {
+    body = '<div class="stat-row" style="grid-template-columns:repeat(3,1fr)"><div class="stat"><span class="k">Current plan</span><span class="v" style="font-size:18px">Growth</span><span class="d">5 worker seats included</span></div><div class="stat"><span class="k">Seats used</span><span class="v">5 / 5</span><span class="d"><span class="dot amber"></span>at capacity</span></div><div class="stat"><span class="k">Next invoice</span><span class="v">RM 1,010</span><span class="d">Renews 1 Oct 2026</span></div></div>';
+  }
+  return tabBar('finance',[
+    {id:'invoices', label:'Invoices', count:INVOICES.length, attn:true},
+    {id:'expenses', label:'Expenses', count:EXPENSES.length},
+    {id:'billing', label:'Billing'},
+  ]) + '<div class="section">' + body + '</div>';
+}
+
+function pageFirmSettings(){
+  const tab = state.tabs.firmsettings;
+  let body;
+  if(tab==='profile'){
+    body = '<div class="panel"><div class="kv-grid">' +
+      '<div class="kv"><div class="k">Firm name</div><div class="v">Amanah Formwork Pilot Firm</div></div>' +
+      '<div class="kv"><div class="k">Firm type</div><div class="v">Formwork Engineering / Temporary Works</div></div>' +
+      '<div class="kv"><div class="k">Principal</div><div class="v">Ir. Demo Principal</div></div>' +
+      '<div class="kv"><div class="k">Registered</div><div class="v">14 Jan 2026</div></div>' +
+      '<div class="kv" style="grid-column:1/-1"><div class="k">Authority boundary</div><div class="v">Human professional authority remains explicit. No virtual worker issues a final regulated deliverable without your approval.</div></div>' +
+      '</div></div>';
+  } else if(tab==='subscription'){
+    body = '<div class="stat-row" style="grid-template-columns:repeat(3,1fr)"><div class="stat"><span class="k">Plan</span><span class="v" style="font-size:18px">Growth</span><span class="d">RM 1,010 / month</span></div><div class="stat"><span class="k">Worker seats</span><span class="v">5 / 5</span><span class="d">All in use</span></div><div class="stat"><span class="k">Renews</span><span class="v" style="font-size:18px">1 Oct</span><span class="d">2026</span></div></div>';
+  } else {
+    body = '<div class="panel">' +
+      '<div class="toggle-row"><div><div class="t1">Email me when a worker needs approval</div><div class="t2">Sent as items land in Workdesk\'s Approval tab</div></div><button class="switch on"></button></div>' +
+      '<div class="toggle-row"><div><div class="t1">Daily digest at 8:00 AM</div><div class="t2">One summary instead of item-by-item alerts</div></div><button class="switch"></button></div>' +
+      '<div class="toggle-row"><div><div class="t1">Notify on invoice overdue</div><div class="t2">3 days past due date</div></div><button class="switch on"></button></div>' +
+      '</div>';
+  }
+  return tabBar('firmsettings',[
+    {id:'profile', label:'Profile'}, {id:'subscription', label:'Subscription'}, {id:'preferences', label:'Preferences'},
+  ]) + '<div class="section">' + body + '</div>';
+}
+
+function pageAdminFirms(){
+  const tab = state.tabs['admin-firms'];
+  let body;
+  if(tab==='firms'){
+    body = '<div class="panel"><table><thead><tr><th>Firm</th><th>Type</th><th>Principal</th><th>Seats</th><th>Status</th><th>Since</th></tr></thead><tbody>' +
+      ADMIN_FIRMS.map(function(f){ return '<tr><td class="cell-primary">' + f.name + '</td><td>' + f.type + '</td><td>' + f.principal + '</td><td class="num">' + f.seats + '</td><td>' + statusPill(f.status) + '</td><td>' + f.since + '</td></tr>'; }).join('') +
+      '</tbody></table></div>';
+  } else if(tab==='tenants'){
+    body = '<div class="panel"><table><thead><tr><th>Tenant</th><th class="num">Firms</th><th>Region</th><th>Plan</th></tr></thead><tbody>' +
+      ADMIN_TENANTS.map(function(t){ return '<tr><td class="cell-primary">' + t.name + '</td><td class="num">' + t.firms + '</td><td>' + t.region + '</td><td>' + t.plan + '</td></tr>'; }).join('') +
+      '</tbody></table></div>';
+  } else {
+    body = '<div class="panel"><table><thead><tr><th>Module / worker template</th><th class="num">Firms using it</th><th class="num">Active seats</th></tr></thead><tbody>' +
+      ADMIN_MODULES.map(function(m){ return '<tr><td class="cell-primary">' + m.name + '</td><td class="num">' + m.firms + '</td><td class="num">' + m.seats + '</td></tr>'; }).join('') +
+      '</tbody></table></div>';
+  }
+  return tabBar('admin-firms',[
+    {id:'firms', label:'Firms', count:ADMIN_FIRMS.length},
+    {id:'tenants', label:'Tenants', count:ADMIN_TENANTS.length},
+    {id:'modules', label:'Modules', count:ADMIN_MODULES.length},
+  ]) + '<div class="section">' + body + '</div>';
+}
+
+function pageAdminUsers(){
+  const tab = state.tabs['admin-users'];
+  let body;
+  if(tab==='users'){
+    body = '<div class="panel"><table><thead><tr><th>User</th><th>Firm</th><th>Role</th><th>Status</th></tr></thead><tbody>' +
+      ADMIN_USERS.map(function(u){ return '<tr><td class="cell-primary">' + u.name + '</td><td>' + u.firm + '</td><td>' + u.role + '</td><td>' + statusPill(u.status) + '</td></tr>'; }).join('') +
+      '</tbody></table></div>';
+  } else if(tab==='roles'){
+    body = '<div class="panel"><table><thead><tr><th>Role</th><th>Can do</th></tr></thead><tbody>' +
+      ADMIN_ROLES.map(function(r){ return '<tr><td class="cell-primary">' + r.role + '</td><td>' + r.can + '</td></tr>'; }).join('') +
+      '</tbody></table></div>';
+  } else {
+    body = '<div class="panel"><table><thead><tr><th>Ticket</th><th>Firm</th><th>Status</th><th>Age</th></tr></thead><tbody>' +
+      ADMIN_SUPPORT.map(function(s){ return '<tr><td class="cell-primary">' + s.subject + '</td><td>' + s.firm + '</td><td>' + statusPill(s.status) + '</td><td>' + s.age + '</td></tr>'; }).join('') +
+      '</tbody></table></div>';
+  }
+  return tabBar('admin-users',[
+    {id:'users', label:'Platform Users', count:ADMIN_USERS.length},
+    {id:'roles', label:'Roles & Permissions', count:ADMIN_ROLES.length},
+    {id:'support', label:'Support Queue', count:ADMIN_SUPPORT.filter(function(s){return s.status==='open';}).length, attn:true},
+  ]) + '<div class="section">' + body + '</div>';
+}
+
+function pageAdminOps(){
+  const tab = state.tabs['admin-ops'];
+  let body;
+  if(tab==='health'){
+    body = '<div class="panel"><div class="list">' +
+      ADMIN_SERVICES.map(function(s){ return '<div class="list-row"><div class="who">' + s.name.slice(0,2).toUpperCase() + '</div><div class="main"><div class="t1">' + s.name + '</div><div class="t2">' + s.detail + '</div></div><div class="side">' + statusPill(s.status) + '</div></div>'; }).join('') +
+      '</div></div>';
+  } else if(tab==='runs'){
+    body = '<div class="panel"><table><thead><tr><th>Workflow run</th><th>Firm</th><th>Status</th><th>When</th></tr></thead><tbody>' +
+      ADMIN_WORKFLOW_RUNS.map(function(w){ return '<tr><td class="cell-primary">' + w.name + '</td><td>' + w.firm + '</td><td>' + statusPill(w.status) + '</td><td>' + w.when + '</td></tr>'; }).join('') +
+      '</tbody></table></div>';
+  } else {
+    body = ADMIN_NETWORK.length ? '<div class="panel"></div>' : '<div class="panel"><div class="empty">No trusted specialist network yet. Per the platform roadmap, this opens after the current controlled pilot &mdash; before any open marketplace.</div></div>';
+  }
+  return tabBar('admin-ops',[
+    {id:'health', label:'System Health', count:ADMIN_SERVICES.length},
+    {id:'runs', label:'Workflow Runs', count:ADMIN_WORKFLOW_RUNS.length},
+    {id:'network', label:'Network'},
+  ]) + '<div class="section">' + body + '</div>';
+}
+
+function pageAdminTechnical(){
+  const tab = state.tabs['admin-technical'];
+  let body;
+  if(tab==='packs'){
+    body = '<div class="panel"><table><thead><tr><th>Practice Pack</th><th>Status</th><th class="num">Firms live</th><th>Engine</th></tr></thead><tbody>' +
+      ADMIN_PACKS.map(function(p){ return '<tr><td class="cell-primary">' + p.name + '</td><td>' + statusPill(p.status) + '</td><td class="num">' + p.firms + '</td><td>' + p.engine + '</td></tr>'; }).join('') +
+      '</tbody></table></div>';
+  } else {
+    body = '<div class="panel"><table><thead><tr><th>Release</th><th>Status</th><th>Note</th></tr></thead><tbody>' +
+      ADMIN_RELEASES.map(function(r){ return '<tr><td class="cell-primary">' + r.name + '</td><td>' + statusPill(r.status) + '</td><td>' + r.note + '</td></tr>'; }).join('') +
+      '</tbody></table></div>';
+  }
+  return tabBar('admin-technical',[
+    {id:'packs', label:'Practice Packs', count:ADMIN_PACKS.length},
+    {id:'releases', label:'Release Pipeline', count:ADMIN_RELEASES.length},
+  ]) + '<div class="section">' + body + '</div>';
+}
+
+function pageAdminAudit(){
+  const tab = state.tabs['admin-audit'];
+  let body;
+  if(tab==='trail'){
+    body = '<div class="panel"><div class="list">' +
+      ADMIN_AUDIT.map(function(a){ return '<div class="list-row"><div class="who">' + initials(a.who.replace(/[()].*$/,'')) + '</div><div class="main"><div class="t1">' + a.action + '</div><div class="t2">' + a.who + ' &middot; ' + a.firm + '</div></div><div class="side"><span class="cell-sub">' + a.when + '</span></div></div>'; }).join('') +
+      '</div></div>';
+  } else if(tab==='approvals'){
+    body = '<div class="field-note" style="margin-bottom:14px"><strong>No orphan regulated work.</strong> Every regulated deliverable traces to a named, credentialed professional.</div><div class="panel"><table><thead><tr><th>Deliverable</th><th>Professional</th><th>Credential</th><th>Status</th></tr></thead><tbody>' +
+      ADMIN_APPROVALS.map(function(a){ return '<tr><td class="cell-primary">' + a.deliverable + '</td><td>' + a.professional + '</td><td>' + a.credential + '</td><td>' + statusPill(a.status) + '</td></tr>'; }).join('') +
+      '</tbody></table></div>';
+  } else {
+    body = '<div class="panel"><table><thead><tr><th>Item</th><th>Status</th><th>Note</th></tr></thead><tbody>' +
+      ADMIN_REVIEW_BOARD.map(function(r){ return '<tr><td class="cell-primary">' + r.item + '</td><td>' + statusPill(r.status) + '</td><td>' + r.note + '</td></tr>'; }).join('') +
+      '</tbody></table></div>';
+  }
+  return tabBar('admin-audit',[
+    {id:'trail', label:'Audit Trail', count:ADMIN_AUDIT.length},
+    {id:'approvals', label:'Approval Records', count:ADMIN_APPROVALS.length},
+    {id:'review', label:'Review Board', count:ADMIN_REVIEW_BOARD.filter(function(r){return r.status==='pending';}).length, attn:true},
+  ]) + '<div class="section">' + body + '</div>';
+}
+
+function pageAdminSalesAccounts(){
+  const tab = state.tabs['admin-salesaccounts'];
+  let body;
+  if(tab==='pipeline'){
+    body = '<div class="panel"><table><thead><tr><th>Prospective firm</th><th>Stage</th><th>Est. value</th></tr></thead><tbody>' +
+      ADMIN_PLATFORM_PIPELINE.map(function(p){ return '<tr><td class="cell-primary">' + p.firm + '</td><td>' + pill('ink',p.stage) + '</td><td>' + p.value + '</td></tr>'; }).join('') +
+      '</tbody></table></div>';
+  } else {
+    body = '<div class="panel"><table><thead><tr><th>Firm</th><th class="num">Amount</th><th>Status</th><th>Due</th></tr></thead><tbody>' +
+      ADMIN_RECEIVABLES.map(function(r){ return '<tr><td class="cell-primary">' + r.firm + '</td><td class="num">' + r.amount + '</td><td>' + statusPill(r.status) + '</td><td>' + r.due + '</td></tr>'; }).join('') +
+      '</tbody></table></div>';
+  }
+  return tabBar('admin-salesaccounts',[
+    {id:'pipeline', label:'Pipeline', count:ADMIN_PLATFORM_PIPELINE.length},
+    {id:'receivable', label:'Accounts Receivable', count:ADMIN_RECEIVABLES.filter(function(r){return r.status==='overdue';}).length, attn:true},
+  ]) + '<div class="section">' + body + '</div>';
+}
+
+function pageAdminBilling(){
+  const tab = state.tabs['admin-billing'];
+  let body;
+  if(tab==='catalogue'){
+    body = '<div class="panel"><table><thead><tr><th>Service Pack</th><th>Price</th><th class="num">Firms live</th></tr></thead><tbody>' +
+      ADMIN_PACK_CATALOGUE.map(function(p){ return '<tr><td class="cell-primary">' + p.name + '</td><td>' + p.price + '</td><td class="num">' + p.firms + '</td></tr>'; }).join('') +
+      '</tbody></table></div>';
+  } else {
+    body = '<div class="stat-row" style="grid-template-columns:repeat(3,1fr)"><div class="stat"><span class="k">MRR</span><span class="v">RM 1,858</span><span class="d"><span class="dot moss"></span>across 2 firms</span></div><div class="stat"><span class="k">Seats billed</span><span class="v">8</span><span class="d">5 + 3 across firms</span></div><div class="stat"><span class="k">Overdue</span><span class="v">RM 848</span><span class="d"><span class="dot rose"></span>NHL Global Solution</span></div></div>';
+  }
+  return tabBar('admin-billing',[
+    {id:'catalogue', label:'Service Pack Catalogue', count:ADMIN_PACK_CATALOGUE.length},
+    {id:'usage', label:'Usage & Billing'},
+  ]) + '<div class="section">' + body + '</div>';
+}
+
+function pageAdminGrowth(){
+  const tab = state.tabs['admin-growth'];
+  let body;
+  if(tab==='launch'){
+    body = '<div class="panel"><div class="list">' +
+      ADMIN_LAUNCH_CHECKLIST.map(function(c){ return '<div class="list-row"><div class="main"><div class="t1">' + c.item + '</div>' + (c.note?'<div class="t2">' + c.note + '</div>':'') + '</div><div class="side">' + statusPill(c.status) + '</div></div>'; }).join('') +
+      '</div></div>';
+  } else {
+    body = '<div class="panel"><table><thead><tr><th>Expansion bundle</th><th>Status</th><th>Note</th></tr></thead><tbody>' +
+      ADMIN_EXPANSION.map(function(e){ return '<tr><td class="cell-primary mono">' + e.bundle + '</td><td>' + statusPill(e.status) + '</td><td>' + (e.note||'') + '</td></tr>'; }).join('') +
+      '</tbody></table></div>';
+  }
+  return tabBar('admin-growth',[
+    {id:'launch', label:'Commercial Launch'},
+    {id:'expansion', label:'Expansion', count:ADMIN_EXPANSION.length},
+  ]) + '<div class="section">' + body + '</div>';
+}
+
+function pageAdminEngineering(){
+  const tab = state.tabs['admin-engineering'];
+  let body;
+  if(tab==='raw'){
+    body = '<div class="scope-banner"><span>&#9432;</span><div><strong>Engineer-only diagnostic.</strong> These call the raw AWIA endpoints directly &mdash; owners use My Team and Workdesk instead, which wrap the same calls with a governed, human-reviewed flow.</div></div>' +
+      '<div class="panel panel-pad" style="display:flex; gap:10px; flex-wrap:wrap;">' +
+      '<button class="btn btn-ghost btn-sm mono">provision-pilot</button>' +
+      '<button class="btn btn-ghost btn-sm mono">task-readiness</button>' +
+      '<button class="btn btn-ghost btn-sm mono">output-draft</button>' +
+      '<button class="btn btn-ghost btn-sm mono">output-review</button>' +
+      '</div>';
+  } else {
+    body = '<div class="panel"><table><thead><tr><th>Decision gate</th><th>Status</th><th>When</th></tr></thead><tbody>' +
+      ADMIN_PILOT_GATES.map(function(g){ return '<tr><td class="cell-primary mono">' + g.code + '</td><td>' + statusPill(g.status) + '</td><td>' + g.when + '</td></tr>'; }).join('') +
+      '</tbody></table></div>';
+  }
+  return tabBar('admin-engineering',[
+    {id:'raw', label:'AI Workforce (raw)'},
+    {id:'pilot', label:'Pilot Programs', count:ADMIN_PILOT_GATES.length},
+  ]) + '<div class="section">' + body + '</div>';
+}
+
+/* ---------------------------------------------------------------
+   PAGE ROUTER
+--------------------------------------------------------------- */
+const PAGES = {
+  dashboard:pageDashboard, team:pageTeam, workdesk:pageWorkdesk, sales:pageSales,
+  projects:pageProjects, finance:pageFinance, firmsettings:pageFirmSettings,
+  'admin-firms':pageAdminFirms, 'admin-users':pageAdminUsers, 'admin-ops':pageAdminOps,
+  'admin-technical':pageAdminTechnical, 'admin-audit':pageAdminAudit,
+  'admin-salesaccounts':pageAdminSalesAccounts, 'admin-billing':pageAdminBilling,
+  'admin-growth':pageAdminGrowth, 'admin-engineering':pageAdminEngineering,
+};
+function renderPage(){
+  const meta = PAGE_META[state.page];
+  if(meta){
+    document.getElementById('pageEyebrow').textContent = meta.eyebrow;
+    document.getElementById('pageTitle').textContent = meta.title;
+    document.getElementById('pageDesc').textContent = meta.desc;
+  }
+  let actions = '';
+  if(state.page==='dashboard') actions = '<button class="btn btn-ghost">Refresh</button>';
+  else if(state.page==='team') actions = '<button class="btn btn-primary" onclick="setTab(\'team\',\'hire\')">+ Hire a worker</button>';
+  else if(state.page==='sales') actions = '<button class="btn btn-primary">+ New proposal</button>';
+  else if(state.page==='finance') actions = '<button class="btn btn-primary" onclick="setTab(\'finance\',\'invoices\')">+ New invoice</button>';
+  else if(state.page==='admin-firms') actions = '<button class="btn btn-primary">+ Provision firm</button>';
+  else if(state.page==='admin-users') actions = '<button class="btn btn-primary">+ Invite user</button>';
+  else if(state.page==='admin-audit') actions = '<button class="btn btn-ghost">Export evidence bundle</button>';
+  document.getElementById('pageActions').innerHTML = actions;
+  const fn = PAGES[state.page];
+  document.getElementById('pageBody').innerHTML = fn ? fn() : '<div class="panel"><div class="empty">Unknown page.</div></div>';
+}
+
+renderNav();
+renderPage();
+</script>
+
+</body></html>

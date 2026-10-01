@@ -477,20 +477,20 @@ async function upsertPolicyDecision(client, decision) {
 async function upsertAuditEvent(client, audit) {
   if (!audit?.id || !uuidOrNull(audit.id) || !uuidOrNull(audit.tenant_id) || !uuidOrNull(audit.actor_id) || !uuidOrNull(audit.resource_id)) return;
   await client.query(
-    `insert into audit_events (id, tenant_id, firm_id, actor_id, action, resource_type, resource_id, resource_version, policy_decision_id, correlation_id, causation_id, occurred_at, summary, evidence_ref)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+    `insert into audit_events (id, tenant_id, firm_id, actor_id, ai_actor_id, action, resource_type, resource_id, resource_version, policy_decision_id, correlation_id, causation_id, occurred_at, summary, evidence_ref)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
      on conflict (id) do nothing`,
-    [audit.id, audit.tenant_id, uuidOrNull(audit.firm_id), audit.actor_id, audit.action, audit.resource_type, audit.resource_id, audit.resource_version ?? 1, uuidOrNull(audit.policy_decision_id), uuidOrNull(audit.correlation_id) ?? newUuid(), uuidOrNull(audit.causation_id), audit.occurred_at ?? now(), audit.summary, audit.evidence_ref ?? null]
+    [audit.id, audit.tenant_id, uuidOrNull(audit.firm_id), audit.actor_id, uuidOrNull(audit.ai_actor_id), audit.action, audit.resource_type, audit.resource_id, audit.resource_version ?? 1, uuidOrNull(audit.policy_decision_id), uuidOrNull(audit.correlation_id) ?? newUuid(), uuidOrNull(audit.causation_id), audit.occurred_at ?? now(), audit.summary, audit.evidence_ref ?? null]
   );
 }
 
 async function upsertEventLog(client, event) {
   if (!event?.id || !uuidOrNull(event.id) || !uuidOrNull(event.tenant_id) || !uuidOrNull(event.actor_id) || !uuidOrNull(event.aggregate_id)) return;
   await client.query(
-    `insert into event_log (id, event_type, event_version, occurred_at, recorded_at, actor_id, actor_type, tenant_id, firm_id, aggregate_type, aggregate_id, aggregate_version, correlation_id, causation_id, idempotency_key, payload, payload_ref, payload_summary, policy_decision_id, audit_event_id, provenance)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16::jsonb, $17, $18, $19, $20, $21::jsonb)
+    `insert into event_log (id, event_type, event_version, occurred_at, recorded_at, actor_id, ai_actor_id, actor_type, tenant_id, firm_id, aggregate_type, aggregate_id, aggregate_version, correlation_id, causation_id, idempotency_key, payload, payload_ref, payload_summary, policy_decision_id, audit_event_id, provenance)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17::jsonb, $18, $19, $20, $21, $22::jsonb)
      on conflict (id) do nothing`,
-    [event.id, event.event_type, event.event_version ?? "1.0", event.occurred_at ?? now(), event.recorded_at ?? now(), event.actor_id, event.actor_type, event.tenant_id, uuidOrNull(event.firm_id), event.aggregate_type, event.aggregate_id, event.aggregate_version ?? 1, uuidOrNull(event.correlation_id) ?? newUuid(), uuidOrNull(event.causation_id), event.idempotency_key ?? null, JSON.stringify(event.payload ?? {}), event.payload_ref ?? null, event.payload_summary, uuidOrNull(event.policy_decision_id), uuidOrNull(event.audit_event_id), JSON.stringify(event.provenance ?? {})]
+    [event.id, event.event_type, event.event_version ?? "1.0", event.occurred_at ?? now(), event.recorded_at ?? now(), event.actor_id, uuidOrNull(event.ai_actor_id), event.actor_type, event.tenant_id, uuidOrNull(event.firm_id), event.aggregate_type, event.aggregate_id, event.aggregate_version ?? 1, uuidOrNull(event.correlation_id) ?? newUuid(), uuidOrNull(event.causation_id), event.idempotency_key ?? null, JSON.stringify(event.payload ?? {}), event.payload_ref ?? null, event.payload_summary, uuidOrNull(event.policy_decision_id), uuidOrNull(event.audit_event_id), JSON.stringify(event.provenance ?? {})]
   );
 }
 async function ensureAppStateTable(client) {
@@ -606,8 +606,8 @@ async function seedWorkerTemplates(client) {
   const commercialLaunchControls = await client.query(`select id::text, tenant_id::text, firm_id::text, payment_provider_config_id::text, subscription_package_id::text, reviewed_by_actor_id::text, launch_status, required_controls, decision_summary, created_at, decided_at, metadata from commercial_launch_controls order by created_at, id`);
   const pilotHandoffRecords = await client.query(`select id::text, tenant_id::text, firm_id::text, accepted_by_actor_id::text, rehearsal_ref, handoff_status, checklist, evidence_refs, decision_summary, accepted_at, created_at, metadata from pilot_handoff_records order by created_at, id`);
   const policyDecisions = await client.query(`select id::text, tenant_id::text, firm_id::text, policy_id, policy_version, actor_id::text, action, resource_type, resource_id::text, context_ref, result, reasons, created_at from policy_decisions order by created_at, id`);
-  const events = await client.query(`select id::text, event_type, event_version, occurred_at, recorded_at, actor_id::text, actor_type, tenant_id::text, firm_id::text, aggregate_type, aggregate_id::text, aggregate_version, correlation_id::text, causation_id::text, idempotency_key, payload, payload_ref, payload_summary, policy_decision_id::text, audit_event_id::text, provenance from event_log order by occurred_at, id`);
-  const audits = await client.query(`select id::text, tenant_id::text, firm_id::text, actor_id::text, action, resource_type, resource_id::text, resource_version, policy_decision_id::text, correlation_id::text, causation_id::text, occurred_at, summary, evidence_ref from audit_events order by occurred_at, id`);
+  const events = await client.query(`select id::text, event_type, event_version, occurred_at, recorded_at, actor_id::text, ai_actor_id::text, actor_type, tenant_id::text, firm_id::text, aggregate_type, aggregate_id::text, aggregate_version, correlation_id::text, causation_id::text, idempotency_key, payload, payload_ref, payload_summary, policy_decision_id::text, audit_event_id::text, provenance from event_log order by occurred_at, id`);
+  const audits = await client.query(`select id::text, tenant_id::text, firm_id::text, actor_id::text, ai_actor_id::text, action, resource_type, resource_id::text, resource_version, policy_decision_id::text, correlation_id::text, causation_id::text, occurred_at, summary, evidence_ref from audit_events order by occurred_at, id`);
   return {
     tenants: tenants.rows.map(mapDbDates),
     service_packs: servicePacks.rows.map(mapDbDates),
@@ -3851,8 +3851,38 @@ function awiaRunFromStore(store, tenant_id, firm_id) {
   };
 }
 
+// HM-S7 Phase 2 (2026-09-24): create (or idempotently reuse) a real `actors` row for one AWIA
+// virtual staff member, mirroring the older, correct worker_instances pattern (buildWorkerInstance /
+// provisionWorkerInstanceRecord above) instead of the synthetic `agent_id` string that used to be the
+// AI worker's only identity. The id is deterministic per (firm_id, staff_code) -- not random -- so
+// that re-provisioning the same firm/staff_code (already idempotent for the member record itself via
+// upsertById by agent_id) stays idempotent for the actor row too, rather than creating a new orphaned
+// actor every time. For the local-json backend this pushes directly into store.actors, same as
+// buildWorkerInstance's non-postgres path; for postgres, `store.actors` is not part of the generic
+// AWIA jsonb-table sync (persistAwiaVirtualStaffFromStore), so the row is inserted directly with its
+// own client, the same way provisionWorkerInstanceRecord's postgres branch inserts the worker's actor.
+async function ensureAwiaAgentActor(store, { tenant_id, firm_id, staff_code, display_name, metadata = {} }) {
+  const seed = `awia-agent-actor-${firm_id}-${staff_code.toLowerCase()}`;
+  const actorId = storeBackend === "postgres" ? deterministicUuid(seed) : seed;
+  const timestamp = now();
+  const actor = { id: actorId, actor_id: actorId, actor_type: "AI_AGENT", person_id: null, worker_instance_id: null, system_id: null, external_service_id: null, tenant_id, firm_id, display_name, status: "ACTIVE", created_at: timestamp, metadata: { awia_staff_code: staff_code, ...metadata } };
+  if (storeBackend === "postgres") {
+    const client = await getPool().connect();
+    try {
+      await client.query(
+        "insert into actors (id, actor_type, person_id, worker_instance_id, system_id, external_service_id, tenant_id, firm_id, display_name, status, created_at, metadata) values ($1,'AI_AGENT',null,null,null,null,$2,$3,$4,'ACTIVE',$5,$6::jsonb) on conflict (id) do nothing",
+        [actor.id, tenant_id, firm_id, display_name, actor.created_at, JSON.stringify(actor.metadata)]
+      );
+    } finally {
+      client.release();
+    }
+  }
+  if (!store.actors.some((record) => record.id === actor.id)) store.actors.push(actor);
+  return actor;
+}
+
 export async function provisionAwiaVirtualStaffPilotRecord(body, actor) {
-  return withStore((store) => {
+  return withStore(async (store) => {
     const firm = store.firms.find((record) => record.id === body.firm_id && record.tenant_id === body.tenant_id);
     if (!firm) throwNotFound("firms", body.firm_id);
     const run = provisionPilotVirtualStaff({
@@ -3862,6 +3892,10 @@ export async function provisionAwiaVirtualStaffPilotRecord(body, actor) {
       salary_plan_id: body.salary_plan_id ?? "virtual-staff-controlled-pilot-plan",
       registry: awiaVirtualStaffPackageRegistry
     });
+    for (const member of run.members) {
+      const agentActor = await ensureAwiaAgentActor(store, { tenant_id: body.tenant_id, firm_id: body.firm_id, staff_code: member.agent_code, display_name: member.display_name });
+      member.agent_actor_id = agentActor.id;
+    }
     upsertById(store.awia_virtual_staff_provisioning_runs, awiaProvisioningSnapshot(run));
     for (const seat of run.seats) upsertById(store.awia_virtual_staff_seats, awiaRecord(seat, "staff_seat_id"));
     for (const member of run.members) upsertById(store.awia_virtual_staff_members, awiaRecord(member, "agent_id"));
@@ -3898,7 +3932,7 @@ export async function updateAwiaVirtualStaffLifecycleRecord(body, actor) {
       created_at: now()
     };
     store.awia_staff_lifecycle_events.push(event);
-    appendEventAndAudit(store, { event_type: "awia.virtual_staff.lifecycle_updated", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaVirtualStaffMember", aggregate_id: storeBackend === "postgres" ? deterministicUuid(member.id) : member.id, payload: { staff_code: body.staff_code, from_state: fromState, to_state: body.to_state }, summary: "AWIA virtual staff lifecycle updated by a human operator." });
+    appendEventAndAudit(store, { event_type: "awia.virtual_staff.lifecycle_updated", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaVirtualStaffMember", aggregate_id: storeBackend === "postgres" ? deterministicUuid(member.id) : member.id, payload: { staff_code: body.staff_code, from_state: fromState, to_state: body.to_state }, summary: "AWIA virtual staff lifecycle updated by a human operator.", ai_actor_id: member.agent_actor_id ?? null });
     return { member, lifecycle_event: event };
   });
 }
@@ -3943,7 +3977,8 @@ export async function evaluateAwiaVirtualStaffTaskReadinessRecord(body, actor) {
     };
     upsertById(store.awia_staff_task_readiness_records, record);
     upsertById(store.awia_staff_authority_decisions, { id: request.request_id, tenant_id: body.tenant_id, firm_id: body.firm_id, ...decision, created_at: now() });
-    appendEventAndAudit(store, { event_type: "awia.virtual_staff.task_readiness_evaluated", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaStaffAuthorityDecision", aggregate_id: record.id, payload: { staff_code: body.staff_code, action: body.action, decision: decision.decision }, summary: "AWIA virtual staff task readiness evaluated with deterministic authority gate." });
+    const readinessMember = run.members.find((candidate) => candidate.agent_code === body.staff_code);
+    appendEventAndAudit(store, { event_type: "awia.virtual_staff.task_readiness_evaluated", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaStaffAuthorityDecision", aggregate_id: record.id, payload: { staff_code: body.staff_code, action: body.action, decision: decision.decision }, summary: "AWIA virtual staff task readiness evaluated with deterministic authority gate.", ai_actor_id: readinessMember?.agent_actor_id ?? null });
     return record;
   });
 }
@@ -4063,7 +4098,7 @@ export async function assignAwiaVirtualStaffTaskRecord(body, actor) {
     task.assigned_actor_or_worker_ref = member.id;
     task.state = "ASSIGNED_TO_AWIA_STAFF";
     task.updated_at = now();
-    appendEventAndAudit(store, { event_type: "awia.virtual_staff.task_assigned", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaStaffWorkdeskItem", aggregate_id: item.id, payload: { staff_code: body.staff_code, task_id: task.id, readiness_record_id: readinessRecord.id }, summary: "AWIA virtual staff task assigned to controlled workdesk after readiness gate." });
+    appendEventAndAudit(store, { event_type: "awia.virtual_staff.task_assigned", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaStaffWorkdeskItem", aggregate_id: item.id, payload: { staff_code: body.staff_code, task_id: task.id, readiness_record_id: readinessRecord.id }, summary: "AWIA virtual staff task assigned to controlled workdesk after readiness gate.", ai_actor_id: member.agent_actor_id ?? null });
     return { workdesk_item: item, task, readiness: readinessRecord };
   });
 }
@@ -4114,7 +4149,7 @@ export async function produceAwiaStaffOutputDraftRecord(body, actor) {
       task.state = "AWIA_OUTPUT_DRAFTED";
       task.updated_at = now();
     }
-    appendEventAndAudit(store, { event_type: "awia.virtual_staff.output_drafted", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaStaffOutputDraft", aggregate_id: output.id, payload: { workdesk_item_id: item.id, task_id: item.task_id, requires_human_review: true }, summary: "AWIA virtual staff produced a draft-only output for human review." });
+    appendEventAndAudit(store, { event_type: "awia.virtual_staff.output_drafted", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaStaffOutputDraft", aggregate_id: output.id, payload: { workdesk_item_id: item.id, task_id: item.task_id, requires_human_review: true }, summary: "AWIA virtual staff produced a draft-only output for human review.", ai_actor_id: member.agent_actor_id ?? null });
     return { output_draft: output, workdesk_item: item, task: task ?? null };
   });
 }
@@ -4158,7 +4193,8 @@ export async function reviewAwiaStaffOutputDraftRecord(body, actor) {
       item.workdesk_status = body.review_decision === "APPROVED_FOR_CLIENT_DRAFT" ? "REVIEWED_FOR_CLIENT_DRAFT" : "REVIEW_ACTION_REQUIRED";
       item.updated_at = now();
     }
-    appendEventAndAudit(store, { event_type: "awia.virtual_staff.output_reviewed", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaStaffOutputReview", aggregate_id: review.id, payload: { output_draft_id: output.id, review_decision: body.review_decision }, summary: "Human reviewed AWIA virtual staff draft output." });
+    const reviewedMember = store.awia_virtual_staff_members.find((record) => record.organization_id === body.tenant_id && record.firm_id === body.firm_id && record.agent_code === output.staff_code);
+    appendEventAndAudit(store, { event_type: "awia.virtual_staff.output_reviewed", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaStaffOutputReview", aggregate_id: review.id, payload: { output_draft_id: output.id, review_decision: body.review_decision }, summary: "Human reviewed AWIA virtual staff draft output.", ai_actor_id: reviewedMember?.agent_actor_id ?? null });
     return { output_draft: output, output_review: review, workdesk_item: item ?? null };
   });
 }
@@ -4194,7 +4230,8 @@ export async function decideAwiaStaffClassAApprovalRecord(body, actor) {
     output.class_a_approval_decided_by_actor_id = actor.actor_id;
     output.class_a_approval_decided_at = now();
     output.updated_at = now();
-    appendEventAndAudit(store, { event_type: "awia.virtual_staff.class_a_output_approval_decided", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaStaffOutputDraft", aggregate_id: output.id, payload: { decision: gate.decision, findings: gate.findings, skill_id: output.skill_id, position_id: output.position_id }, summary: `Class A approval ${gate.decision === "ALLOW" ? "granted" : "denied"} for AWIA staff output requiring firm-owner sign-off.` });
+    const classAMember = store.awia_virtual_staff_members.find((record) => record.organization_id === body.tenant_id && record.firm_id === body.firm_id && record.agent_code === output.staff_code);
+    appendEventAndAudit(store, { event_type: "awia.virtual_staff.class_a_output_approval_decided", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaStaffOutputDraft", aggregate_id: output.id, payload: { decision: gate.decision, findings: gate.findings, skill_id: output.skill_id, position_id: output.position_id }, summary: `Class A approval ${gate.decision === "ALLOW" ? "granted" : "denied"} for AWIA staff output requiring firm-owner sign-off.`, ai_actor_id: classAMember?.agent_actor_id ?? null });
     return { output_draft: output, decision: gate.decision, findings: gate.findings };
   });
 }
@@ -4234,7 +4271,8 @@ export async function prepareAwiaClientDeliveryDraftRecord(body, actor) {
       item.client_delivery_draft_id = draft.id;
       item.updated_at = now();
     }
-    appendEventAndAudit(store, { event_type: "awia.virtual_staff.client_delivery_draft_prepared", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaClientDeliveryDraft", aggregate_id: draft.id, payload: { output_draft_id: output.id, output_review_id: review.id, final_issue_allowed: false }, summary: "Client delivery draft prepared from reviewed AWIA staff output without final issue authority." });
+    const deliveryMember = store.awia_virtual_staff_members.find((record) => record.organization_id === body.tenant_id && record.firm_id === body.firm_id && record.agent_code === output.staff_code);
+    appendEventAndAudit(store, { event_type: "awia.virtual_staff.client_delivery_draft_prepared", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaClientDeliveryDraft", aggregate_id: draft.id, payload: { output_draft_id: output.id, output_review_id: review.id, final_issue_allowed: false }, summary: "Client delivery draft prepared from reviewed AWIA staff output without final issue authority.", ai_actor_id: deliveryMember?.agent_actor_id ?? null });
     return { client_delivery_draft: draft, output_draft: output, output_review: review, workdesk_item: item ?? null };
   });
 }
@@ -4254,7 +4292,8 @@ export async function markAwiaClientDeliveryDraftSentRecord(body, actor) {
       item.archived_by_actor_id = actor.actor_id;
       item.updated_at = now();
     }
-    appendEventAndAudit(store, { event_type: "awia.virtual_staff.client_delivery_draft_marked_sent", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaClientDeliveryDraft", aggregate_id: draft.id, payload: { output_draft_id: draft.output_draft_id, marked_sent_by_actor_id: actor.actor_id }, summary: "Owner recorded that a prepared client delivery draft was delivered outside vFirm; this is a recordkeeping action only, not a system client transmission or final issue action." });
+    const markedSentMember = item?.staff_code ? store.awia_virtual_staff_members.find((record) => record.organization_id === body.tenant_id && record.firm_id === body.firm_id && record.agent_code === item.staff_code) : null;
+    appendEventAndAudit(store, { event_type: "awia.virtual_staff.client_delivery_draft_marked_sent", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaClientDeliveryDraft", aggregate_id: draft.id, payload: { output_draft_id: draft.output_draft_id, marked_sent_by_actor_id: actor.actor_id }, summary: "Owner recorded that a prepared client delivery draft was delivered outside vFirm; this is a recordkeeping action only, not a system client transmission or final issue action.", ai_actor_id: markedSentMember?.agent_actor_id ?? null });
     return { client_delivery_draft: draft, workdesk_item: item ?? null };
   });
 }
@@ -4274,7 +4313,8 @@ export async function archiveAwiaStaffWorkdeskItemRecord(body, actor) {
     item.archived_by_actor_id = actor.actor_id;
     item.archived_reason = body.archived_reason ?? (isRejectedOutput ? "output_rejected" : "review_action_dismissed_by_owner");
     item.updated_at = now();
-    appendEventAndAudit(store, { event_type: "awia.virtual_staff.workdesk_item_archived", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaStaffWorkdeskItem", aggregate_id: item.id, payload: { archived_reason: item.archived_reason }, summary: "Owner archived a dead-end AWIA workdesk item; no re-draft path exists yet for revision-required items (tracked separately)." });
+    const archivedMember = store.awia_virtual_staff_members.find((record) => record.organization_id === body.tenant_id && record.firm_id === body.firm_id && record.agent_code === item.staff_code);
+    appendEventAndAudit(store, { event_type: "awia.virtual_staff.workdesk_item_archived", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaStaffWorkdeskItem", aggregate_id: item.id, payload: { archived_reason: item.archived_reason }, summary: "Owner archived a dead-end AWIA workdesk item; no re-draft path exists yet for revision-required items (tracked separately).", ai_actor_id: archivedMember?.agent_actor_id ?? null });
     return { workdesk_item: item };
   });
 }
@@ -4299,7 +4339,7 @@ export async function appendAwiaStaffMemoryEntryRecord(body, actor) {
     });
     if (!built.accepted) invalidState(`AWIA staff memory entry rejected: ${built.findings.join(", ")}`);
     store.awia_staff_memory_entries.push(built.entry);
-    appendEventAndAudit(store, { event_type: "awia.virtual_staff.memory_entry_appended", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaStaffMemoryEntry", aggregate_id: built.entry.id, payload: { staff_code: body.staff_code, kind: body.kind }, summary: "AWIA virtual staff memory entry appended as bounded evidence summary." });
+    appendEventAndAudit(store, { event_type: "awia.virtual_staff.memory_entry_appended", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaStaffMemoryEntry", aggregate_id: built.entry.id, payload: { staff_code: body.staff_code, kind: body.kind }, summary: "AWIA virtual staff memory entry appended as bounded evidence summary.", ai_actor_id: member.agent_actor_id ?? null });
     return built.entry;
   });
 }
@@ -4319,7 +4359,7 @@ export async function openAwiaStaffConversationThreadRecord(body, actor) {
       created_at: now()
     });
     store.awia_staff_conversation_threads.push(thread);
-    appendEventAndAudit(store, { event_type: "awia.virtual_staff.conversation_thread_opened", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaStaffConversationThread", aggregate_id: thread.id, payload: { staff_code: body.staff_code }, summary: "AWIA virtual staff conversation thread opened under human supervision." });
+    appendEventAndAudit(store, { event_type: "awia.virtual_staff.conversation_thread_opened", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaStaffConversationThread", aggregate_id: thread.id, payload: { staff_code: body.staff_code }, summary: "AWIA virtual staff conversation thread opened under human supervision.", ai_actor_id: member.agent_actor_id ?? null });
     return thread;
   });
 }
@@ -4343,7 +4383,8 @@ export async function postAwiaStaffConversationMessageRecord(body, actor) {
     });
     if (!built.accepted) invalidState(`AWIA staff conversation message rejected: ${built.findings.join(", ")}`);
     store.awia_staff_conversation_messages.push(built.message);
-    appendEventAndAudit(store, { event_type: "awia.virtual_staff.conversation_message_posted", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaStaffConversationMessage", aggregate_id: built.message.id, payload: { thread_id: thread.id, participant_role: body.participant_role, classification: built.message.classification }, summary: "AWIA virtual staff conversation message posted as internal operational context." });
+    const messageMember = store.awia_virtual_staff_members.find((record) => record.organization_id === body.tenant_id && record.firm_id === body.firm_id && record.agent_code === thread.staff_code);
+    appendEventAndAudit(store, { event_type: "awia.virtual_staff.conversation_message_posted", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaStaffConversationMessage", aggregate_id: built.message.id, payload: { thread_id: thread.id, participant_role: body.participant_role, classification: built.message.classification }, summary: "AWIA virtual staff conversation message posted as internal operational context.", ai_actor_id: messageMember?.agent_actor_id ?? null });
     return { message: built.message, thread };
   });
 }
@@ -4485,7 +4526,7 @@ export async function hireAwiaFirmWorkerRecord(body, actor) {
     if (positionLookup.position.role_code !== roleCode) invalidState(`AWIA staff hire rejected: position_role_code_mismatch:${body.position_id} expects role_code ${positionLookup.position.role_code}, got ${roleCode}`);
     resolvedPositionId = positionLookup.position.position_id;
   }
-  return withStore((store) => {
+  return withStore(async (store) => {
     const firm = store.firms.find((record) => record.id === body.firm_id && record.tenant_id === body.tenant_id);
     if (!firm) throwNotFound("firms", body.firm_id);
 
@@ -4536,6 +4577,10 @@ export async function hireAwiaFirmWorkerRecord(body, actor) {
     });
     if (!run.ok) invalidState(`AWIA staff hire rejected: ${run.findings.map((finding) => finding.code).join(", ")}`);
 
+    const hiredMemberDisplayName = body.display_name ?? run.members[0]?.display_name;
+    const agentActor = await ensureAwiaAgentActor(store, { tenant_id: body.tenant_id, firm_id: body.firm_id, staff_code: staffCode, display_name: hiredMemberDisplayName });
+    for (const member of run.members) member.agent_actor_id = agentActor.id;
+
     for (const seat of run.seats) upsertById(store.awia_virtual_staff_seats, awiaRecord(seat, "staff_seat_id"));
     for (const member of run.members) upsertById(store.awia_virtual_staff_members, { ...awiaRecord(member, "agent_id"), display_name: body.display_name ?? member.display_name, position_id: resolvedPositionId });
     for (const assignment of run.role_assignments) upsertById(store.awia_staff_role_assignments, awiaRecord(assignment, "role_assignment_id"));
@@ -4556,7 +4601,8 @@ export async function hireAwiaFirmWorkerRecord(body, actor) {
       aggregate_type: "AwiaVirtualStaffMember",
       aggregate_id: storeBackend === "postgres" ? deterministicUuid(hiredMember.id) : hiredMember.id,
       payload: { staff_code: staffCode, role_code: roleCode, package_code: packageAssignment.package_code, team_size: fullRun.summary.member_count },
-      summary: `Business owner hired a new AWIA virtual staff member (${roleCode}) into this firm's team.`
+      summary: `Business owner hired a new AWIA virtual staff member (${roleCode}) into this firm's team.`,
+      ai_actor_id: agentActor.id
     });
 
     return { member: hiredMember, staff_code: staffCode, role_code: roleCode, team_size: fullRun.summary.member_count, evidence_pack: evidencePack };
@@ -4564,7 +4610,7 @@ export async function hireAwiaFirmWorkerRecord(body, actor) {
 }
 
 export async function provisionAwiaVirtualStaffFromTemplateRecord(body, actor) {
-  return withStore((store) => {
+  return withStore(async (store) => {
     const firm = store.firms.find((record) => record.id === body.firm_id && record.tenant_id === body.tenant_id);
     if (!firm) throwNotFound("firms", body.firm_id);
     const existingRun = (store.awia_virtual_staff_provisioning_runs ?? []).find((record) => record.tenant_id === body.tenant_id && record.firm_id === body.firm_id);
@@ -4589,6 +4635,10 @@ export async function provisionAwiaVirtualStaffFromTemplateRecord(body, actor) {
       registry: awiaVirtualStaffPackageRegistry,
       pilotStaff
     });
+    for (const member of run.members) {
+      const agentActor = await ensureAwiaAgentActor(store, { tenant_id: body.tenant_id, firm_id: body.firm_id, staff_code: member.agent_code, display_name: member.display_name });
+      member.agent_actor_id = agentActor.id;
+    }
     upsertById(store.awia_virtual_staff_provisioning_runs, { ...awiaProvisioningSnapshot(run), template_id: resolved.template.template_id, template_name: resolved.template.name, template_version: resolved.template.version, package_code: packageAssignment.package_code });
     for (const seat of run.seats) upsertById(store.awia_virtual_staff_seats, { ...awiaRecord(seat, "staff_seat_id"), template_id: resolved.template.template_id });
     for (const member of run.members) upsertById(store.awia_virtual_staff_members, awiaRecord(member, "agent_id"));
@@ -4634,14 +4684,21 @@ export function requireFields(body, fields) {
   }
 }
 
-export function appendEventAndAudit(store, { event_type, actor, tenant_id, firm_id = null, aggregate_type, aggregate_id, payload, summary, policy_decision_id = null }) {
+export function appendEventAndAudit(store, { event_type, actor, tenant_id, firm_id = null, aggregate_type, aggregate_id, payload, summary, policy_decision_id = null, ai_actor_id = null }) {
   const timestamp = now();
   const correlation_id = newUuid();
+  // HM-S7 Phase 2 (2026-09-24): `actor_id` stays the accountable actor (the human supervising the
+  // work, per existing behavior and the explicit product decision to keep human attribution
+  // unchanged). `ai_actor_id` is a new, separate, optional field recording the real actors.id of the
+  // AI worker that actually performed the action, when one exists (see ensureAwiaAgentActor() and
+  // awia_virtual_staff_members.agent_actor_id) -- distinct from `actor.actor_id` above and never a
+  // replacement for it.
   const audit = {
     id: storeBackend === "postgres" ? newUuid() : newId("audit"),
     tenant_id,
     firm_id,
     actor_id: actor.actor_id,
+    ai_actor_id,
     action: event_type,
     resource_type: aggregate_type,
     resource_id: aggregate_id,
@@ -4660,6 +4717,7 @@ export function appendEventAndAudit(store, { event_type, actor, tenant_id, firm_
     occurred_at: timestamp,
     recorded_at: timestamp,
     actor_id: actor.actor_id,
+    ai_actor_id,
     actor_type: actor.actor_type,
     tenant_id,
     firm_id,

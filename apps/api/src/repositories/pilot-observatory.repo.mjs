@@ -31,12 +31,12 @@ export async function getPilotUser(id) {
   return rows[0] ?? null;
 }
 
-export async function createPilotUser(record) {
-  return insertRow("pilot_users", PILOT_USERS_COLUMNS, record);
+export async function createPilotUser(record, client = null) {
+  return insertRow("pilot_users", PILOT_USERS_COLUMNS, record, client);
 }
 
-export async function updatePilotUser(id, patch) {
-  return updateRowById("pilot_users", PILOT_USERS_COLUMNS, id, patch);
+export async function updatePilotUser(id, patch, client = null) {
+  return updateRowById("pilot_users", PILOT_USERS_COLUMNS, id, patch, client);
 }
 
 // --- support_cases ---
@@ -55,12 +55,12 @@ export async function getSupportCase(id) {
   return rows[0] ?? null;
 }
 
-export async function createSupportCase(record) {
-  return insertRow("support_cases", SUPPORT_CASES_COLUMNS, record);
+export async function createSupportCase(record, client = null) {
+  return insertRow("support_cases", SUPPORT_CASES_COLUMNS, record, client);
 }
 
-export async function updateSupportCase(id, patch) {
-  return updateRowById("support_cases", SUPPORT_CASES_COLUMNS, id, patch);
+export async function updateSupportCase(id, patch, client = null) {
+  return updateRowById("support_cases", SUPPORT_CASES_COLUMNS, id, patch, client);
 }
 
 // --- pilot_incidents ---
@@ -79,12 +79,12 @@ export async function getPilotIncident(id) {
   return rows[0] ?? null;
 }
 
-export async function createPilotIncident(record) {
-  return insertRow("pilot_incidents", PILOT_INCIDENTS_COLUMNS, record);
+export async function createPilotIncident(record, client = null) {
+  return insertRow("pilot_incidents", PILOT_INCIDENTS_COLUMNS, record, client);
 }
 
-export async function updatePilotIncident(id, patch) {
-  return updateRowById("pilot_incidents", PILOT_INCIDENTS_COLUMNS, id, patch);
+export async function updatePilotIncident(id, patch, client = null) {
+  return updateRowById("pilot_incidents", PILOT_INCIDENTS_COLUMNS, id, patch, client);
 }
 
 // --- pilot_feedback ---
@@ -103,12 +103,12 @@ export async function getPilotFeedback(id) {
   return rows[0] ?? null;
 }
 
-export async function createPilotFeedback(record) {
-  return insertRow("pilot_feedback", PILOT_FEEDBACK_COLUMNS, record);
+export async function createPilotFeedback(record, client = null) {
+  return insertRow("pilot_feedback", PILOT_FEEDBACK_COLUMNS, record, client);
 }
 
-export async function updatePilotFeedback(id, patch) {
-  return updateRowById("pilot_feedback", PILOT_FEEDBACK_COLUMNS, id, patch);
+export async function updatePilotFeedback(id, patch, client = null) {
+  return updateRowById("pilot_feedback", PILOT_FEEDBACK_COLUMNS, id, patch, client);
 }
 
 // --- pilot_acceptance_reviews ---
@@ -127,12 +127,12 @@ export async function getPilotAcceptanceReview(id) {
   return rows[0] ?? null;
 }
 
-export async function createPilotAcceptanceReview(record) {
-  return insertRow("pilot_acceptance_reviews", PILOT_ACCEPTANCE_REVIEWS_COLUMNS, record);
+export async function createPilotAcceptanceReview(record, client = null) {
+  return insertRow("pilot_acceptance_reviews", PILOT_ACCEPTANCE_REVIEWS_COLUMNS, record, client);
 }
 
-export async function updatePilotAcceptanceReview(id, patch) {
-  return updateRowById("pilot_acceptance_reviews", PILOT_ACCEPTANCE_REVIEWS_COLUMNS, id, patch);
+export async function updatePilotAcceptanceReview(id, patch, client = null) {
+  return updateRowById("pilot_acceptance_reviews", PILOT_ACCEPTANCE_REVIEWS_COLUMNS, id, patch, client);
 }
 
 // --- pilot_improvement_items ---
@@ -151,12 +151,12 @@ export async function getPilotImprovementItem(id) {
   return rows[0] ?? null;
 }
 
-export async function createPilotImprovementItem(record) {
-  return insertRow("pilot_improvement_items", PILOT_IMPROVEMENT_ITEMS_COLUMNS, record);
+export async function createPilotImprovementItem(record, client = null) {
+  return insertRow("pilot_improvement_items", PILOT_IMPROVEMENT_ITEMS_COLUMNS, record, client);
 }
 
-export async function updatePilotImprovementItem(id, patch) {
-  return updateRowById("pilot_improvement_items", PILOT_IMPROVEMENT_ITEMS_COLUMNS, id, patch);
+export async function updatePilotImprovementItem(id, patch, client = null) {
+  return updateRowById("pilot_improvement_items", PILOT_IMPROVEMENT_ITEMS_COLUMNS, id, patch, client);
 }
 
 // --- pilot_report_packs ---
@@ -175,12 +175,12 @@ export async function getPilotReportPack(id) {
   return rows[0] ?? null;
 }
 
-export async function createPilotReportPack(record) {
-  return insertRow("pilot_report_packs", PILOT_REPORT_PACKS_COLUMNS, record);
+export async function createPilotReportPack(record, client = null) {
+  return insertRow("pilot_report_packs", PILOT_REPORT_PACKS_COLUMNS, record, client);
 }
 
-export async function updatePilotReportPack(id, patch) {
-  return updateRowById("pilot_report_packs", PILOT_REPORT_PACKS_COLUMNS, id, patch);
+export async function updatePilotReportPack(id, patch, client = null) {
+  return updateRowById("pilot_report_packs", PILOT_REPORT_PACKS_COLUMNS, id, patch, client);
 }
 
 // --- stakeholder_review_boards ---
@@ -199,12 +199,12 @@ export async function getStakeholderReviewBoard(id) {
   return rows[0] ?? null;
 }
 
-export async function createStakeholderReviewBoard(record) {
-  return insertRow("stakeholder_review_boards", STAKEHOLDER_REVIEW_BOARDS_COLUMNS, record);
+export async function createStakeholderReviewBoard(record, client = null) {
+  return insertRow("stakeholder_review_boards", STAKEHOLDER_REVIEW_BOARDS_COLUMNS, record, client);
 }
 
-export async function updateStakeholderReviewBoard(id, patch) {
-  return updateRowById("stakeholder_review_boards", STAKEHOLDER_REVIEW_BOARDS_COLUMNS, id, patch);
+export async function updateStakeholderReviewBoard(id, patch, client = null) {
+  return updateRowById("stakeholder_review_boards", STAKEHOLDER_REVIEW_BOARDS_COLUMNS, id, patch, client);
 }
 
 // --- stakeholder_review_decisions ---
@@ -223,12 +223,12 @@ export async function getStakeholderReviewDecision(id) {
   return rows[0] ?? null;
 }
 
-export async function createStakeholderReviewDecision(record) {
-  return insertRow("stakeholder_review_decisions", STAKEHOLDER_REVIEW_DECISIONS_COLUMNS, record);
+export async function createStakeholderReviewDecision(record, client = null) {
+  return insertRow("stakeholder_review_decisions", STAKEHOLDER_REVIEW_DECISIONS_COLUMNS, record, client);
 }
 
-export async function updateStakeholderReviewDecision(id, patch) {
-  return updateRowById("stakeholder_review_decisions", STAKEHOLDER_REVIEW_DECISIONS_COLUMNS, id, patch);
+export async function updateStakeholderReviewDecision(id, patch, client = null) {
+  return updateRowById("stakeholder_review_decisions", STAKEHOLDER_REVIEW_DECISIONS_COLUMNS, id, patch, client);
 }
 
 // --- pilot_expansion_cohorts ---
@@ -247,12 +247,12 @@ export async function getPilotExpansionCohort(id) {
   return rows[0] ?? null;
 }
 
-export async function createPilotExpansionCohort(record) {
-  return insertRow("pilot_expansion_cohorts", PILOT_EXPANSION_COHORTS_COLUMNS, record);
+export async function createPilotExpansionCohort(record, client = null) {
+  return insertRow("pilot_expansion_cohorts", PILOT_EXPANSION_COHORTS_COLUMNS, record, client);
 }
 
-export async function updatePilotExpansionCohort(id, patch) {
-  return updateRowById("pilot_expansion_cohorts", PILOT_EXPANSION_COHORTS_COLUMNS, id, patch);
+export async function updatePilotExpansionCohort(id, patch, client = null) {
+  return updateRowById("pilot_expansion_cohorts", PILOT_EXPANSION_COHORTS_COLUMNS, id, patch, client);
 }
 
 // --- tenant_onboarding_plans ---
@@ -271,12 +271,12 @@ export async function getTenantOnboardingPlan(id) {
   return rows[0] ?? null;
 }
 
-export async function createTenantOnboardingPlan(record) {
-  return insertRow("tenant_onboarding_plans", TENANT_ONBOARDING_PLANS_COLUMNS, record);
+export async function createTenantOnboardingPlan(record, client = null) {
+  return insertRow("tenant_onboarding_plans", TENANT_ONBOARDING_PLANS_COLUMNS, record, client);
 }
 
-export async function updateTenantOnboardingPlan(id, patch) {
-  return updateRowById("tenant_onboarding_plans", TENANT_ONBOARDING_PLANS_COLUMNS, id, patch);
+export async function updateTenantOnboardingPlan(id, patch, client = null) {
+  return updateRowById("tenant_onboarding_plans", TENANT_ONBOARDING_PLANS_COLUMNS, id, patch, client);
 }
 
 // --- release_candidate_gates ---
@@ -295,12 +295,12 @@ export async function getReleaseCandidateGate(id) {
   return rows[0] ?? null;
 }
 
-export async function createReleaseCandidateGate(record) {
-  return insertRow("release_candidate_gates", RELEASE_CANDIDATE_GATES_COLUMNS, record);
+export async function createReleaseCandidateGate(record, client = null) {
+  return insertRow("release_candidate_gates", RELEASE_CANDIDATE_GATES_COLUMNS, record, client);
 }
 
-export async function updateReleaseCandidateGate(id, patch) {
-  return updateRowById("release_candidate_gates", RELEASE_CANDIDATE_GATES_COLUMNS, id, patch);
+export async function updateReleaseCandidateGate(id, patch, client = null) {
+  return updateRowById("release_candidate_gates", RELEASE_CANDIDATE_GATES_COLUMNS, id, patch, client);
 }
 
 // --- tenant_pilot_controls ---
@@ -319,10 +319,10 @@ export async function getTenantPilotControl(id) {
   return rows[0] ?? null;
 }
 
-export async function createTenantPilotControl(record) {
-  return insertRow("tenant_pilot_controls", TENANT_PILOT_CONTROLS_COLUMNS, record);
+export async function createTenantPilotControl(record, client = null) {
+  return insertRow("tenant_pilot_controls", TENANT_PILOT_CONTROLS_COLUMNS, record, client);
 }
 
-export async function updateTenantPilotControl(id, patch) {
-  return updateRowById("tenant_pilot_controls", TENANT_PILOT_CONTROLS_COLUMNS, id, patch);
+export async function updateTenantPilotControl(id, patch, client = null) {
+  return updateRowById("tenant_pilot_controls", TENANT_PILOT_CONTROLS_COLUMNS, id, patch, client);
 }

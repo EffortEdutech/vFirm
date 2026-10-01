@@ -9,6 +9,7 @@ import { PAGE_META, navForMode, defaultPageForMode } from "./nav.js";
 import { OWNER_PAGES } from "./pages-owner.js";
 import { ADMIN_PAGES } from "./pages-admin.js";
 import { initials, escapeHtml } from "./ui.js";
+import { openNewRequestDrawer } from "./request-drawer.js";
 
 const state = {
   mode: "owner", // "owner" | "admin"
@@ -29,6 +30,7 @@ const els = {
   pageTitle: document.getElementById("pageTitle"),
   pageDesc: document.getElementById("pageDesc"),
   pageBody: document.getElementById("pageBody"),
+  pageActions: document.getElementById("pageActions"),
 };
 
 function renderNav() {
@@ -60,6 +62,18 @@ function renderPageChrome() {
   els.pageEyebrow.textContent = meta.eyebrow;
   els.pageTitle.textContent = meta.title;
   els.pageDesc.textContent = meta.desc;
+  // ADR-090 W2 (F1): the owner's front door -- always one click away in the Owner workspace.
+  els.pageActions.innerHTML = state.mode === "owner"
+    ? `<button class="btn btn-primary" id="newRequestBtn" type="button">+ New request</button>`
+    : "";
+}
+
+// After a request is created, land on the Workdesk tab where it now lives (Inbox, or Pending if
+// it was assigned straight away).
+function afterRequestCreated(result) {
+  window.__vfirmWorkdeskTab = result?.workdesk_item ? "pending" : "inbox";
+  if (state.page === "workdesk") renderPage();
+  else setPage("workdesk");
 }
 
 async function renderPage() {
@@ -119,9 +133,22 @@ function applyIdentityToChrome() {
   els.footAvatar.textContent = initials(actorName);
 }
 
+// ADR-093 W4 (F4/F5): pages ask the shell to navigate (e.g. a Dashboard tray tile -> a Workdesk tab,
+// "Filed as ..." -> Documents) with a window event, so page modules never touch the shell directly.
+window.addEventListener("vfirm:navigate", (event) => {
+  const { page, tab } = event.detail ?? {};
+  if (tab) window.__vfirmWorkdeskTab = tab;
+  if (!page) return;
+  if (state.page === page) renderPage();
+  else setPage(page);
+});
+
 function wireEvents() {
   els.modeOwnerBtn.addEventListener("click", () => setMode("owner"));
   els.modeAdminBtn.addEventListener("click", () => setMode("admin"));
+  els.pageActions.addEventListener("click", (event) => {
+    if (event.target.closest("#newRequestBtn")) openNewRequestDrawer({ onCreated: afterRequestCreated });
+  });
   els.navScroll.addEventListener("click", (event) => {
     const btn = event.target.closest("button[data-page]");
     if (btn) setPage(btn.dataset.page);

@@ -1,3 +1,13 @@
+import {
+  isArchivedPilotFirm as isArchivedPilotFirmShared,
+  selectableFirmsForStore as selectableFirmsForStoreShared,
+  resolveActiveFirm,
+  resolveActiveTenant,
+  latestPrincipalActor as latestPrincipalActorShared,
+  scopeStoreToFirm,
+  systemActor,
+} from "/shared/identity-resolution.mjs";
+
 const API_BASE = window.VFIRM_API_BASE ?? "/api";
 const apiStatus = document.querySelector("#apiStatus");
 const navButtons = [...document.querySelectorAll(".nav-button")];
@@ -1293,55 +1303,29 @@ function latestRecord(store, collection) {
   const records = store?.[collection] ?? [];
   return records[records.length - 1] ?? null;
 }
+// Phase 6 slice 6b: latestPrincipalActor(), isArchivedPilotFirm(),
+// selectableFirmsForStore(), activeFirmInStore(), and activeTenantInStore()
+// used to be this file's own originals -- web-console's api.js hand-copied
+// them (see claude/vfirm-architecture-review.md, Slice 6a). Both frontends
+// now share one implementation from packages/core-domain, served at
+// /shared/identity-resolution.mjs. activeFirmId (this file's localStorage-
+// persisted "sticky" firm choice) is passed in as the preferred pick; the
+// shared module stays pure and doesn't touch localStorage itself.
 function latestPrincipalActor(store, firmId) {
-  const actors = store?.actors ?? [];
-  return (
-    [...actors]
-      .reverse()
-      .find(
-        (actor) => actor.firm_id === firmId && actor.actor_type === "HUMAN",
-      ) ?? null
-  );
+  return latestPrincipalActorShared(store, firmId);
 }
 function isArchivedPilotFirm(firm, store) {
-  const tenant = (store?.tenants ?? []).find(
-    (item) => item.id === firm?.tenant_id,
-  );
-  return /\bPD[- ]?H2\b/i.test(`${firm?.name ?? ""} ${tenant?.name ?? ""}`);
+  return isArchivedPilotFirmShared(firm, store);
 }
 function selectableFirmsForStore(store) {
-  const firms = store?.firms ?? [];
-  const currentPilotFirms = firms.filter(
-    (firm) => !isArchivedPilotFirm(firm, store),
-  );
-  return currentPilotFirms.length ? currentPilotFirms : firms;
+  return selectableFirmsForStoreShared(store);
 }
 function activeFirmInStore(store) {
-  const firms = store?.firms ?? [];
-  const selectableFirms = selectableFirmsForStore(store);
-  const selectedFirm = selectableFirms.find((firm) => firm.id === activeFirmId);
-  if (selectedFirm) return selectedFirm;
-  const packages = store?.subscription_packages ?? [];
-  const subscribedFirm = [...selectableFirms]
-    .reverse()
-    .find((firm) =>
-      packages.some(
-        (item) => item.firm_id === firm.id && item.package_status === "ACTIVE",
-      ),
-    );
-  return (
-    subscribedFirm ??
-    selectableFirms[selectableFirms.length - 1] ??
-    firms[firms.length - 1] ??
-    null
-  );
+  return resolveActiveFirm(store, activeFirmId);
 }
 function activeTenantInStore(store) {
   const firm = activeFirmInStore(store);
-  return firm
-    ? ((store?.tenants ?? []).find((tenant) => tenant.id === firm.tenant_id) ??
-        null)
-    : latestRecord(store, "tenants");
+  return firm ? resolveActiveTenant(store, firm) : latestRecord(store, "tenants");
 }
 function ensureActiveFirm(store) {
   const firm = activeFirmInStore(store);
@@ -1700,93 +1684,26 @@ function defaultOutputRef(contract) {
     ? "ai://outputs/organization-support-draft"
     : "ai://outputs/formwork-intake-summary";
 }
+// Phase 6 slice 6b: the firm/tenant/relationship/project scoping logic here
+// used to be this file's own original (web-console's simpler scopeStoreToCurrentFirm()
+// was modeled on it but missed the requesting_firm_id/provider_firm_id/
+// accountable_firm_id fields -- see Slice 6a finding #4, now fixed there
+// too). The scoping itself now comes from the shared module; this wrapper
+// keeps app.js's own view-layer additions (_active_*, _dashboard_summary)
+// that are specific to this file's rendering and were deliberately not
+// pulled into the shared module (Slice 6a finding #5).
 function scopedStoreForActiveFirm(store) {
   const firm = ensureActiveFirm(store);
   const tenant = firm
     ? (store.tenants ?? []).find((item) => item.id === firm.tenant_id)
     : latestRecord(store, "tenants");
   if (!firm || !tenant) return store;
-  const firmIds = new Set([firm.id]);
-  const scopedRelationships = (store.firm_client_relationships ?? []).filter(
-    (item) => item.tenant_id === tenant.id && item.firm_id === firm.id,
-  );
-  const relationshipIds = new Set(scopedRelationships.map((item) => item.id));
-  const clientIds = new Set(scopedRelationships.map((item) => item.client_id));
-  const projectIds = new Set(
-    (store.projects ?? [])
-      .filter(
-        (item) => item.tenant_id === tenant.id && item.firm_id === firm.id,
-      )
-      .map((item) => item.id),
-  );
-  const globalCollections = new Set([
-    "service_packs",
-    "service_skus",
-    "worker_templates",
-    "auth_context",
-    "ops_readiness",
-    "staging_package",
-    "data_protection_policy",
-    "data_export_manifest",
-    "pilot_package",
-    "pilot_learning_loop",
-    "support_summary",
-  ]);
   const scoped = {
-    ...store,
+    ...scopeStoreToFirm(store, firm, tenant),
     _active_tenant: tenant,
     _active_firm: firm,
     _active_actor: activePrincipalActor(store),
   };
-  for (const [key, value] of Object.entries(store)) {
-    if (!Array.isArray(value)) continue;
-    if (key === "tenants") scoped[key] = [tenant];
-    else if (key === "firms") scoped[key] = [firm];
-    else if (globalCollections.has(key)) scoped[key] = value;
-    else if (key === "firm_client_relationships")
-      scoped[key] = scopedRelationships;
-    else if (key === "clients")
-      scoped[key] = value.filter(
-        (item) =>
-          item.tenant_id === tenant.id &&
-          (clientIds.has(item.id) ||
-            !(store.firm_client_relationships ?? []).some(
-              (rel) => rel.client_id === item.id,
-            )),
-      );
-    else if (["leads", "intake_sessions"].includes(key))
-      scoped[key] = value.filter(
-        (item) =>
-          item.tenant_id === tenant.id &&
-          (!item.relationship_id || relationshipIds.has(item.relationship_id)),
-      );
-    else if (
-      ["documents", "document_versions", "evidence_bundles"].includes(key)
-    )
-      scoped[key] = value.filter(
-        (item) =>
-          item.tenant_id === tenant.id &&
-          (!item.project_id || projectIds.has(item.project_id)) &&
-          (!item.firm_id || item.firm_id === firm.id),
-      );
-    else
-      scoped[key] = value.filter((item) => {
-        if (item.tenant_id && item.tenant_id !== tenant.id) return false;
-        const scopedFirmValues = [
-          item.firm_id,
-          item.requesting_firm_id,
-          item.provider_firm_id,
-          item.accountable_firm_id,
-        ].filter(Boolean);
-        if (scopedFirmValues.length)
-          return scopedFirmValues.some((id) => firmIds.has(id));
-        if (item.relationship_id)
-          return relationshipIds.has(item.relationship_id);
-        if (item.client_id) return clientIds.has(item.client_id);
-        if (item.project_id) return projectIds.has(item.project_id);
-        return item.tenant_id === tenant.id;
-      });
-  }
   scoped._dashboard_summary = {
     ...(store._dashboard_summary ?? {}),
     counts: {
@@ -2413,13 +2330,7 @@ function renderIntakeModule(store) {
   );
 }
 function systemActorForBrowser(tenant_id, firm_id) {
-  return {
-    actor_id: "system",
-    actor_type: "SYSTEM",
-    tenant_id,
-    firm_id,
-    display_name: "vFirm System",
-  };
+  return systemActor(tenant_id, firm_id);
 }
 function renderProposalModule(store) {
   const latestFirm = latestRecord(store, "firms");
@@ -4057,12 +3968,15 @@ function renderWorkdeskModule(store) {
   const clientDeliveryDrafts = store.awia_client_delivery_drafts ?? [];
 
   // Inbox: real tasks not yet assigned to any hired worker.
+  // ADR-090 W2: ad-hoc tasks behind an owner work request are assigned from the web-console
+  // Workdesk's work-request row, never from this list.
   const openTasks = tasks.filter(
-    (task) => !workdesk.some((item) => item.task_id === task.id),
+    (task) => !workdesk.some((item) => item.task_id === task.id) && !String(task.input_ref ?? "").startsWith("work-request:"),
   );
 
   // Pending: assigned, worker still to produce their draft.
-  const pendingItems = workdesk.filter((item) => item.workdesk_status === "ASSIGNED");
+  // ADR-089 W1 (B3): REWORK (owner requested a revision) is back with the worker too.
+  const pendingItems = workdesk.filter((item) => item.workdesk_status === "ASSIGNED" || item.workdesk_status === "REWORK");
 
   // Approval: draft produced and waiting on the owner's decision, plus
   // dead-end items stuck after a REVISION_REQUIRED/REJECTED decision --

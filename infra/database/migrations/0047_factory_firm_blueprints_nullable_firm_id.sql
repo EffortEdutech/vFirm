@@ -1,0 +1,27 @@
+-- HM-S7 Phase 4f, slice 5 (2026-09-29): factory_firm_blueprints.firm_id was created NOT NULL by
+-- migration 0025, but a blueprint's firm_id is only ever set once it is provisioned into a real
+-- firm (see apps/api/src/store.mjs createFactoryProvisioningRunRecord's
+-- `current.firm_id = firmResult.firm.id`). Before that point -- i.e. for every DRAFT,
+-- VALIDATED, VALIDATION_FAILED and APPROVED_FOR_PROVISIONING blueprint -- firm_id is legitimately
+-- null on the in-memory record.
+--
+-- Discovered while verifying slice 5's persist-on-write dedup fix: persistFirmFactoryFromStore's
+-- guard (`if (!naturalKey || !tenantId || !firmId) continue;`, correct for the other 6 Firm
+-- Factory collections, which always have a real firm_id by the time they're created) was also
+-- applied to factory_firm_blueprints, so the NOT NULL constraint here silently dropped every
+-- blueprint write before provisioning -- a blueprint created via createFactoryFirmBlueprintRecord
+-- was never actually persisted to Postgres and vanished on the very next request (loadStore()
+-- always does a full fresh reload, there is no in-process cache). validateFactoryFirmBlueprintRecord
+-- / approveFactoryFirmBlueprintRecord on a freshly-created blueprint therefore always 404'd. This
+-- predates this session's Phase 4f work (introduced by migration 0025, HM-S6, 2026-09-22) and is
+-- unrelated to the dedup fix itself, but blocks verifying it end-to-end, so it is fixed here as
+-- part of the same slice.
+--
+-- Fix: make firm_id nullable here (and only here -- the other 6 Firm Factory tables keep NOT NULL,
+-- since their rows are never created before a firm exists). The composite unique index still
+-- works correctly with firm_id null, because natural_key (the application-level blueprint id) is
+-- already globally unique on its own. The FK constraint is unaffected -- a null value always
+-- passes a foreign-key check. apps/api/src/store.mjs's persistFirmFactoryFromStore is updated in
+-- the same slice to stop requiring firm_id for this one collection.
+
+alter table factory_firm_blueprints alter column firm_id drop not null;

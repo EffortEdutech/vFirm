@@ -153,7 +153,9 @@ try {
   const assignB = await post("/awia/virtual-staff/assign-task", { tenant_id: firm.tenant_id, firm_id: firm.id, staff_code: staffCode, task_id: b.task.id, action: "finance.analysis.prepare", tool: "finance.analysis.prepare", client_id: b.clientId, project_id: b.project.id, evidence_refs: ["archive-smoke-evidence-b"] }, h);
   const draftB = await post("/awia/virtual-staff/output-draft", { tenant_id: firm.tenant_id, firm_id: firm.id, workdesk_item_id: assignB.workdesk_item.id }, h);
   const revisedB = await post("/awia/virtual-staff/output-review", { tenant_id: firm.tenant_id, firm_id: firm.id, output_draft_id: draftB.output_draft.id, review_decision: "REVISION_REQUIRED", review_notes: "Needs another pass." }, h);
-  assert.equal(revisedB.workdesk_item.workdesk_status, "REVIEW_ACTION_REQUIRED");
+  // ADR-089 W1 (B3): REVISION_REQUIRED now returns the item to the worker as REWORK (no longer
+  // the REVIEW_ACTION_REQUIRED dead end); the owner can still choose to dismiss it instead.
+  assert.equal(revisedB.workdesk_item.workdesk_status, "REWORK");
 
   const archivedB = await post("/awia/virtual-staff/workdesk-item/archive", { tenant_id: firm.tenant_id, firm_id: firm.id, workdesk_item_id: assignB.workdesk_item.id }, h);
   assert.equal(archivedB.workdesk_item.workdesk_status, "ARCHIVED_DISMISSED");

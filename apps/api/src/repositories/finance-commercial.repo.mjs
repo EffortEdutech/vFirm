@@ -31,12 +31,12 @@ export async function getInvoice(id) {
   return rows[0] ?? null;
 }
 
-export async function createInvoice(record) {
-  return insertRow("invoices", INVOICES_COLUMNS, record);
+export async function createInvoice(record, client = null) {
+  return insertRow("invoices", INVOICES_COLUMNS, record, client);
 }
 
-export async function updateInvoice(id, patch) {
-  return updateRowById("invoices", INVOICES_COLUMNS, id, patch);
+export async function updateInvoice(id, patch, client = null) {
+  return updateRowById("invoices", INVOICES_COLUMNS, id, patch, client);
 }
 
 // --- payment_statuses ---
@@ -55,8 +55,8 @@ export async function getPaymentStatus(id) {
   return rows[0] ?? null;
 }
 
-export async function createPaymentStatus(record) {
-  return insertRow("payment_statuses", PAYMENT_STATUSES_COLUMNS, record);
+export async function createPaymentStatus(record, client = null) {
+  return insertRow("payment_statuses", PAYMENT_STATUSES_COLUMNS, record, client);
 }
 
 export async function updatePaymentStatus(id, patch) {
@@ -127,12 +127,12 @@ export async function getPaymentProviderConfig(id) {
   return rows[0] ?? null;
 }
 
-export async function createPaymentProviderConfig(record) {
-  return insertRow("payment_provider_configs", PAYMENT_PROVIDER_CONFIGS_COLUMNS, record);
+export async function createPaymentProviderConfig(record, client = null) {
+  return insertRow("payment_provider_configs", PAYMENT_PROVIDER_CONFIGS_COLUMNS, record, client);
 }
 
-export async function updatePaymentProviderConfig(id, patch) {
-  return updateRowById("payment_provider_configs", PAYMENT_PROVIDER_CONFIGS_COLUMNS, id, patch);
+export async function updatePaymentProviderConfig(id, patch, client = null) {
+  return updateRowById("payment_provider_configs", PAYMENT_PROVIDER_CONFIGS_COLUMNS, id, patch, client);
 }
 
 // --- subscription_packages ---
@@ -151,12 +151,12 @@ export async function getSubscriptionPackage(id) {
   return rows[0] ?? null;
 }
 
-export async function createSubscriptionPackage(record) {
-  return insertRow("subscription_packages", SUBSCRIPTION_PACKAGES_COLUMNS, record);
+export async function createSubscriptionPackage(record, client = null) {
+  return insertRow("subscription_packages", SUBSCRIPTION_PACKAGES_COLUMNS, record, client);
 }
 
-export async function updateSubscriptionPackage(id, patch) {
-  return updateRowById("subscription_packages", SUBSCRIPTION_PACKAGES_COLUMNS, id, patch);
+export async function updateSubscriptionPackage(id, patch, client = null) {
+  return updateRowById("subscription_packages", SUBSCRIPTION_PACKAGES_COLUMNS, id, patch, client);
 }
 
 // --- commercial_launch_controls ---
@@ -175,16 +175,16 @@ export async function getCommercialLaunchControl(id) {
   return rows[0] ?? null;
 }
 
-export async function createCommercialLaunchControl(record) {
-  return insertRow("commercial_launch_controls", COMMERCIAL_LAUNCH_CONTROLS_COLUMNS, record);
+export async function createCommercialLaunchControl(record, client = null) {
+  return insertRow("commercial_launch_controls", COMMERCIAL_LAUNCH_CONTROLS_COLUMNS, record, client);
 }
 
-export async function updateCommercialLaunchControl(id, patch) {
-  return updateRowById("commercial_launch_controls", COMMERCIAL_LAUNCH_CONTROLS_COLUMNS, id, patch);
+export async function updateCommercialLaunchControl(id, patch, client = null) {
+  return updateRowById("commercial_launch_controls", COMMERCIAL_LAUNCH_CONTROLS_COLUMNS, id, patch, client);
 }
 
 // --- billing_readiness_reviews ---
-const BILLING_READINESS_REVIEWS_COLUMNS = [{ name: "id", jsonb: false }, { name: "tenant_id", jsonb: false }, { name: "firm_id", jsonb: false }, { name: "reviewed_by_actor_id", jsonb: false }, { name: "readiness_status", jsonb: false }, { name: "pricing_model", jsonb: false }, { name: "decision_summary", jsonb: false }, { name: "created_at", jsonb: false }, { name: "metadata", jsonb: true }];
+const BILLING_READINESS_REVIEWS_COLUMNS = [{ name: "id", jsonb: false }, { name: "tenant_id", jsonb: false }, { name: "firm_id", jsonb: false }, { name: "reviewed_by_actor_id", jsonb: false }, { name: "readiness_status", jsonb: false }, { name: "pricing_model", jsonb: false }, { name: "checks", jsonb: true }, { name: "decision_summary", jsonb: false }, { name: "created_at", jsonb: false }, { name: "metadata", jsonb: true }];
 
 export async function listBillingReadinessReviewsByFirm(tenantId, firmId) {
   const { rows } = await query(
@@ -199,12 +199,12 @@ export async function getBillingReadinessReview(id) {
   return rows[0] ?? null;
 }
 
-export async function createBillingReadinessReview(record) {
-  return insertRow("billing_readiness_reviews", BILLING_READINESS_REVIEWS_COLUMNS, record);
+export async function createBillingReadinessReview(record, client = null) {
+  return insertRow("billing_readiness_reviews", BILLING_READINESS_REVIEWS_COLUMNS, record, client);
 }
 
-export async function updateBillingReadinessReview(id, patch) {
-  return updateRowById("billing_readiness_reviews", BILLING_READINESS_REVIEWS_COLUMNS, id, patch);
+export async function updateBillingReadinessReview(id, patch, client = null) {
+  return updateRowById("billing_readiness_reviews", BILLING_READINESS_REVIEWS_COLUMNS, id, patch, client);
 }
 
 // --- tenant_usage_events ---
@@ -223,10 +223,10 @@ export async function getTenantUsageEvent(id) {
   return rows[0] ?? null;
 }
 
-export async function createTenantUsageEvent(record) {
-  return insertRow("tenant_usage_events", TENANT_USAGE_EVENTS_COLUMNS, record);
+export async function createTenantUsageEvent(record, client = null) {
+  return insertRow("tenant_usage_events", TENANT_USAGE_EVENTS_COLUMNS, record, client);
 }
 
-export async function updateTenantUsageEvent(id, patch) {
-  return updateRowById("tenant_usage_events", TENANT_USAGE_EVENTS_COLUMNS, id, patch);
+export async function updateTenantUsageEvent(id, patch, client = null) {
+  return updateRowById("tenant_usage_events", TENANT_USAGE_EVENTS_COLUMNS, id, patch, client);
 }

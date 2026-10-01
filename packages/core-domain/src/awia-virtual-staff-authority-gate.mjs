@@ -72,7 +72,12 @@ export function evaluateVirtualStaffRuntimeAction({ provisioningRun = provisionP
   if (!roleAssignment) findings.push(error("ROLE_ASSIGNMENT_REQUIRED"));
   if (!request.tenant_id || request.tenant_id !== provisioningRun.tenant_id) findings.push(error("REQUEST_TENANT_SCOPE_MISMATCH"));
   if (!request.firm_id || request.firm_id !== provisioningRun.firm_id) findings.push(error("REQUEST_FIRM_SCOPE_MISMATCH"));
-  if (!request.client_id || !request.project_id) findings.push(error("TASK_SCOPE_REQUIRED"));
+  // ADR-090 W2 (decision D2): INTERNAL firm work (e.g. reconciling the firm's own books,
+  // onboarding the firm's own hire) has no client or project by definition. Every other risk
+  // class still requires both. INTERNAL work can never reach a client: the client-delivery-draft
+  // step refuses INTERNAL items (see prepareAwiaClientDeliveryDraftRecord in apps/api/src/store.mjs).
+  const internalWork = request.risk_class === "INTERNAL";
+  if (!internalWork && (!request.client_id || !request.project_id)) findings.push(error("TASK_SCOPE_REQUIRED"));
   if (!Array.isArray(request.evidence_refs) || request.evidence_refs.length === 0) findings.push(error("EVIDENCE_REQUIRED"));
   if (request.prompt_authority_claim) findings.push(error("PROMPT_AUTHORITY_DENIED"));
   if (request.salary_authority_claim) findings.push(error("SALARY_PLAN_AUTHORITY_DENIED"));

@@ -31,12 +31,12 @@ export async function getMarketplaceListing(id) {
   return rows[0] ?? null;
 }
 
-export async function createMarketplaceListing(record) {
-  return insertRow("marketplace_listings", MARKETPLACE_LISTINGS_COLUMNS, record);
+export async function createMarketplaceListing(record, client = null) {
+  return insertRow("marketplace_listings", MARKETPLACE_LISTINGS_COLUMNS, record, client);
 }
 
-export async function updateMarketplaceListing(id, patch) {
-  return updateRowById("marketplace_listings", MARKETPLACE_LISTINGS_COLUMNS, id, patch);
+export async function updateMarketplaceListing(id, patch, client = null) {
+  return updateRowById("marketplace_listings", MARKETPLACE_LISTINGS_COLUMNS, id, patch, client);
 }
 
 // --- directory_review_board_decisions ---
@@ -55,12 +55,12 @@ export async function getDirectoryReviewBoardDecision(id) {
   return rows[0] ?? null;
 }
 
-export async function createDirectoryReviewBoardDecision(record) {
-  return insertRow("directory_review_board_decisions", DIRECTORY_REVIEW_BOARD_DECISIONS_COLUMNS, record);
+export async function createDirectoryReviewBoardDecision(record, client = null) {
+  return insertRow("directory_review_board_decisions", DIRECTORY_REVIEW_BOARD_DECISIONS_COLUMNS, record, client);
 }
 
-export async function updateDirectoryReviewBoardDecision(id, patch) {
-  return updateRowById("directory_review_board_decisions", DIRECTORY_REVIEW_BOARD_DECISIONS_COLUMNS, id, patch);
+export async function updateDirectoryReviewBoardDecision(id, patch, client = null) {
+  return updateRowById("directory_review_board_decisions", DIRECTORY_REVIEW_BOARD_DECISIONS_COLUMNS, id, patch, client);
 }
 
 // --- directory_private_enquiries ---
@@ -79,12 +79,12 @@ export async function getDirectoryPrivateEnquiry(id) {
   return rows[0] ?? null;
 }
 
-export async function createDirectoryPrivateEnquiry(record) {
-  return insertRow("directory_private_enquiries", DIRECTORY_PRIVATE_ENQUIRIES_COLUMNS, record);
+export async function createDirectoryPrivateEnquiry(record, client = null) {
+  return insertRow("directory_private_enquiries", DIRECTORY_PRIVATE_ENQUIRIES_COLUMNS, record, client);
 }
 
-export async function updateDirectoryPrivateEnquiry(id, patch) {
-  return updateRowById("directory_private_enquiries", DIRECTORY_PRIVATE_ENQUIRIES_COLUMNS, id, patch);
+export async function updateDirectoryPrivateEnquiry(id, patch, client = null) {
+  return updateRowById("directory_private_enquiries", DIRECTORY_PRIVATE_ENQUIRIES_COLUMNS, id, patch, client);
 }
 
 // --- qualification_renewal_reviews ---
@@ -103,16 +103,16 @@ export async function getQualificationRenewalReview(id) {
   return rows[0] ?? null;
 }
 
-export async function createQualificationRenewalReview(record) {
-  return insertRow("qualification_renewal_reviews", QUALIFICATION_RENEWAL_REVIEWS_COLUMNS, record);
+export async function createQualificationRenewalReview(record, client = null) {
+  return insertRow("qualification_renewal_reviews", QUALIFICATION_RENEWAL_REVIEWS_COLUMNS, record, client);
 }
 
-export async function updateQualificationRenewalReview(id, patch) {
-  return updateRowById("qualification_renewal_reviews", QUALIFICATION_RENEWAL_REVIEWS_COLUMNS, id, patch);
+export async function updateQualificationRenewalReview(id, patch, client = null) {
+  return updateRowById("qualification_renewal_reviews", QUALIFICATION_RENEWAL_REVIEWS_COLUMNS, id, patch, client);
 }
 
 // --- capacity_offers ---
-const CAPACITY_OFFERS_COLUMNS = [{ name: "id", jsonb: false }, { name: "tenant_id", jsonb: false }, { name: "firm_id", jsonb: false }, { name: "service_pack_id", jsonb: false }, { name: "capacity_type", jsonb: false }, { name: "pce_units", jsonb: false }, { name: "available_from", jsonb: false }, { name: "available_until", jsonb: false }, { name: "jurisdiction_refs", jsonb: true }, { name: "status", jsonb: false }, { name: "created_at", jsonb: false }, { name: "updated_at", jsonb: false }];
+const CAPACITY_OFFERS_COLUMNS = [{ name: "id", jsonb: false }, { name: "tenant_id", jsonb: false }, { name: "firm_id", jsonb: false }, { name: "service_pack_id", jsonb: false }, { name: "capacity_type", jsonb: false }, { name: "pce_units", jsonb: false }, { name: "available_from", jsonb: false }, { name: "available_until", jsonb: false }, { name: "jurisdiction_refs", jsonb: true }, { name: "constraints", jsonb: true }, { name: "status", jsonb: false }, { name: "created_at", jsonb: false }, { name: "updated_at", jsonb: false }];
 
 export async function listCapacityOffersByFirm(tenantId, firmId) {
   const { rows } = await query(
@@ -127,12 +127,12 @@ export async function getCapacityOffer(id) {
   return rows[0] ?? null;
 }
 
-export async function createCapacityOffer(record) {
-  return insertRow("capacity_offers", CAPACITY_OFFERS_COLUMNS, record);
+export async function createCapacityOffer(record, client = null) {
+  return insertRow("capacity_offers", CAPACITY_OFFERS_COLUMNS, record, client);
 }
 
-export async function updateCapacityOffer(id, patch) {
-  return updateRowById("capacity_offers", CAPACITY_OFFERS_COLUMNS, id, patch);
+export async function updateCapacityOffer(id, patch, client = null) {
+  return updateRowById("capacity_offers", CAPACITY_OFFERS_COLUMNS, id, patch, client);
 }
 
 // --- collaboration_requests ---
@@ -175,12 +175,12 @@ export async function getNetworkProfessionalProfile(id) {
   return rows[0] ?? null;
 }
 
-export async function createNetworkProfessionalProfile(record) {
-  return insertRow("network_professional_profiles", NETWORK_PROFESSIONAL_PROFILES_COLUMNS, record);
+export async function createNetworkProfessionalProfile(record, client = null) {
+  return insertRow("network_professional_profiles", NETWORK_PROFESSIONAL_PROFILES_COLUMNS, record, client);
 }
 
-export async function updateNetworkProfessionalProfile(id, patch) {
-  return updateRowById("network_professional_profiles", NETWORK_PROFESSIONAL_PROFILES_COLUMNS, id, patch);
+export async function updateNetworkProfessionalProfile(id, patch, client = null) {
+  return updateRowById("network_professional_profiles", NETWORK_PROFESSIONAL_PROFILES_COLUMNS, id, patch, client);
 }
 
 // --- network_firm_profiles ---
@@ -199,12 +199,12 @@ export async function getNetworkFirmProfile(id) {
   return rows[0] ?? null;
 }
 
-export async function createNetworkFirmProfile(record) {
-  return insertRow("network_firm_profiles", NETWORK_FIRM_PROFILES_COLUMNS, record);
+export async function createNetworkFirmProfile(record, client = null) {
+  return insertRow("network_firm_profiles", NETWORK_FIRM_PROFILES_COLUMNS, record, client);
 }
 
-export async function updateNetworkFirmProfile(id, patch) {
-  return updateRowById("network_firm_profiles", NETWORK_FIRM_PROFILES_COLUMNS, id, patch);
+export async function updateNetworkFirmProfile(id, patch, client = null) {
+  return updateRowById("network_firm_profiles", NETWORK_FIRM_PROFILES_COLUMNS, id, patch, client);
 }
 
 // --- network_capabilities ---
@@ -223,12 +223,12 @@ export async function getNetworkCapability(id) {
   return rows[0] ?? null;
 }
 
-export async function createNetworkCapability(record) {
-  return insertRow("network_capabilities", NETWORK_CAPABILITIES_COLUMNS, record);
+export async function createNetworkCapability(record, client = null) {
+  return insertRow("network_capabilities", NETWORK_CAPABILITIES_COLUMNS, record, client);
 }
 
-export async function updateNetworkCapability(id, patch) {
-  return updateRowById("network_capabilities", NETWORK_CAPABILITIES_COLUMNS, id, patch);
+export async function updateNetworkCapability(id, patch, client = null) {
+  return updateRowById("network_capabilities", NETWORK_CAPABILITIES_COLUMNS, id, patch, client);
 }
 
 // --- network_credentials ---
@@ -247,12 +247,12 @@ export async function getNetworkCredential(id) {
   return rows[0] ?? null;
 }
 
-export async function createNetworkCredential(record) {
-  return insertRow("network_credentials", NETWORK_CREDENTIALS_COLUMNS, record);
+export async function createNetworkCredential(record, client = null) {
+  return insertRow("network_credentials", NETWORK_CREDENTIALS_COLUMNS, record, client);
 }
 
-export async function updateNetworkCredential(id, patch) {
-  return updateRowById("network_credentials", NETWORK_CREDENTIALS_COLUMNS, id, patch);
+export async function updateNetworkCredential(id, patch, client = null) {
+  return updateRowById("network_credentials", NETWORK_CREDENTIALS_COLUMNS, id, patch, client);
 }
 
 // --- network_trust_signals ---
@@ -271,16 +271,16 @@ export async function getNetworkTrustSignal(id) {
   return rows[0] ?? null;
 }
 
-export async function createNetworkTrustSignal(record) {
-  return insertRow("network_trust_signals", NETWORK_TRUST_SIGNALS_COLUMNS, record);
+export async function createNetworkTrustSignal(record, client = null) {
+  return insertRow("network_trust_signals", NETWORK_TRUST_SIGNALS_COLUMNS, record, client);
 }
 
-export async function updateNetworkTrustSignal(id, patch) {
-  return updateRowById("network_trust_signals", NETWORK_TRUST_SIGNALS_COLUMNS, id, patch);
+export async function updateNetworkTrustSignal(id, patch, client = null) {
+  return updateRowById("network_trust_signals", NETWORK_TRUST_SIGNALS_COLUMNS, id, patch, client);
 }
 
 // --- network_conflict_checks ---
-const NETWORK_CONFLICT_CHECKS_COLUMNS = [{ name: "id", jsonb: false }, { name: "tenant_id", jsonb: false }, { name: "requesting_firm_id", jsonb: false }, { name: "provider_firm_id", jsonb: false }, { name: "subject_profile_id", jsonb: false }, { name: "conflict_summary", jsonb: false }, { name: "evidence_refs", jsonb: true }, { name: "created_at", jsonb: false }, { name: "metadata", jsonb: true }];
+const NETWORK_CONFLICT_CHECKS_COLUMNS = [{ name: "id", jsonb: false }, { name: "tenant_id", jsonb: false }, { name: "requesting_firm_id", jsonb: false }, { name: "provider_firm_id", jsonb: false }, { name: "subject_profile_id", jsonb: false }, { name: "check_status", jsonb: false }, { name: "conflict_summary", jsonb: false }, { name: "evidence_refs", jsonb: true }, { name: "checked_by_actor_id", jsonb: false }, { name: "created_at", jsonb: false }, { name: "metadata", jsonb: true }];
 
 export async function listNetworkConflictChecksByTenant(tenantId) {
   const { rows } = await query(
@@ -295,12 +295,12 @@ export async function getNetworkConflictCheck(id) {
   return rows[0] ?? null;
 }
 
-export async function createNetworkConflictCheck(record) {
-  return insertRow("network_conflict_checks", NETWORK_CONFLICT_CHECKS_COLUMNS, record);
+export async function createNetworkConflictCheck(record, client = null) {
+  return insertRow("network_conflict_checks", NETWORK_CONFLICT_CHECKS_COLUMNS, record, client);
 }
 
-export async function updateNetworkConflictCheck(id, patch) {
-  return updateRowById("network_conflict_checks", NETWORK_CONFLICT_CHECKS_COLUMNS, id, patch);
+export async function updateNetworkConflictCheck(id, patch, client = null) {
+  return updateRowById("network_conflict_checks", NETWORK_CONFLICT_CHECKS_COLUMNS, id, patch, client);
 }
 
 // --- network_qualification_gates ---
@@ -319,12 +319,12 @@ export async function getNetworkQualificationGate(id) {
   return rows[0] ?? null;
 }
 
-export async function createNetworkQualificationGate(record) {
-  return insertRow("network_qualification_gates", NETWORK_QUALIFICATION_GATES_COLUMNS, record);
+export async function createNetworkQualificationGate(record, client = null) {
+  return insertRow("network_qualification_gates", NETWORK_QUALIFICATION_GATES_COLUMNS, record, client);
 }
 
-export async function updateNetworkQualificationGate(id, patch) {
-  return updateRowById("network_qualification_gates", NETWORK_QUALIFICATION_GATES_COLUMNS, id, patch);
+export async function updateNetworkQualificationGate(id, patch, client = null) {
+  return updateRowById("network_qualification_gates", NETWORK_QUALIFICATION_GATES_COLUMNS, id, patch, client);
 }
 
 // --- specialist_invitations ---
@@ -343,12 +343,12 @@ export async function getSpecialistInvitation(id) {
   return rows[0] ?? null;
 }
 
-export async function createSpecialistInvitation(record) {
-  return insertRow("specialist_invitations", SPECIALIST_INVITATIONS_COLUMNS, record);
+export async function createSpecialistInvitation(record, client = null) {
+  return insertRow("specialist_invitations", SPECIALIST_INVITATIONS_COLUMNS, record, client);
 }
 
-export async function updateSpecialistInvitation(id, patch) {
-  return updateRowById("specialist_invitations", SPECIALIST_INVITATIONS_COLUMNS, id, patch);
+export async function updateSpecialistInvitation(id, patch, client = null) {
+  return updateRowById("specialist_invitations", SPECIALIST_INVITATIONS_COLUMNS, id, patch, client);
 }
 
 // --- collaboration_workspaces ---
@@ -367,12 +367,12 @@ export async function getCollaborationWorkspace(id) {
   return rows[0] ?? null;
 }
 
-export async function createCollaborationWorkspace(record) {
-  return insertRow("collaboration_workspaces", COLLABORATION_WORKSPACES_COLUMNS, record);
+export async function createCollaborationWorkspace(record, client = null) {
+  return insertRow("collaboration_workspaces", COLLABORATION_WORKSPACES_COLUMNS, record, client);
 }
 
-export async function updateCollaborationWorkspace(id, patch) {
-  return updateRowById("collaboration_workspaces", COLLABORATION_WORKSPACES_COLUMNS, id, patch);
+export async function updateCollaborationWorkspace(id, patch, client = null) {
+  return updateRowById("collaboration_workspaces", COLLABORATION_WORKSPACES_COLUMNS, id, patch, client);
 }
 
 // --- collaboration_workspace_participants ---
@@ -391,12 +391,12 @@ export async function getCollaborationWorkspaceParticipant(id) {
   return rows[0] ?? null;
 }
 
-export async function createCollaborationWorkspaceParticipant(record) {
-  return insertRow("collaboration_workspace_participants", COLLABORATION_WORKSPACE_PARTICIPANTS_COLUMNS, record);
+export async function createCollaborationWorkspaceParticipant(record, client = null) {
+  return insertRow("collaboration_workspace_participants", COLLABORATION_WORKSPACE_PARTICIPANTS_COLUMNS, record, client);
 }
 
-export async function updateCollaborationWorkspaceParticipant(id, patch) {
-  return updateRowById("collaboration_workspace_participants", COLLABORATION_WORKSPACE_PARTICIPANTS_COLUMNS, id, patch);
+export async function updateCollaborationWorkspaceParticipant(id, patch, client = null) {
+  return updateRowById("collaboration_workspace_participants", COLLABORATION_WORKSPACE_PARTICIPANTS_COLUMNS, id, patch, client);
 }
 
 // --- collaboration_workspace_evidence ---
@@ -415,12 +415,12 @@ export async function getCollaborationWorkspaceEvidence(id) {
   return rows[0] ?? null;
 }
 
-export async function createCollaborationWorkspaceEvidence(record) {
-  return insertRow("collaboration_workspace_evidence", COLLABORATION_WORKSPACE_EVIDENCE_COLUMNS, record);
+export async function createCollaborationWorkspaceEvidence(record, client = null) {
+  return insertRow("collaboration_workspace_evidence", COLLABORATION_WORKSPACE_EVIDENCE_COLUMNS, record, client);
 }
 
-export async function updateCollaborationWorkspaceEvidence(id, patch) {
-  return updateRowById("collaboration_workspace_evidence", COLLABORATION_WORKSPACE_EVIDENCE_COLUMNS, id, patch);
+export async function updateCollaborationWorkspaceEvidence(id, patch, client = null) {
+  return updateRowById("collaboration_workspace_evidence", COLLABORATION_WORKSPACE_EVIDENCE_COLUMNS, id, patch, client);
 }
 
 // --- responsibility_matrices ---
@@ -439,12 +439,12 @@ export async function getResponsibilityMatrix(id) {
   return rows[0] ?? null;
 }
 
-export async function createResponsibilityMatrix(record) {
-  return insertRow("responsibility_matrices", RESPONSIBILITY_MATRICES_COLUMNS, record);
+export async function createResponsibilityMatrix(record, client = null) {
+  return insertRow("responsibility_matrices", RESPONSIBILITY_MATRICES_COLUMNS, record, client);
 }
 
-export async function updateResponsibilityMatrix(id, patch) {
-  return updateRowById("responsibility_matrices", RESPONSIBILITY_MATRICES_COLUMNS, id, patch);
+export async function updateResponsibilityMatrix(id, patch, client = null) {
+  return updateRowById("responsibility_matrices", RESPONSIBILITY_MATRICES_COLUMNS, id, patch, client);
 }
 
 // --- specialist_assignments ---
@@ -487,10 +487,10 @@ export async function getObservatorySnapshot(id) {
   return rows[0] ?? null;
 }
 
-export async function createObservatorySnapshot(record) {
-  return insertRow("observatory_snapshots", OBSERVATORY_SNAPSHOTS_COLUMNS, record);
+export async function createObservatorySnapshot(record, client = null) {
+  return insertRow("observatory_snapshots", OBSERVATORY_SNAPSHOTS_COLUMNS, record, client);
 }
 
-export async function updateObservatorySnapshot(id, patch) {
-  return updateRowById("observatory_snapshots", OBSERVATORY_SNAPSHOTS_COLUMNS, id, patch);
+export async function updateObservatorySnapshot(id, patch, client = null) {
+  return updateRowById("observatory_snapshots", OBSERVATORY_SNAPSHOTS_COLUMNS, id, patch, client);
 }

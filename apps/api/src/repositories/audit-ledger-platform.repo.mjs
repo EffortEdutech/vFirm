@@ -31,12 +31,19 @@ export async function getPolicyDecision(id) {
   return rows[0] ?? null;
 }
 
-export async function createPolicyDecision(record) {
-  return insertRow("policy_decisions", POLICY_DECISIONS_COLUMNS, record);
+// HM-S7 Phase 4c (2026-09-28): createPolicyDecision/createEventLog/createAuditEvent below all
+// use `onConflictDoNothing` -- the hand-written inserts they replace (store.mjs's
+// upsertPolicyDecision/upsertAuditEvent/upsertEventLog) are `on conflict (id) do nothing`
+// upserts, not plain inserts, because these three tables are written from both the bulk
+// withStore() path and newer per-operation handlers and must tolerate being asked to write
+// the same id twice. The optional trailing `client` lets these participate in a caller's
+// existing transaction, same pattern as every other domain in Phase 4b/4c.
+export async function createPolicyDecision(record, client = null) {
+  return insertRow("policy_decisions", POLICY_DECISIONS_COLUMNS, record, client, { onConflictDoNothing: true });
 }
 
-export async function updatePolicyDecision(id, patch) {
-  return updateRowById("policy_decisions", POLICY_DECISIONS_COLUMNS, id, patch);
+export async function updatePolicyDecision(id, patch, client = null) {
+  return updateRowById("policy_decisions", POLICY_DECISIONS_COLUMNS, id, patch, client);
 }
 
 // --- event_log ---
@@ -55,12 +62,12 @@ export async function getEventLog(id) {
   return rows[0] ?? null;
 }
 
-export async function createEventLog(record) {
-  return insertRow("event_log", EVENT_LOG_COLUMNS, record);
+export async function createEventLog(record, client = null) {
+  return insertRow("event_log", EVENT_LOG_COLUMNS, record, client, { onConflictDoNothing: true });
 }
 
-export async function updateEventLog(id, patch) {
-  return updateRowById("event_log", EVENT_LOG_COLUMNS, id, patch);
+export async function updateEventLog(id, patch, client = null) {
+  return updateRowById("event_log", EVENT_LOG_COLUMNS, id, patch, client);
 }
 
 // --- audit_events ---
@@ -79,10 +86,10 @@ export async function getAuditEvent(id) {
   return rows[0] ?? null;
 }
 
-export async function createAuditEvent(record) {
-  return insertRow("audit_events", AUDIT_EVENTS_COLUMNS, record);
+export async function createAuditEvent(record, client = null) {
+  return insertRow("audit_events", AUDIT_EVENTS_COLUMNS, record, client, { onConflictDoNothing: true });
 }
 
-export async function updateAuditEvent(id, patch) {
-  return updateRowById("audit_events", AUDIT_EVENTS_COLUMNS, id, patch);
+export async function updateAuditEvent(id, patch, client = null) {
+  return updateRowById("audit_events", AUDIT_EVENTS_COLUMNS, id, patch, client);
 }

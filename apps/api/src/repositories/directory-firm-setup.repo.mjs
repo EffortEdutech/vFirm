@@ -28,12 +28,17 @@ export async function getTenant(id) {
   return rows[0] ?? null;
 }
 
-export async function createTenant(record) {
-  return insertRow("tenants", TENANTS_COLUMNS, record);
+// HM-S7 Phase 4c (2026-09-28): optional trailing `client` (same pattern as
+// approvals.repo.mjs, Phase 4b) lets a caller with an existing begin/commit transaction on
+// its own pg client (createTenantRecord, createFirmRecord in store.mjs) run these on that
+// same connection instead of the shared pool. Omitting it keeps the original standalone-pool
+// behavior for any other caller.
+export async function createTenant(record, client = null) {
+  return insertRow("tenants", TENANTS_COLUMNS, record, client);
 }
 
-export async function updateTenant(id, patch) {
-  return updateRowById("tenants", TENANTS_COLUMNS, id, patch);
+export async function updateTenant(id, patch, client = null) {
+  return updateRowById("tenants", TENANTS_COLUMNS, id, patch, client);
 }
 
 // --- firms ---
@@ -52,12 +57,12 @@ export async function getFirm(id) {
   return rows[0] ?? null;
 }
 
-export async function createFirm(record) {
-  return insertRow("firms", FIRMS_COLUMNS, record);
+export async function createFirm(record, client = null) {
+  return insertRow("firms", FIRMS_COLUMNS, record, client);
 }
 
-export async function updateFirm(id, patch) {
-  return updateRowById("firms", FIRMS_COLUMNS, id, patch);
+export async function updateFirm(id, patch, client = null) {
+  return updateRowById("firms", FIRMS_COLUMNS, id, patch, client);
 }
 
 // --- firm_memberships ---
@@ -76,12 +81,12 @@ export async function getFirmMembership(id) {
   return rows[0] ?? null;
 }
 
-export async function createFirmMembership(record) {
-  return insertRow("firm_memberships", FIRM_MEMBERSHIPS_COLUMNS, record);
+export async function createFirmMembership(record, client = null) {
+  return insertRow("firm_memberships", FIRM_MEMBERSHIPS_COLUMNS, record, client);
 }
 
-export async function updateFirmMembership(id, patch) {
-  return updateRowById("firm_memberships", FIRM_MEMBERSHIPS_COLUMNS, id, patch);
+export async function updateFirmMembership(id, patch, client = null) {
+  return updateRowById("firm_memberships", FIRM_MEMBERSHIPS_COLUMNS, id, patch, client);
 }
 
 // --- persons ---
@@ -100,12 +105,12 @@ export async function getPerson(id) {
   return rows[0] ?? null;
 }
 
-export async function createPerson(record) {
-  return insertRow("persons", PERSONS_COLUMNS, record);
+export async function createPerson(record, client = null) {
+  return insertRow("persons", PERSONS_COLUMNS, record, client);
 }
 
-export async function updatePerson(id, patch) {
-  return updateRowById("persons", PERSONS_COLUMNS, id, patch);
+export async function updatePerson(id, patch, client = null) {
+  return updateRowById("persons", PERSONS_COLUMNS, id, patch, client);
 }
 
 // --- actors ---
@@ -124,12 +129,12 @@ export async function getActor(id) {
   return rows[0] ?? null;
 }
 
-export async function createActor(record) {
-  return insertRow("actors", ACTORS_COLUMNS, record);
+export async function createActor(record, client = null) {
+  return insertRow("actors", ACTORS_COLUMNS, record, client);
 }
 
-export async function updateActor(id, patch) {
-  return updateRowById("actors", ACTORS_COLUMNS, id, patch);
+export async function updateActor(id, patch, client = null) {
+  return updateRowById("actors", ACTORS_COLUMNS, id, patch, client);
 }
 
 // --- professional_profiles ---
@@ -148,12 +153,12 @@ export async function getProfessionalProfile(id) {
   return rows[0] ?? null;
 }
 
-export async function createProfessionalProfile(record) {
-  return insertRow("professional_profiles", PROFESSIONAL_PROFILES_COLUMNS, record);
+export async function createProfessionalProfile(record, client = null) {
+  return insertRow("professional_profiles", PROFESSIONAL_PROFILES_COLUMNS, record, client);
 }
 
-export async function updateProfessionalProfile(id, patch) {
-  return updateRowById("professional_profiles", PROFESSIONAL_PROFILES_COLUMNS, id, patch);
+export async function updateProfessionalProfile(id, patch, client = null) {
+  return updateRowById("professional_profiles", PROFESSIONAL_PROFILES_COLUMNS, id, patch, client);
 }
 
 // --- professional_authorities ---
@@ -172,12 +177,12 @@ export async function getProfessionalAuthority(id) {
   return rows[0] ?? null;
 }
 
-export async function createProfessionalAuthority(record) {
-  return insertRow("professional_authorities", PROFESSIONAL_AUTHORITIES_COLUMNS, record);
+export async function createProfessionalAuthority(record, client = null) {
+  return insertRow("professional_authorities", PROFESSIONAL_AUTHORITIES_COLUMNS, record, client);
 }
 
-export async function updateProfessionalAuthority(id, patch) {
-  return updateRowById("professional_authorities", PROFESSIONAL_AUTHORITIES_COLUMNS, id, patch);
+export async function updateProfessionalAuthority(id, patch, client = null) {
+  return updateRowById("professional_authorities", PROFESSIONAL_AUTHORITIES_COLUMNS, id, patch, client);
 }
 
 // --- service_packs ---

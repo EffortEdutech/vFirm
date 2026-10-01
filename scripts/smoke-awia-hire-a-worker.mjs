@@ -8,8 +8,9 @@ import { spawn } from "node:child_process";
 // firm's team, rather than only the whole-roster template flow. Verifies:
 // - hiring with no package assigned is rejected;
 // - once HireMe is assigned, hiring a worker succeeds and grows the team;
-// - a second hire of the same role auto-generates the next staff code
-//   (CFO-001, then CFO-002) rather than colliding;
+// - a second hire into an occupied role is refused (ADR-088 guardrail); after
+//   retiring the occupant, the re-hire gets the next staff code (CFO-001, then
+//   CFO-002) rather than colliding;
 // - hiring a role with no defined tool policy yet is rejected clearly;
 // - the hired worker can be activated and, once active, actually assigned a
 //   task and complete the full draft/review/client-delivery loop -- proving
@@ -97,7 +98,14 @@ try {
   if (hire1.team_size !== 1) throw new Error(`Expected team size 1 after first hire, got ${hire1.team_size}.`);
   if (hire1.member.display_name !== "Amira (CFO)") throw new Error("Hired worker did not record the business owner's chosen display name.");
 
-  // Hire a second CFO: must not collide with CFO-001.
+  // ADR-091 (2026-10-01): the ADR-088 occupied-position guardrail now really fires (it filtered
+  // members on a tenant_id field they never carry, so it was silently a no-op). A second CFO while
+  // CFO-001 is in post is refused; retiring CFO-001 frees the seat, and the re-hire still gets the
+  // next staff code (CFO-002) rather than colliding.
+  const rejectedDuplicate = await postExpectError("/awia/virtual-staff/hire-worker", { tenant_id: tenant.id, firm_id: firm.firm.id, role_code: "CFO" }, headers);
+  if (!String(rejectedDuplicate.error?.message ?? "").includes("position_already_occupied")) throw new Error(`Expected position_already_occupied, got ${JSON.stringify(rejectedDuplicate)}`);
+  await post("/awia/virtual-staff/lifecycle", { tenant_id: tenant.id, firm_id: firm.firm.id, staff_code: "CFO-001", to_state: "ACTIVE" }, headers);
+  await post("/awia/virtual-staff/lifecycle", { tenant_id: tenant.id, firm_id: firm.firm.id, staff_code: "CFO-001", to_state: "RETIRED" }, headers);
   const hire2 = await post("/awia/virtual-staff/hire-worker", { tenant_id: tenant.id, firm_id: firm.firm.id, role_code: "CFO" }, headers);
   if (hire2.staff_code !== "CFO-002") throw new Error(`Expected second CFO hire to be CFO-002, got ${hire2.staff_code}.`);
   if (hire2.team_size !== 2) throw new Error(`Expected team size 2 after second hire, got ${hire2.team_size}.`);

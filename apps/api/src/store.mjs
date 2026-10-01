@@ -5,7 +5,7 @@ import pg from "pg";
 import { validateFactoryBlueprintBundle } from "../../../packages/core-domain/src/factory-blueprints.mjs";
 import { evaluatePackBindingCertification } from "../../../packages/core-domain/src/pack-certification.mjs";
 import { awiaVirtualStaffPackageRegistry } from "../../../packages/core-domain/src/awia-virtual-staff-registry.mjs";
-import { provisionPilotVirtualStaff, validateVirtualStaffProvisioningRun } from "../../../packages/core-domain/src/awia-virtual-staff-provisioning.mjs";
+import { provisionPilotVirtualStaff, validateVirtualStaffProvisioningRun, staffLifecycleStates } from "../../../packages/core-domain/src/awia-virtual-staff-provisioning.mjs";
 import { createRuntimeActionRequest, evaluateVirtualStaffRuntimeAction } from "../../../packages/core-domain/src/awia-virtual-staff-authority-gate.mjs";
 import { resolveAwiaVirtualStaffPosition } from "../../../packages/core-domain/src/awia-virtual-staff-position-catalogue.mjs";
 import { resolveClassAApprovalRequirement, evaluateClassAApprovalGate } from "../../../packages/core-domain/src/awia-virtual-staff-class-a-approval-routing.mjs";
@@ -14,6 +14,49 @@ import { buildStaffMemoryEntry, buildConversationThread, buildConversationMessag
 import { evaluateSeatBillingTransition } from "../../../packages/core-domain/src/awia-virtual-staff-payroll.mjs";
 import { resolveAwiaStaffTemplate, listAwiaStaffTemplates } from "../../../packages/core-domain/src/awia-virtual-staff-templates.mjs";
 import { resolveAwiaFirmPackage, evaluateAwiaFirmPackageSeatGate, listAwiaFirmPackages } from "../../../packages/core-domain/src/awia-firm-package-catalogue.mjs";
+// ADR-090 W2: owner work requests (request-type menu + deterministic ARO-01 triage suggestion).
+import { resolveWorkRequestType, workerFitsRequestType, positionForTriageQueue } from "../../../packages/core-domain/src/awia-work-request-types.mjs";
+import { isRunnableSkill, sanitizeSkillFormInputs, sanitizeFileRoles } from "../../../packages/core-domain/src/awia-skill-runner.mjs";
+import { triageAdministrativeRequest } from "../../../packages/core-domain/src/awia-virtual-staff-aro01-request-triage.mjs";
+// HM-S7 Phase 4b (2026-09-28): first slice of the repositories/ layer wired into a real handler --
+// see createApproval()'s call sites below in approveProposalRecord/reviewDeliverableRecord.
+import { createApproval } from "./repositories/approvals.repo.mjs";
+// HM-S7 Phase 4c (2026-09-28): second proof-of-pattern slice -- Directory & Firm Setup's
+// tenant/firm-bootstrap path (createTenantRecord/createFirmRecord below).
+import { createTenant, createPerson, createActor, updateActor, createFirm, createFirmMembership, createProfessionalProfile, createProfessionalAuthority } from "./repositories/directory-firm-setup.repo.mjs";
+import { setTenantContext } from "./repositories/shared/db.mjs";
+// HM-S7 Phase 4c (2026-09-28): third proof-of-pattern slice -- Sales & Intake's client
+// bootstrap path (createClientRecord below). clients/firm_client_relationships were chosen
+// because buildClientFrontdoor() already returns fully-normalized objects (uuidOrNull/??
+// defaults already applied), unlike event_log/audit_events/policy_decisions (deferred --
+// see the Phase 4c doc note on why those three need more than the plain insertRow pattern).
+import { createClient, createFirmClientRelationship } from "./repositories/sales-intake.repo.mjs";
+// HM-S7 Phase 4c (2026-09-28): fourth proof-of-pattern slice -- Client Engagements &
+// Projects' acceptProposalRecord (engagements) and openProjectDeliveryRecord
+// (projects/work_packages/tasks) below. All four tables are written from a single
+// pre-normalized builder object (buildEngagement/buildDeliveryPackage) inside one existing
+// transaction, the same safe shape as every slice so far -- unlike this domain's other 5
+// tables (technical_skill_bindings, drawing_review_records, calculation_input_sets,
+// technical_qa_findings, delivery_package_records, pilot_handoff_records), which are written
+// by the bulk upsert-sync loop in withStore() and are out of scope for this slice.
+import { createEngagement, createProject, createWorkPackage, createTask } from "./repositories/client-engagements-projects.repo.mjs";
+// HM-S7 Phase 4c (2026-09-28): fifth proof-of-pattern slice -- Documents & Correspondence's
+// createDeliverableDraftRecord (documents/document_versions) and createEvidenceBundleRecord
+// (evidence_bundles) below, all built from pre-normalized builder objects
+// (buildDeliverableDraft/buildEvidenceBundle) inside one existing transaction each. This
+// domain's other 6 tables (document_register_entries, document_revision_records,
+// correspondence_records, administrative_deadlines, transmittal_drafts,
+// administration_skill_bindings) are written by the bulk upsert-sync loop in withStore() and
+// are out of scope for this slice, same as the excluded tables in the second and third
+// slices.
+import { createDocument, createDocumentVersion, createEvidenceBundle } from "./repositories/documents-correspondence.repo.mjs";
+import { createInvoice, createPaymentProviderConfig, createSubscriptionPackage, createCommercialLaunchControl, createBillingReadinessReview, createTenantUsageEvent } from "./repositories/finance-commercial.repo.mjs";
+import { createMarketplaceListing as repoCreateMarketplaceListing, createDirectoryReviewBoardDecision, createDirectoryPrivateEnquiry, createQualificationRenewalReview, createCapacityOffer, createNetworkProfessionalProfile, createNetworkFirmProfile, createNetworkCapability, createNetworkCredential, createNetworkTrustSignal, createNetworkConflictCheck, createNetworkQualificationGate, createSpecialistInvitation, createCollaborationWorkspace, createCollaborationWorkspaceParticipant, createCollaborationWorkspaceEvidence, createResponsibilityMatrix, createObservatorySnapshot as repoCreateObservatorySnapshot } from "./repositories/network-marketplace.repo.mjs";
+import { createPilotUser, createSupportCase, createPilotIncident, createPilotFeedback, createPilotAcceptanceReview, createPilotImprovementItem, createPilotReportPack, createStakeholderReviewBoard, createStakeholderReviewDecision, updateStakeholderReviewBoard, createPilotExpansionCohort, createTenantOnboardingPlan, createReleaseCandidateGate, createTenantPilotControl } from "./repositories/pilot-observatory.repo.mjs";
+import { createWorkerInstance, createTaskOutput, createToolInvocation } from "./repositories/my-team-hr.repo.mjs";
+import { createPolicyDecision } from "./repositories/audit-ledger-platform.repo.mjs";
+import { createLead, createIntakeSession, createProposal, createPriceBuildUp } from "./repositories/sales-intake.repo.mjs";
+import { createPaymentStatus, updateInvoice } from "./repositories/finance-commercial.repo.mjs";
 
 const { Pool } = pg;
 const root = process.cwd();
@@ -123,6 +166,11 @@ const initialStore = () => ({
   quotation_draft_packs: [],
   quotation_issue_records: [],
   quotation_receivable_preparations: [],
+  // ADR-089 W1 (B1, 2026-09-30): uploaded-file metadata (bytes live in Supabase Storage or on
+  // local disk -- see apps/api/src/file-storage.mjs). Own relational table, migration 0048.
+  file_objects: [],
+  // ADR-090 W2 (B2): owner work requests -- the firm's front door. Migration 0049.
+  work_requests: [],
   professional_authorities: [],
   actors: [],
   persons: [],
@@ -192,13 +240,16 @@ export function getStoreInfo() {
   };
 }
 
-async function loadStore() {
-  if (storeBackend === "postgres") return loadPostgresStore();
+async function loadStore(tenantId = null) {
+  // tenantId only ever does anything on the postgres backend (see loadPostgresStore's comment).
+  // The JSON backend is dev/test-only -- confirmed in the Phase 2 audit that production only ever
+  // runs postgres -- so there's no equivalent scoped-read path for it, and none is needed.
+  if (storeBackend === "postgres") return loadPostgresStore(tenantId);
   return loadJsonStore();
 }
 
-async function saveStore(store) {
-  if (storeBackend === "postgres") return savePostgresStore(store);
+async function saveStore(store, ledgerBaseline, recordBaseline) {
+  if (storeBackend === "postgres") return savePostgresStore(store, ledgerBaseline, recordBaseline);
   return saveJsonStore(store);
 }
 
@@ -216,57 +267,114 @@ async function saveJsonStore(store) {
   await writeFile(storePath, JSON.stringify(normalizeStore(store), null, 2), "utf8");
 }
 
-async function loadPostgresStore() {
+// HM-S7 Phase 4f, slice 2 (2026-09-29): loadPostgresStore() previously ran ~90+ unscoped
+// "select * from <table>" queries one after another on a single held connection -- every one of
+// them a full-table scan, in serial, with a full client<->server round trip paid before the next
+// query was even sent. That per-request cost (not the small amount of JSON left in app_state,
+// which turned out to be just 3 collections -- see the doc for the read-side audit) is the direct
+// cause of the app's reported slowness. None of these ~90+ selects depend on each other or share
+// a transaction (loadPostgresStore never wraps them in begin/commit, so there was never a
+// consistent-snapshot guarantee to preserve), so firing them concurrently across the connection
+// pool changes nothing about correctness -- only how long the wait takes. The one connection this
+// function still checks out directly is released as soon as the small app_state row is read,
+// before the concurrent relational reads start, so it doesn't sit idle holding a pool slot.
+// HM-S7 Phase 4f follow-on (2026-09-30): tenantId is optional and additive -- every existing
+// caller (loadStore(), withStore(), withAppState(), readStore(), all ~230 call sites) keeps
+// calling this with no argument and gets today's exact unscoped behavior, unchanged. A caller
+// that DOES pass a tenantId gets every relational table's read filtered to `where tenant_id =
+// $1` (the ~4 genuinely global catalog tables -- service_packs, service_skus, worker_templates
+// -- and `tenants` itself, which identifies a tenant rather than belonging to one, are never
+// filtered, by design). This is the mechanism only: readStore(tenantId) is now safe to call
+// directly wherever a handler genuinely just needs one tenant's data. Threading this into the
+// ~230 existing withStore/withAppState/readStore call sites (most of which mix reads with a
+// same-request mutation, so each needs its own per-handler audit before it's safe to scope) is
+// deliberately NOT done in this pass -- see the architecture review doc for why, and the planned
+// slice-by-slice approach for doing it, the same way Phase 4c/4d rolled out their own patterns.
+async function loadPostgresStore(tenantId = null) {
   const client = await getPool().connect();
+  let store;
   try {
     await ensureAppStateTable(client);
     const appStateResult = await client.query("select data from app_state where id = $1", ["mvp-store"]);
-    const store = appStateResult.rowCount === 0 ? initialStore() : normalizeStore(appStateResult.rows[0].data);
-    const relational = await readRelationalStore(client);
-    const awiaRelational = await readAwiaVirtualStaffRelational(client);
-    const firmFactoryRelational = await readFirmFactoryRelational(client);
-    const quotationAwiaRelational = await readQuotationAwiaRelational(client);
-    return { ...store, ...relational, ...awiaRelational, ...firmFactoryRelational, ...quotationAwiaRelational };
+    store = appStateResult.rowCount === 0 ? initialStore() : normalizeStore(appStateResult.rows[0].data);
   } finally {
     client.release();
   }
+  const [relational, awiaRelational, firmFactoryRelational, quotationAwiaRelational, workIntakeRelational] = await Promise.all([
+    readRelationalStore(tenantId),
+    readAwiaVirtualStaffRelational(tenantId),
+    readFirmFactoryRelational(tenantId),
+    readQuotationAwiaRelational(tenantId),
+    readWorkIntakeRelational(tenantId)
+  ]);
+  return { ...store, ...relational, ...awiaRelational, ...firmFactoryRelational, ...quotationAwiaRelational, ...workIntakeRelational };
 }
 
-async function savePostgresStore(store) {
+async function savePostgresStore(store, ledgerBaseline, recordBaseline) {
   const client = await getPool().connect();
   try {
     await ensureAppStateTable(client);
-    await persistLedgerFromStore(client, store);
-    await persistAwiaVirtualStaffFromStore(client, store);
-    await persistFirmFactoryFromStore(client, store);
-    await persistQuotationAwiaFromStore(client, store);
-    await persistFrontDeskFromStore(client, store);
-    await persistAdministrationFromStore(client, store);
-    await persistCommercialOperationsFromStore(client, store);
-    await persistTechnicalDeliveryFromStore(client, store);
+    // HM-S7 Phase 4a (2026-09-28): this sequence of 8 persist*FromStore calls plus the
+    // app_state upsert previously ran with no begin/commit -- a genuine partial-write gap
+    // (finding C.2 in the architecture review): if any call threw partway through, earlier
+    // calls in the sequence were already committed (Postgres autocommit) and later ones
+    // weren't, with no rollback. This affects every caller that reaches savePostgresStore,
+    // both the bulk withStore() mutator path (e.g. hireAwiaFirmWorkerRecord's full
+    // seat/member/role-assignment/package-binding/lifecycle-event/provisioning-run/
+    // evidence-pack/event-audit write set) and withAppState()'s post-transactional
+    // event/audit-append sweep. Wrapping the existing sequence in begin/commit/rollback is a
+    // zero-call-site-change fix: on success nothing observable changes; on failure, every
+    // table this function touches now rolls back together instead of leaving a partially
+    // written store.
+    await client.query("begin");
+    await persistLedgerFromStore(client, store, ledgerBaseline);
+    await persistAwiaVirtualStaffFromStore(client, store, recordBaseline);
+    await persistFirmFactoryFromStore(client, store, recordBaseline);
+    await persistQuotationAwiaFromStore(client, store, recordBaseline);
+    await persistWorkIntakeFromStore(client, store, recordBaseline);
+    await persistFrontDeskFromStore(client, store, recordBaseline);
+    await persistAdministrationFromStore(client, store, recordBaseline);
+    await persistCommercialOperationsFromStore(client, store, recordBaseline);
+    await persistTechnicalDeliveryFromStore(client, store, recordBaseline);
     await client.query(
       `insert into app_state (id, data, updated_at)
        values ($1, $2::jsonb, now())
        on conflict (id) do update set data = excluded.data, updated_at = now()`,
       ["mvp-store", JSON.stringify(stripRelationalCollections(normalizeStore(store)))]
     );
+    await client.query("commit");
+  } catch (error) {
+    await client.query("rollback");
+    throw error;
   } finally {
     client.release();
   }
 }
-async function persistLedgerFromStore(client, store) {
+async function persistLedgerFromStore(client, store, ledgerBaseline = {}) {
   await ensureSystemActor(client);
-  for (const decision of store.policy_decisions ?? []) await upsertPolicyDecision(client, decision);
-  for (const audit of store.audit_events ?? []) await upsertAuditEvent(client, audit);
-  for (const event of store.event_log ?? []) await upsertEventLog(client, event);
+  const decisions = store.policy_decisions ?? [];
+  for (const decision of decisions.slice(ledgerBaseline.policy_decisions ?? 0)) await upsertPolicyDecision(client, decision);
+  const audits = store.audit_events ?? [];
+  for (const audit of audits.slice(ledgerBaseline.audit_events ?? 0)) await upsertAuditEvent(client, audit);
+  const events = store.event_log ?? [];
+  for (const event of events.slice(ledgerBaseline.event_log ?? 0)) await upsertEventLog(client, event);
 }
 
-async function persistFrontDeskFromStore(client, store) {
-  for (const item of store.front_desk_enquiries ?? []) {
+// HM-S7 Phase 4f, slice 3 (2026-09-29): first of the 7 remaining persist*FromStore domains to get
+// the dedup treatment (see captureRecordBaseline's comment for why this is content-diff based,
+// not baseline-array-length like the ledger). Audit: front_desk_enquiries rows are created by
+// createFrontDeskEnquiryRecord (store.front_desk_enquiries.push(...)) and later mutated in place
+// by handOffQualifiedEnquiry (Object.assign(current, {status: "HANDED_OFF", ...})) -- exactly the
+// in-place-mutation case the ledger's technique can't handle, which changedRecords()'s
+// content-diff approach does handle correctly. client_communication_drafts rows are only ever
+// created (store.client_communication_drafts.push(...)), never mutated in place -- still safe to
+// include since changedRecords() treats create-only collections the same as append-only ones.
+async function persistFrontDeskFromStore(client, store, recordBaseline) {
+  for (const item of changedRecords(store, "front_desk_enquiries", recordBaseline)) {
     if (!uuidOrNull(item.id)) continue;
     await client.query(`insert into front_desk_enquiries (id, tenant_id, firm_id, source_channel, contact_name, organization_name, contact_email, contact_phone, enquiry_summary, requested_service_hint, urgency, status, qualification_reason, consent_or_legal_basis_ref, conflict_check_status, conflict_check_ref, assigned_actor_id, client_id, relationship_id, lead_id, intake_session_id, created_at, updated_at, metadata) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24::jsonb) on conflict (id) do update set status=excluded.status, qualification_reason=excluded.qualification_reason, consent_or_legal_basis_ref=excluded.consent_or_legal_basis_ref, conflict_check_status=excluded.conflict_check_status, conflict_check_ref=excluded.conflict_check_ref, client_id=excluded.client_id, relationship_id=excluded.relationship_id, lead_id=excluded.lead_id, intake_session_id=excluded.intake_session_id, updated_at=excluded.updated_at, metadata=excluded.metadata`, [item.id,item.tenant_id,item.firm_id,item.source_channel,item.contact_name,item.organization_name,item.contact_email,item.contact_phone,item.enquiry_summary,item.requested_service_hint,item.urgency,item.status,item.qualification_reason,item.consent_or_legal_basis_ref,item.conflict_check_status,item.conflict_check_ref,uuidOrNull(item.assigned_actor_id),uuidOrNull(item.client_id),uuidOrNull(item.relationship_id),uuidOrNull(item.lead_id),uuidOrNull(item.intake_session_id),item.created_at,item.updated_at,JSON.stringify(item.metadata ?? {})]);
   }
-  for (const item of store.client_communication_drafts ?? []) {
+  for (const item of changedRecords(store, "client_communication_drafts", recordBaseline)) {
     if (!uuidOrNull(item.id)) continue;
     await client.query(`insert into client_communication_drafts (id, tenant_id, firm_id, enquiry_id, channel, subject, body, status, requires_human_review, prepared_by_actor_id, approved_by_actor_id, sent_at, created_at, updated_at, metadata) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15::jsonb) on conflict (id) do update set subject=excluded.subject, body=excluded.body, status=excluded.status, approved_by_actor_id=excluded.approved_by_actor_id, updated_at=excluded.updated_at, metadata=excluded.metadata`, [item.id,item.tenant_id,item.firm_id,item.enquiry_id,item.channel,item.subject,item.body,item.status,true,uuidOrNull(item.prepared_by_actor_id),uuidOrNull(item.approved_by_actor_id),item.sent_at,item.created_at,item.updated_at,JSON.stringify(item.metadata ?? {})]);
   }
@@ -297,6 +405,630 @@ async function ensureSystemActor(client) {
 // conversation threads/messages, seat billing events, task-readiness/authority-decision records) use
 // genuinely random ids that are already backend-aware (storeBackend === "postgres" ? newUuid() : ...,
 // wired in above), so for those the surrogate key and the natural key are simply the same value.
+// Phase 5, slice 5a (2026-09-30): server-owned equivalent of apps/web-console/public/js/
+// pages-owner.js's classifyWorkdeskItem() + workdeskStatusLabel() (read directly from that
+// file, cases mirrored exactly). Purely additive: attached as `display_status` (bucket) and
+// `display_status_label` (raw label incl. Class A override) only on the GET /mvp/store
+// response (see server.mjs's /mvp/store handler) -- nothing here is persisted, and no
+// existing caller of readStore()/loadStore()/withStore()/withAppState() is touched or
+// affected. The frontend keeps using its own classifyWorkdeskItem() until slice 5b
+// explicitly cuts it over to read this field instead.
+// ADR-089 W1 (B1, 2026-09-30): uploaded file metadata. The bytes themselves are written by
+// apps/api/src/file-storage.mjs BEFORE this record is created (so a record never points at
+// missing bytes); this function only records the already-stored object and its SHA-256.
+export async function registerFileObjectRecord(body, actor) {
+  return withStore((store) => {
+    store.file_objects ??= [];
+    const timestamp = now();
+    const record = {
+      id: body.file_id,
+      tenant_id: body.tenant_id,
+      firm_id: body.firm_id,
+      filename: body.filename,
+      mime_type: body.mime_type,
+      size_bytes: body.size_bytes,
+      sha256: body.sha256,
+      storage_backend: body.storage_backend,
+      storage_key: body.storage_key,
+      classification: body.classification ?? "CLIENT_CONFIDENTIAL",
+      purpose: body.purpose ?? "WORK_INPUT",
+      linked_to: body.linked_to ?? null,
+      scan_status: "NOT_SCANNED",
+      status: "STORED",
+      uploaded_by_actor_id: actor.actor_id ?? actor.id ?? null,
+      created_at: timestamp,
+      updated_at: timestamp
+    };
+    store.file_objects.push(record);
+    appendEventAndAudit(store, { event_type: "file.uploaded", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "FileObject", aggregate_id: record.id, payload: { filename: record.filename, mime_type: record.mime_type, size_bytes: record.size_bytes, sha256: record.sha256, purpose: record.purpose, storage_backend: record.storage_backend }, summary: "File uploaded to firm storage." });
+    return record;
+  });
+}
+
+export async function recordFileDownloadRecord(body, actor) {
+  return withStore((store) => {
+    const record = (store.file_objects ?? []).find((item) => item.id === body.file_id && item.tenant_id === body.tenant_id && item.firm_id === body.firm_id);
+    if (!record) throwNotFound("file_objects", body.file_id);
+    appendEventAndAudit(store, { event_type: "file.downloaded", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "FileObject", aggregate_id: record.id, payload: { filename: record.filename, sha256: record.sha256 }, summary: "File downloaded from firm storage." });
+    return record;
+  });
+}
+
+// Resolves every "file:<id>" ref in `refs` against store.file_objects, requiring each to belong
+// to scope.tenant_id/scope.firm_id. Non-file refs are ignored (free-text evidence refs still work
+// exactly as before). Returns the matched file records.
+export function assertScopedFileRefs(store, refs, scope) {
+  const matched = [];
+  for (const ref of Array.isArray(refs) ? refs : []) {
+    if (typeof ref !== "string" || !ref.startsWith("file:")) continue;
+    const id = ref.slice("file:".length);
+    const record = (store.file_objects ?? []).find((item) => item.id === id);
+    if (!record || record.tenant_id !== scope.tenant_id || record.firm_id !== scope.firm_id) throwNotFound("file_objects", id);
+    matched.push(record);
+  }
+  return matched;
+}
+
+// ---------------------------------------------------------------------------------------------
+// ADR-090 W2 (B2, 2026-10-01): owner work requests -- the firm's front door.
+// A work request is the owner's brief (title, instructions, input files, optional client/project,
+// priority, due date, request type). It sits in the Workdesk Inbox until the owner assigns it
+// (or is assigned immediately -- decision D3). Assigning creates an ad-hoc task (no proposal or
+// project needed) and hands it to the EXISTING governed path, assignAwiaVirtualStaffTaskRecord,
+// so the authority gate, position/skill scope and Class A rules apply unchanged. Requests with no
+// client are INTERNAL firm work (decision D2) and can never be prepared for a client.
+// ---------------------------------------------------------------------------------------------
+const WORK_REQUEST_PRIORITIES = new Set(["LOW", "NORMAL", "HIGH"]);
+
+function scopedFind(store, collection, id, scope) {
+  return (store[collection] ?? []).find((record) => record.id === id && record.tenant_id === scope.tenant_id && record.firm_id === scope.firm_id);
+}
+
+// ---------------------------------------------------------------------------------------------
+// ADR-093 W4 (B6, 2026-10-01): one conversation thread per workdesk item -- the item's timeline
+// between the owner and the worker (assigned, needs info, owner replies/files, draft ready, review
+// decisions, filed). Uses the existing awia_staff_conversation_threads/messages collections and
+// their boundary checks (buildConversationThread/buildConversationMessage: participant roles,
+// classification, bounded length, no reasoning traces). Only ever called in a withStore() AFTER the
+// item itself was persisted (thread -> workdesk item FK on Postgres).
+// ---------------------------------------------------------------------------------------------
+const WITH_WORKER_STATUSES = new Set(["ASSIGNED", "REWORK", "NEEDS_INFO"]);
+
+// The status an item returns to once the owner answers a NEEDS_INFO question.
+function effectiveWorkdeskStatus(item) {
+  return item.workdesk_status === "NEEDS_INFO" ? (item.needs_info_return_status ?? "ASSIGNED") : item.workdesk_status;
+}
+
+function ensureItemThread(store, item, actor) {
+  store.awia_staff_conversation_threads ??= [];
+  let thread = store.awia_staff_conversation_threads.find((record) => record.workdesk_item_id === item.id && record.tenant_id === item.tenant_id && record.firm_id === item.firm_id);
+  if (thread) return thread;
+  thread = buildConversationThread({
+    thread_id: storeBackend === "postgres" ? newUuid() : newId("awia_staff_conversation_thread"),
+    tenant_id: item.tenant_id,
+    firm_id: item.firm_id,
+    staff_code: item.staff_code,
+    workdesk_item_id: item.id,
+    task_id: item.task_id ?? null,
+    opened_by_actor_id: actor?.actor_id ?? null,
+    created_at: now()
+  });
+  store.awia_staff_conversation_threads.push(thread);
+  item.thread_id = thread.id;
+  return thread;
+}
+
+function postItemThreadMessage(store, item, actor, { role, kind, content, file_ids = [] }) {
+  const thread = ensureItemThread(store, item, actor);
+  store.awia_staff_conversation_messages ??= [];
+  const built = buildConversationMessage({
+    message_id: storeBackend === "postgres" ? newUuid() : newId("awia_staff_conversation_message"),
+    thread_id: thread.id,
+    tenant_id: item.tenant_id,
+    firm_id: item.firm_id,
+    staff_code: item.staff_code,
+    participant_role: role,
+    classification: "INTERNAL_OPERATIONAL_CONTEXT",
+    content: String(content ?? "").slice(0, 4000),
+    authored_by_actor_id: actor?.actor_id ?? null,
+    created_at: now()
+  });
+  if (!built.accepted) invalidState(`Message rejected: ${built.findings.join(", ")}`);
+  const message = { ...built.message, kind, workdesk_item_id: item.id, file_ids };
+  store.awia_staff_conversation_messages.push(message);
+  return message;
+}
+
+// The owner answered a NEEDS_INFO question (reply, files or corrected inputs): back to the worker.
+function resumeFromNeedsInfo(item) {
+  if (item.workdesk_status !== "NEEDS_INFO") return false;
+  item.workdesk_status = item.needs_info_return_status ?? "ASSIGNED";
+  item.needs_info_return_status = null;
+  item.last_run_error = null;
+  item.updated_at = now();
+  return true;
+}
+
+// ADR-093 W4 (B7): files an approved output into the firm's document register when the work is
+// closed (marked sent, or internal work completed). One register entry per workdesk item; a later
+// filing of the same item adds a revision. Only real output files are filed (storage_ref
+// "file:<id>", content_hash = the file's SHA-256) -- no placeholders.
+function fileWorkdeskOutputToRegister(store, item, outputDraft, actor) {
+  if (!outputDraft?.output_file_id) return null;
+  const file = (store.file_objects ?? []).find((record) => record.id === outputDraft.output_file_id && record.tenant_id === item.tenant_id && record.firm_id === item.firm_id);
+  if (!file) return null;
+  store.document_register_entries ??= [];
+  store.document_revision_records ??= [];
+  const scope = { tenant_id: item.tenant_id, firm_id: item.firm_id };
+  const request = item.work_request_id ? scopedFind(store, "work_requests", item.work_request_id, scope) : null;
+  const project = item.project_id ? scopedFind(store, "projects", item.project_id, scope) : null;
+  const timestamp = now();
+  let entry = store.document_register_entries.find((record) => record.tenant_id === item.tenant_id && record.firm_id === item.firm_id && record.metadata?.workdesk_item_id === item.id);
+  let revisionLabel = "R1";
+  let previous = null;
+  if (!entry) {
+    const firmEntries = store.document_register_entries.filter((record) => record.tenant_id === item.tenant_id && record.firm_id === item.firm_id);
+    const base = request?.request_number ? `${request.request_number}-OUT` : `OUT-${String(firmEntries.length + 1).padStart(4, "0")}`;
+    let number = base;
+    for (let n = 2; firmEntries.some((record) => record.document_number === number); n += 1) number = `${base}-${n}`;
+    entry = { id: sf3Id("document_register"), tenant_id: item.tenant_id, firm_id: item.firm_id, relationship_id: project?.relationship_id ?? null, project_id: project?.id ?? null, document_number: number, title: outputDraft.output_title ?? file.filename, document_type: "WORK_OUTPUT", discipline: null, classification: file.classification ?? "CLIENT_CONFIDENTIAL", status: "ACTIVE", current_revision_id: null, owner_actor_id: actor?.actor_id ?? null, created_at: timestamp, updated_at: timestamp, metadata: { source: "workdesk", workdesk_item_id: item.id, work_request_id: item.work_request_id ?? null, staff_code: item.staff_code, risk_class: item.risk_class ?? null } };
+    store.document_register_entries.push(entry);
+  } else {
+    previous = store.document_revision_records.find((record) => record.id === entry.current_revision_id) ?? null;
+    if (previous?.metadata?.file_id === file.id) return entry; // already filed
+    const count = store.document_revision_records.filter((record) => record.document_register_entry_id === entry.id).length;
+    revisionLabel = `R${count + 1}`;
+    if (previous) previous.status = "SUPERSEDED";
+  }
+  const revision = { id: sf3Id("document_revision"), tenant_id: item.tenant_id, firm_id: item.firm_id, document_register_entry_id: entry.id, revision: revisionLabel, version_label: revisionLabel, storage_ref: `file:${file.id}`, content_hash: file.sha256, status: "CURRENT", supersedes_revision_id: previous?.id ?? null, created_by_actor_id: actor?.actor_id ?? null, created_at: timestamp, metadata: { file_id: file.id, filename: file.filename, output_draft_id: outputDraft.id, output_revision_number: outputDraft.revision_number ?? 1 } };
+  store.document_revision_records.push(revision);
+  entry.current_revision_id = revision.id;
+  entry.updated_at = timestamp;
+  item.filed_document_id = entry.id;
+  appendEventAndAudit(store, { event_type: "document.work_output_filed", actor, tenant_id: item.tenant_id, firm_id: item.firm_id, aggregate_type: "DocumentRegisterEntry", aggregate_id: entry.id, payload: { document_number: entry.document_number, revision: revisionLabel, workdesk_item_id: item.id, file_id: file.id, sha256: file.sha256 }, summary: "Approved work output filed in the document register." });
+  return entry;
+}
+
+export async function createWorkRequestRecord(body, actor) {
+  return withStore((store) => {
+    store.work_requests ??= [];
+    const { found, type } = resolveWorkRequestType(body.request_type_id);
+    if (!found) invalidState(`Unknown request type: ${body.request_type_id}`);
+    const title = String(body.title ?? "").trim();
+    if (!title) invalidState("A work request needs a title.");
+    const priority = String(body.priority ?? "NORMAL").toUpperCase();
+    if (!WORK_REQUEST_PRIORITIES.has(priority)) invalidState(`Unknown priority: ${body.priority}`);
+    // Client/project must belong to this firm; a project implies its own client.
+    let clientId = body.client_id ?? null;
+    let projectId = body.project_id ?? null;
+    if (projectId) {
+      const project = scopedFind(store, "projects", projectId, body);
+      if (!project) throwNotFound("projects", projectId);
+      const relationship = scopedFind(store, "firm_client_relationships", project.relationship_id, body);
+      const projectClientId = relationship?.client_id ?? null;
+      if (clientId && projectClientId && clientId !== projectClientId) invalidState("The selected project belongs to a different client.");
+      clientId = clientId ?? projectClientId;
+    }
+    if (clientId) {
+      const client = scopedFind(store, "clients", clientId, body);
+      const relationship = (store.firm_client_relationships ?? []).find((record) => record.client_id === clientId && record.tenant_id === body.tenant_id && record.firm_id === body.firm_id);
+      if (!client && !relationship) throwNotFound("clients", clientId);
+    }
+    // The authority gate scopes all non-INTERNAL work to a client AND a project (TASK_SCOPE_REQUIRED,
+    // unchanged by D2). Say so up front instead of failing later at assignment. Pre-sales work on a
+    // prospect (e.g. scoring a lead) is the firm's own work: leave the client empty.
+    if (clientId && !projectId) invalidState("Client work must be linked to one of the client's projects. For the firm's own work (including pre-sales on a prospect), leave the client empty.");
+    const fileIds = Array.isArray(body.file_ids) ? [...new Set(body.file_ids)] : [];
+    assertScopedFileRefs(store, fileIds.map((id) => `file:${id}`), body);
+    const references = (Array.isArray(body.references) ? body.references : []).map((ref) => String(ref).trim()).filter(Boolean).slice(0, 10);
+    // Deterministic ARO-01 triage over the brief -- a suggestion only, never an assignment.
+    const triage = triageAdministrativeRequest({ request_subject: title, request_body: body.instructions ?? "" });
+    const firmRequests = store.work_requests.filter((record) => record.tenant_id === body.tenant_id && record.firm_id === body.firm_id);
+    const timestamp = now();
+    const request = {
+      id: storeBackend === "postgres" ? newUuid() : newId("work_request"),
+      tenant_id: body.tenant_id,
+      firm_id: body.firm_id,
+      request_number: `WR-${String(firmRequests.length + 1).padStart(4, "0")}`,
+      title,
+      instructions: String(body.instructions ?? "").trim() || null,
+      request_type_id: type.id,
+      request_type_label: type.label,
+      position_id: type.position_id ?? null,
+      role_code: type.role_code,
+      tool: type.tool,
+      skill_id: type.skill_id ?? null,
+      class_a: type.class_a === true,
+      client_id: clientId,
+      project_id: projectId,
+      risk_class: clientId ? "CONTROLLED" : "INTERNAL",
+      priority,
+      due_at: body.due_at || null,
+      file_ids: fileIds,
+      // ADR-092 W3: the skill's own inputs (form fields + which file is which), sanitized against
+      // the runner's definitions -- unknown keys are dropped.
+      form_inputs: sanitizeSkillFormInputs(type.skill_id, body.form_inputs),
+      file_roles: sanitizeFileRoles(type.skill_id, body.file_roles, fileIds),
+      references,
+      triage_suggestion: { category: triage.category, priority: triage.priority, routed_to: triage.routed_to, suggested_position_id: positionForTriageQueue[triage.routed_to] ?? null, rationale: triage.rationale, boundary: triage.boundary },
+      status: "SUBMITTED",
+      task_id: null,
+      workdesk_item_id: null,
+      assigned_staff_code: null,
+      last_assignment_error: null,
+      created_by_actor_id: actor.actor_id ?? actor.id ?? null,
+      created_at: timestamp,
+      updated_at: timestamp
+    };
+    store.work_requests.push(request);
+    appendEventAndAudit(store, { event_type: "work_request.submitted", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "WorkRequest", aggregate_id: request.id, payload: { request_number: request.request_number, request_type_id: request.request_type_id, risk_class: request.risk_class, file_count: fileIds.length, priority }, summary: "Owner submitted a work request to the firm." });
+    return request;
+  });
+}
+
+// Checks the chosen worker can take this request, then makes sure the request has its ad-hoc task
+// (created once; a retried assignment after a refusal reuses it). Returns what the caller needs to
+// run the governed assignment.
+export async function prepareWorkRequestAssignment(body) {
+  const store = await loadStore();
+  const request = scopedFind(store, "work_requests", body.work_request_id, body);
+  if (!request) throwNotFound("work_requests", body.work_request_id);
+  if (request.status !== "SUBMITTED") invalidState(`Only a SUBMITTED work request can be assigned (this one is ${request.status}).`);
+  const member = (store.awia_virtual_staff_members ?? []).find((record) => record.organization_id === body.tenant_id && record.firm_id === body.firm_id && record.agent_code === body.staff_code);
+  if (!member) throwNotFound("awia_virtual_staff_members", body.staff_code);
+  if (member.lifecycle_status !== "ACTIVE") invalidState(`${member.display_name ?? body.staff_code} is ${member.lifecycle_status}, not ACTIVE.`);
+  const role = (store.awia_staff_role_assignments ?? []).find((record) => record.staff_code === body.staff_code && (record.firm_id ?? body.firm_id) === body.firm_id);
+  const { type } = resolveWorkRequestType(request.request_type_id);
+  if (!workerFitsRequestType(member, role, type)) invalidState(`${member.display_name ?? body.staff_code} cannot take "${type.label}" requests -- choose a worker in that position.`);
+  let taskId = request.task_id;
+  if (!taskId || !(store.tasks ?? []).some((task) => task.id === taskId)) {
+    const task = {
+      id: storeBackend === "postgres" ? newUuid() : newId("task"),
+      tenant_id: body.tenant_id,
+      firm_id: body.firm_id,
+      project_id: request.project_id ?? null,
+      work_package_id: null,
+      task_type: request.request_type_id,
+      input_ref: `work-request:${request.id}`,
+      output_ref: null,
+      assigned_actor_or_worker_ref: null,
+      state: "CREATED",
+      risk_class: request.risk_class,
+      due_at: request.due_at ?? null,
+      created_at: now(),
+      updated_at: now()
+    };
+    if (storeBackend === "postgres") {
+      const clientConn = await getPool().connect();
+      try {
+        await clientConn.query("begin");
+        await setTenantContext(clientConn, body.tenant_id);
+        await createTask(task, clientConn);
+        await clientConn.query("commit");
+      } catch (error) {
+        await clientConn.query("rollback");
+        throw error;
+      } finally {
+        clientConn.release();
+      }
+      await withStore((next) => {
+        const wr = scopedFind(next, "work_requests", request.id, body);
+        if (wr) { wr.task_id = task.id; wr.updated_at = now(); }
+        return wr;
+      });
+    } else {
+      await withStore((next) => {
+        next.tasks.push(task);
+        const wr = scopedFind(next, "work_requests", request.id, body);
+        if (wr) { wr.task_id = task.id; wr.updated_at = now(); }
+        return wr;
+      });
+    }
+    taskId = task.id;
+  }
+  // Skill scope needs the worker's position; a pre-position worker runs without it.
+  const skillId = member.position_id && request.skill_id ? request.skill_id : undefined;
+  return {
+    request,
+    assignment: {
+      tenant_id: body.tenant_id,
+      firm_id: body.firm_id,
+      staff_code: body.staff_code,
+      task_id: taskId,
+      tool: request.tool,
+      action: request.tool,
+      skill_id: skillId,
+      client_id: request.client_id ?? null,
+      project_id: request.project_id ?? null,
+      risk_class: request.risk_class,
+      evidence_refs: [...request.file_ids.map((id) => `file:${id}`), ...request.references, `work-request:${request.id}`],
+      assignment_summary: request.title,
+      instructions: request.instructions,
+      due_at: request.due_at,
+      work_request_id: request.id
+    }
+  };
+}
+
+export async function recordWorkRequestAssignmentRecord(body, actor, outcome) {
+  return withStore((store) => {
+    const request = scopedFind(store, "work_requests", body.work_request_id, body);
+    if (!request) throwNotFound("work_requests", body.work_request_id);
+    if (outcome.error) {
+      request.last_assignment_error = outcome.error;
+      request.updated_at = now();
+      appendEventAndAudit(store, { event_type: "work_request.assignment_refused", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "WorkRequest", aggregate_id: request.id, payload: { staff_code: body.staff_code, error: outcome.error }, summary: "Work request assignment refused by the governed path; request stays in the Inbox." });
+      return request;
+    }
+    request.status = "ASSIGNED";
+    request.assigned_staff_code = body.staff_code;
+    request.workdesk_item_id = outcome.workdesk_item_id;
+    request.assigned_by_actor_id = actor.actor_id ?? actor.id ?? null;
+    request.assigned_at = now();
+    request.last_assignment_error = null;
+    request.updated_at = now();
+    // ADR-093 W4 (B6): the item's thread starts with the hand-over.
+    const assignedItem = scopedFind(store, "awia_staff_workdesk_items", outcome.workdesk_item_id, body);
+    if (assignedItem) {
+      const fileCount = (request.file_ids ?? []).length;
+      postItemThreadMessage(store, assignedItem, actor, { role: "VIRTUAL_STAFF", kind: "ASSIGNED", content: `Received ${request.request_number}: "${request.title}" with ${fileCount} input file${fileCount === 1 ? "" : "s"}.${isRunnableSkill(request.skill_id) ? " I can work this out from the inputs as soon as you press the button." : " I can't produce this kind of work automatically yet: attach the finished file when it's done."}` });
+    }
+    appendEventAndAudit(store, { event_type: "work_request.assigned", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "WorkRequest", aggregate_id: request.id, payload: { staff_code: body.staff_code, workdesk_item_id: outcome.workdesk_item_id, task_id: request.task_id }, summary: "Work request assigned to a team member." });
+    return request;
+  });
+}
+
+export async function cancelWorkRequestRecord(body, actor) {
+  return withStore((store) => {
+    const request = scopedFind(store, "work_requests", body.work_request_id, body);
+    if (!request) throwNotFound("work_requests", body.work_request_id);
+    if (request.status !== "SUBMITTED") invalidState("Only a work request still in the Inbox can be cancelled.");
+    request.status = "CANCELLED";
+    request.cancelled_reason = String(body.reason ?? "").trim() || "cancelled_by_owner";
+    request.cancelled_by_actor_id = actor.actor_id ?? actor.id ?? null;
+    request.cancelled_at = now();
+    request.updated_at = now();
+    appendEventAndAudit(store, { event_type: "work_request.cancelled", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "WorkRequest", aggregate_id: request.id, payload: { reason: request.cancelled_reason }, summary: "Owner cancelled a work request." });
+    return request;
+  });
+}
+
+// Adds input files to a request. If it has already been assigned and the worker has not produced
+// a draft yet (ASSIGNED / REWORK), the files are also added to the workdesk item's evidence.
+export async function addWorkRequestFilesRecord(body, actor) {
+  return withStore((store) => {
+    const request = scopedFind(store, "work_requests", body.work_request_id, body);
+    if (!request) throwNotFound("work_requests", body.work_request_id);
+    if (request.status === "CANCELLED") invalidState("Cannot add files to a cancelled work request.");
+    const fileIds = Array.isArray(body.file_ids) ? body.file_ids : [];
+    if (!fileIds.length) invalidState("No files to add.");
+    assertScopedFileRefs(store, fileIds.map((id) => `file:${id}`), body);
+    const item = request.workdesk_item_id ? scopedFind(store, "awia_staff_workdesk_items", request.workdesk_item_id, body) : null;
+    if (item && !WITH_WORKER_STATUSES.has(item.workdesk_status)) invalidState("Files can only be added before the worker's draft is in review.");
+    request.file_ids = [...new Set([...(request.file_ids ?? []), ...fileIds])];
+    // ADR-092 W3: optional slot for the added files (e.g. a corrected bank statement replaces the
+    // one in the "bank_statement" slot -- the newest file in a slot is the one the skill reads).
+    const roleMap = body.file_role ? Object.fromEntries(fileIds.map((id) => [id, body.file_role])) : (body.file_roles ?? {});
+    const addedRoles = sanitizeFileRoles(request.skill_id, roleMap, fileIds);
+    if (Object.keys(addedRoles).length) {
+      const replacedRoles = new Set(Object.values(addedRoles));
+      request.file_roles = { ...Object.fromEntries(Object.entries(request.file_roles ?? {}).filter(([, role]) => !replacedRoles.has(role))), ...addedRoles };
+    }
+    request.updated_at = now();
+    if (item) {
+      item.evidence_refs = [...new Set([...(item.evidence_refs ?? []), ...fileIds.map((id) => `file:${id}`)])];
+      item.updated_at = now();
+      // ADR-093 W4: adding files answers a "needs info" question and shows on the item's timeline.
+      resumeFromNeedsInfo(item);
+      const names = fileIds.map((id) => (store.file_objects ?? []).find((f) => f.id === id)?.filename).filter(Boolean);
+      postItemThreadMessage(store, item, actor, { role: "HUMAN_SUPERVISOR", kind: "FILES_ADDED", content: `Added ${names.length} file${names.length === 1 ? "" : "s"}: ${names.join(", ")}.`, file_ids: fileIds });
+    }
+    appendEventAndAudit(store, { event_type: "work_request.files_added", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "WorkRequest", aggregate_id: request.id, payload: { file_ids: fileIds, workdesk_item_id: item?.id ?? null }, summary: "Owner added input files to a work request." });
+    return { work_request: request, workdesk_item: item ?? null };
+  });
+}
+
+// ADR-092 W3: the owner corrects the skill's form inputs (e.g. after "Fill in: start date"). Allowed
+// while the request is in the Inbox or the worker has not produced a draft yet (ASSIGNED / REWORK).
+export async function updateWorkRequestInputsRecord(body, actor) {
+  return withStore((store) => {
+    const request = scopedFind(store, "work_requests", body.work_request_id, body);
+    if (!request) throwNotFound("work_requests", body.work_request_id);
+    if (request.status === "CANCELLED") invalidState("Cannot change a cancelled work request.");
+    const item = request.workdesk_item_id ? scopedFind(store, "awia_staff_workdesk_items", request.workdesk_item_id, body) : null;
+    if (item && !WITH_WORKER_STATUSES.has(item.workdesk_status)) invalidState("Inputs can only be changed before the worker's draft is in review.");
+    request.form_inputs = sanitizeSkillFormInputs(request.skill_id, body.form_inputs);
+    if (body.file_roles) request.file_roles = sanitizeFileRoles(request.skill_id, body.file_roles, request.file_ids ?? []);
+    request.updated_at = now();
+    if (item) {
+      resumeFromNeedsInfo(item);
+      postItemThreadMessage(store, item, actor, { role: "HUMAN_SUPERVISOR", kind: "INPUTS_UPDATED", content: "Updated the request's inputs." });
+    }
+    appendEventAndAudit(store, { event_type: "work_request.inputs_updated", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "WorkRequest", aggregate_id: request.id, payload: { fields: Object.keys(request.form_inputs), workdesk_item_id: item?.id ?? null }, summary: "Owner updated a work request's inputs." });
+    return request;
+  });
+}
+
+// ADR-092 W3 (B4): read-only preparation for a skill run (the API then fetches the file bytes from
+// storage and calls runSkill()). Checks the item can still produce a draft, the worker is active,
+// the request type has a deterministic module, and every input file belongs to this tenant/firm.
+export async function prepareAwiaSkillRunRecord(body) {
+  const store = await loadStore();
+  const item = scopedFind(store, "awia_staff_workdesk_items", body.workdesk_item_id, body);
+  if (!item) throwNotFound("awia_staff_workdesk_items", body.workdesk_item_id);
+  if (!WITH_WORKER_STATUSES.has(item.workdesk_status)) invalidState("The worker can only run this while it is with them (Pending).");
+  const member = (store.awia_virtual_staff_members ?? []).find((record) => record.id === item.staff_member_id && record.lifecycle_status === "ACTIVE");
+  if (!member) invalidState(`${item.staff_code} is not ACTIVE -- reactivate them in My Team first.`);
+  const request = item.work_request_id ? scopedFind(store, "work_requests", item.work_request_id, body) : null;
+  if (!request) invalidState("Only work given through a request can be run automatically; attach the finished output file instead.");
+  if (!isRunnableSkill(request.skill_id)) invalidState(`"${request.request_type_label}" cannot be run automatically yet -- attach the finished output file instead.`);
+  const files = assertScopedFileRefs(store, (request.file_ids ?? []).map((id) => `file:${id}`), body);
+  return { item, request, member, files, skill_id: request.skill_id };
+}
+
+// ADR-092 W3: records why a run could not start (missing inputs) on the item, so the Workdesk shows
+// it; the item stays Pending.
+export async function recordAwiaSkillRunIssueRecord(body, actor, message) {
+  return withStore((store) => {
+    const item = scopedFind(store, "awia_staff_workdesk_items", body.workdesk_item_id, body);
+    if (!item) return null;
+    item.last_run_error = message;
+    // ADR-093 W4 (B6): the worker is now waiting on the owner -- NEEDS_INFO (Inbox), remembering
+    // where to return once answered (ASSIGNED, or REWORK during a revision).
+    if (item.workdesk_status !== "NEEDS_INFO") {
+      item.needs_info_return_status = item.workdesk_status;
+      item.workdesk_status = "NEEDS_INFO";
+    }
+    item.updated_at = now();
+    postItemThreadMessage(store, item, actor, { role: "VIRTUAL_STAFF", kind: "NEEDS_INFO", content: `I need more from you before I can do this. ${message}` });
+    appendEventAndAudit(store, { event_type: "awia.virtual_staff.skill_run_needs_input", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaStaffWorkdeskItem", aggregate_id: item.id, payload: { skill_id: item.skill_id ?? null, message }, summary: "Skill run needs more input from the owner." });
+    return item;
+  });
+}
+
+// Files approved INTERNAL work (decision D2): REVIEWED_FOR_CLIENT_DRAFT -> ARCHIVED_COMPLETED.
+// Requires the same human approval as client work; only the client-delivery step is replaced.
+export async function completeAwiaInternalWorkdeskItemRecord(body, actor) {
+  return withStore((store) => {
+    const item = scopedFind(store, "awia_staff_workdesk_items", body.workdesk_item_id, body);
+    if (!item) throwNotFound("awia_staff_workdesk_items", body.workdesk_item_id);
+    if (item.risk_class !== "INTERNAL") invalidState("Only INTERNAL firm work can be completed without client delivery.");
+    if (item.workdesk_status !== "REVIEWED_FOR_CLIENT_DRAFT") invalidState("Internal work must be approved by you before it can be completed.");
+    item.workdesk_status = "ARCHIVED_COMPLETED";
+    item.archived_at = now();
+    item.archived_by_actor_id = actor.actor_id;
+    item.archived_reason = "internal_work_completed";
+    item.updated_at = now();
+    const task = store.tasks.find((record) => record.id === item.task_id);
+    if (task) { task.state = "COMPLETED"; task.updated_at = now(); }
+    // ADR-093 W4 (B7): file the approved output in the document register.
+    const filed = fileWorkdeskOutputToRegister(store, item, store.awia_staff_output_drafts.find((record) => record.id === item.output_draft_id), actor);
+    if (item.work_request_id) postItemThreadMessage(store, item, actor, { role: "HUMAN_SUPERVISOR", kind: "CLOSED", content: `Marked complete.${filed ? ` Filed in Documents as ${filed.document_number}.` : ""}` });
+    appendEventAndAudit(store, { event_type: "awia.virtual_staff.internal_work_completed", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaStaffWorkdeskItem", aggregate_id: item.id, payload: { output_draft_id: item.output_draft_id, work_request_id: item.work_request_id ?? null }, summary: "Owner filed approved internal work as complete." });
+    return { workdesk_item: item, filed_document: filed };
+  });
+}
+
+// ADR-093 W4 (B6): the owner writes on an item's thread -- a note, an answer to the worker's
+// question, optionally with files (added to the request and the item's evidence while the work is
+// still with the worker). Answering a NEEDS_INFO item sends it back to the worker.
+export async function postWorkdeskItemMessageRecord(body, actor) {
+  return withStore((store) => {
+    const item = scopedFind(store, "awia_staff_workdesk_items", body.workdesk_item_id, body);
+    if (!item) throwNotFound("awia_staff_workdesk_items", body.workdesk_item_id);
+    const content = String(body.content ?? "").trim();
+    const fileIds = Array.isArray(body.file_ids) ? [...new Set(body.file_ids)] : [];
+    if (!content && !fileIds.length) invalidState("Write a message or attach a file.");
+    if (fileIds.length) {
+      if (!WITH_WORKER_STATUSES.has(item.workdesk_status)) invalidState("Files can only be added while the work is with the worker.");
+      assertScopedFileRefs(store, fileIds.map((id) => `file:${id}`), body);
+      item.evidence_refs = [...new Set([...(item.evidence_refs ?? []), ...fileIds.map((id) => `file:${id}`)])];
+      const request = item.work_request_id ? scopedFind(store, "work_requests", item.work_request_id, body) : null;
+      if (request) { request.file_ids = [...new Set([...(request.file_ids ?? []), ...fileIds])]; request.updated_at = now(); }
+    }
+    const resumed = resumeFromNeedsInfo(item);
+    item.updated_at = now();
+    const message = postItemThreadMessage(store, item, actor, { role: "HUMAN_SUPERVISOR", kind: resumed ? "ANSWER" : "NOTE", content: content || `Attached ${fileIds.length} file${fileIds.length === 1 ? "" : "s"}.`, file_ids: fileIds });
+    appendEventAndAudit(store, { event_type: "awia.virtual_staff.workdesk_item_message_posted", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaStaffWorkdeskItem", aggregate_id: item.id, payload: { message_id: message.id, file_count: fileIds.length, resumed_from_needs_info: resumed }, summary: resumed ? "Owner answered the worker's question; work is back with the worker." : "Owner posted a note on a workdesk item." });
+    return { message, workdesk_item: item };
+  });
+}
+
+// ADR-093 W4 (F3): the owner files a document straight into the firm's register from an uploaded
+// file (storage_ref "file:<id>", content_hash = its SHA-256 -- no hand-typed hashes). Numbered
+// DOC-0001... unless the owner gives a number; optional project (its client follows).
+export async function registerFileDocumentRecord(body, actor) {
+  return withStore((store) => {
+    store.document_register_entries ??= [];
+    store.document_revision_records ??= [];
+    if (!body.file_id) invalidState("Choose a file to register.");
+    const [file] = assertScopedFileRefs(store, [`file:${body.file_id}`], body);
+    const title = String(body.title ?? "").trim() || file.filename;
+    const project = body.project_id ? scopedFind(store, "projects", body.project_id, body) : null;
+    if (body.project_id && !project) throwNotFound("projects", body.project_id);
+    const firmEntries = store.document_register_entries.filter((record) => record.tenant_id === body.tenant_id && record.firm_id === body.firm_id);
+    let number = String(body.document_number ?? "").trim().slice(0, 60);
+    if (number) {
+      if (firmEntries.some((record) => record.document_number === number)) invalidState(`Document number ${number} already exists in this firm.`);
+    } else {
+      let n = firmEntries.filter((record) => /^DOC-\d+$/.test(record.document_number)).length + 1;
+      do { number = `DOC-${String(n).padStart(4, "0")}`; n += 1; } while (firmEntries.some((record) => record.document_number === number));
+    }
+    const timestamp = now();
+    const documentType = String(body.document_type ?? "GENERAL").toUpperCase().replace(/[^A-Z_]/g, "_").slice(0, 40) || "GENERAL";
+    const entry = { id: sf3Id("document_register"), tenant_id: body.tenant_id, firm_id: body.firm_id, relationship_id: project?.relationship_id ?? null, project_id: project?.id ?? null, document_number: number, title: title.slice(0, 200), document_type: documentType, discipline: null, classification: file.classification ?? "CLIENT_CONFIDENTIAL", status: "ACTIVE", current_revision_id: null, owner_actor_id: actor.actor_id ?? null, created_at: timestamp, updated_at: timestamp, metadata: { source: "owner_upload" } };
+    const revision = { id: sf3Id("document_revision"), tenant_id: body.tenant_id, firm_id: body.firm_id, document_register_entry_id: entry.id, revision: "R1", version_label: "R1", storage_ref: `file:${file.id}`, content_hash: file.sha256, status: "CURRENT", supersedes_revision_id: null, created_by_actor_id: actor.actor_id ?? null, created_at: timestamp, metadata: { file_id: file.id, filename: file.filename, note: String(body.note ?? "").trim().slice(0, 500) || null } };
+    entry.current_revision_id = revision.id;
+    store.document_register_entries.push(entry);
+    store.document_revision_records.push(revision);
+    appendEventAndAudit(store, { event_type: "administration.document_registered", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "DocumentRegisterEntry", aggregate_id: entry.id, payload: { document_number: entry.document_number, revision: "R1", file_id: file.id, sha256: file.sha256 }, summary: "Document registered from an uploaded file." });
+    return { document: entry, revision };
+  });
+}
+
+export async function reviseFileDocumentRecord(body, actor) {
+  return withStore((store) => {
+    const entry = scopedFind(store, "document_register_entries", body.document_register_entry_id, body);
+    if (!entry) throwNotFound("document_register_entries", body.document_register_entry_id);
+    if (!body.file_id) invalidState("Choose a file for the new revision.");
+    const [file] = assertScopedFileRefs(store, [`file:${body.file_id}`], body);
+    const revisions = (store.document_revision_records ?? []).filter((record) => record.document_register_entry_id === entry.id);
+    const previous = revisions.find((record) => record.id === entry.current_revision_id) ?? null;
+    if (previous?.content_hash === file.sha256) invalidState("This file is identical to the current revision.");
+    let n = revisions.length + 1;
+    while (revisions.some((record) => record.revision === `R${n}`)) n += 1;
+    const label = `R${n}`;
+    if (previous) previous.status = "SUPERSEDED";
+    const timestamp = now();
+    const revision = { id: sf3Id("document_revision"), tenant_id: body.tenant_id, firm_id: body.firm_id, document_register_entry_id: entry.id, revision: label, version_label: label, storage_ref: `file:${file.id}`, content_hash: file.sha256, status: "CURRENT", supersedes_revision_id: previous?.id ?? null, created_by_actor_id: actor.actor_id ?? null, created_at: timestamp, metadata: { file_id: file.id, filename: file.filename, note: String(body.note ?? "").trim().slice(0, 500) || null } };
+    store.document_revision_records.push(revision);
+    entry.current_revision_id = revision.id;
+    entry.updated_at = timestamp;
+    appendEventAndAudit(store, { event_type: "administration.document_revision_registered", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "DocumentRegisterEntry", aggregate_id: entry.id, payload: { revision_id: revision.id, revision: label, supersedes_revision_id: previous?.id ?? null, sha256: file.sha256 }, summary: "New document revision registered from an uploaded file; prior revision superseded." });
+    return { document: entry, revision, previous_revision: previous };
+  });
+}
+
+export function computeWorkdeskItemStatus(item, drafts = [], deliveries = []) {
+  if (item.workdesk_status !== undefined) {
+    switch (item.workdesk_status) {
+      case "ASSIGNED": return "pending";
+      // ADR-089 W1 (B3): owner requested a revision -- back with the worker.
+      case "REWORK": return "pending";
+      // ADR-093 W4 (B6): the worker is waiting on the owner -- shown in the Inbox.
+      case "NEEDS_INFO": return "inbox";
+      case "OUTPUT_DRAFTED": return "approval";
+      case "REVIEW_ACTION_REQUIRED": return "approval";
+      case "REVIEWED_FOR_CLIENT_DRAFT": return "outbox";
+      case "CLIENT_DELIVERY_DRAFT_PREPARED": return "outbox";
+      case "ARCHIVED_SENT": return "archived";
+      case "ARCHIVED_DISMISSED": return "archived";
+      // ADR-090 W2: approved INTERNAL work, filed by the owner (never sent to a client).
+      case "ARCHIVED_COMPLETED": return "archived";
+      default: return "inbox";
+    }
+  }
+  const draft = drafts.find((d) => d.workdesk_item_id === item.id || d.task_id === item.id);
+  const delivery = deliveries.find((d) => d.workdesk_item_id === item.id || d.task_id === item.id);
+  if (item.archived || item.status === "archived") return "archived";
+  if (delivery) return delivery.status === "sent" ? "archived" : "outbox";
+  if (draft) {
+    if (draft.status === "stuck" || draft.status === "rejected") return "approval";
+    if (draft.status === "awaiting_review" || draft.status === "pending_review") return "approval";
+    return "pending";
+  }
+  if (item.status === "assigned" || item.assignee_id) return "pending";
+  return "inbox";
+}
+
+export function computeWorkdeskItemStatusLabel(item, drafts = []) {
+  const draft = drafts.find((d) => d.workdesk_item_id === item.id);
+  if (draft?.class_a_approval_required && draft.class_a_approval_status === "PENDING") {
+    return "CLASS_A_APPROVAL_PENDING";
+  }
+  return item.workdesk_status ?? "unknown";
+}
+
 const AWIA_RELATIONAL_TABLES = [
   "awia_virtual_staff_provisioning_runs",
   "awia_virtual_staff_seats",
@@ -317,32 +1049,52 @@ const AWIA_RELATIONAL_TABLES = [
   "awia_staff_seat_billing_events"
 ];
 
-async function persistAwiaVirtualStaffFromStore(client, store) {
+// HM-S7 Phase 4f, slice 4 (2026-09-29): see RECORD_DEDUP_COLLECTIONS's comment for the audit of
+// all 17 tables here. changedRecords() replaces the raw store[collection] loop so only rows that
+// actually changed since load get upserted.
+async function persistAwiaVirtualStaffFromStore(client, store, recordBaseline) {
   for (const collection of AWIA_RELATIONAL_TABLES) {
-    for (const record of store[collection] ?? []) {
+    for (const record of changedRecords(store, collection, recordBaseline)) {
       const naturalKey = record?.id;
       const tenantIdRaw = record?.tenant_id ?? record?.organization_id;
       const firmIdRaw = record?.firm_id;
       const tenantId = uuidOrNull(tenantIdRaw);
       const firmId = uuidOrNull(firmIdRaw);
       if (!naturalKey || !tenantId || !firmId) continue;
-      const pgId = uuidOrNull(naturalKey) ?? deterministicUuid(naturalKey);
+      // Hiring-bug fix (2026-10-01, ADR-091): the surrogate id used to be deterministicUuid(naturalKey)
+      // for every non-uuid natural key, so seat-cfo-001 (etc.) got the SAME primary key in every firm
+      // and "on conflict (id)" silently overwrote the first firm's row with the second firm's record
+      // (or, for seats, broke fk_awia_virtual_staff_members_seat and failed the hire). New rows now
+      // get a firm-scoped surrogate unless the natural key already embeds the firm id (members,
+      // provisioning runs -- their ids are unchanged), and the upsert targets the existing unique
+      // index (tenant_id, firm_id, natural_key), so rows already stored under the old formula are
+      // still matched and updated in place -- no data migration needed.
+      const naturalKeyText = String(naturalKey);
+      const pgId = uuidOrNull(naturalKey) ?? deterministicUuid(naturalKeyText.includes(String(firmIdRaw)) ? naturalKeyText : `${firmIdRaw}:${naturalKeyText}`);
       await client.query(
         `insert into ${collection} (id, natural_key, tenant_id, firm_id, record, created_at, updated_at)
          values ($1, $2, $3, $4, $5::jsonb, coalesce($6, now()), now())
-         on conflict (id) do update set record = excluded.record, updated_at = now()`,
-        [pgId, String(naturalKey), tenantId, firmId, JSON.stringify(record), record?.created_at ?? null]
+         on conflict (tenant_id, firm_id, natural_key) do update set record = excluded.record, updated_at = now()`,
+        [pgId, naturalKeyText, tenantId, firmId, JSON.stringify(record), record?.created_at ?? null]
       );
     }
   }
 }
 
-async function readAwiaVirtualStaffRelational(client) {
+// HM-S7 Phase 4f, slice 2 (2026-09-29): was a sequential loop of 17 awaited queries on one
+// connection -- now fires all 17 concurrently via the pool (see loadPostgresStore's comment for
+// the full rationale) and waits for them together.
+async function readAwiaVirtualStaffRelational(tenantId = null) {
+  const pool = getPool();
+  const tenantWhere = tenantId ? " where tenant_id = $1" : "";
+  const tenantParams = tenantId ? [tenantId] : [];
+  const results = await Promise.all(
+    AWIA_RELATIONAL_TABLES.map((collection) => pool.query(`select record from ${collection}${tenantWhere} order by created_at, id`, tenantParams))
+  );
   const result = {};
-  for (const collection of AWIA_RELATIONAL_TABLES) {
-    const { rows } = await client.query(`select record from ${collection} order by created_at, id`);
-    result[collection] = rows.map((row) => row.record);
-  }
+  AWIA_RELATIONAL_TABLES.forEach((collection, i) => {
+    result[collection] = results[i].rows.map((row) => row.record);
+  });
   return result;
 }
 
@@ -361,13 +1113,17 @@ const FIRM_FACTORY_RELATIONAL_TABLES = [
   "service_activation_records"
 ];
 
-async function persistFirmFactoryFromStore(client, store) {
+async function persistFirmFactoryFromStore(client, store, recordBaseline) {
   for (const collection of FIRM_FACTORY_RELATIONAL_TABLES) {
-    for (const record of store[collection] ?? []) {
+    for (const record of changedRecords(store, collection, recordBaseline)) {
       const naturalKey = record?.id;
       const tenantId = uuidOrNull(record?.tenant_id);
       const firmId = uuidOrNull(record?.firm_id);
-      if (!naturalKey || !tenantId || !firmId) continue;
+      // slice 5 (2026-09-29): factory_firm_blueprints legitimately has firm_id === null before
+      // provisioning (see migration 0047) -- the other 6 collections always have a real firm_id
+      // by the time they're created, so they keep requiring one.
+      const firmIdRequired = collection !== "factory_firm_blueprints";
+      if (!naturalKey || !tenantId || (firmIdRequired && !firmId)) continue;
       const pgId = uuidOrNull(naturalKey) ?? deterministicUuid(naturalKey);
       await client.query(
         `insert into ${collection} (id, natural_key, tenant_id, firm_id, record, created_at, updated_at)
@@ -379,12 +1135,19 @@ async function persistFirmFactoryFromStore(client, store) {
   }
 }
 
-async function readFirmFactoryRelational(client) {
+// HM-S7 Phase 4f, slice 2 (2026-09-29): same fix as readAwiaVirtualStaffRelational above -- fires
+// all 7 queries concurrently via the pool instead of one after another on one connection.
+async function readFirmFactoryRelational(tenantId = null) {
+  const pool = getPool();
+  const tenantWhere = tenantId ? " where tenant_id = $1" : "";
+  const tenantParams = tenantId ? [tenantId] : [];
+  const results = await Promise.all(
+    FIRM_FACTORY_RELATIONAL_TABLES.map((collection) => pool.query(`select record from ${collection}${tenantWhere} order by created_at, id`, tenantParams))
+  );
   const result = {};
-  for (const collection of FIRM_FACTORY_RELATIONAL_TABLES) {
-    const { rows } = await client.query(`select record from ${collection} order by created_at, id`);
-    result[collection] = rows.map((row) => row.record);
-  }
+  FIRM_FACTORY_RELATIONAL_TABLES.forEach((collection, i) => {
+    result[collection] = results[i].rows.map((row) => row.record);
+  });
   return result;
 }
 
@@ -406,9 +1169,9 @@ const QUOTATION_AWIA_RELATIONAL_TABLES = [
   "awia_firm_package_assignments"
 ];
 
-async function persistQuotationAwiaFromStore(client, store) {
+async function persistQuotationAwiaFromStore(client, store, recordBaseline) {
   for (const collection of QUOTATION_AWIA_RELATIONAL_TABLES) {
-    for (const record of store[collection] ?? []) {
+    for (const record of changedRecords(store, collection, recordBaseline)) {
       const naturalKey = record?.id;
       const tenantId = uuidOrNull(record?.tenant_id);
       const firmId = uuidOrNull(record?.firm_id);
@@ -424,44 +1187,132 @@ async function persistQuotationAwiaFromStore(client, store) {
   }
 }
 
-async function readQuotationAwiaRelational(client) {
+// HM-S7 Phase 4f, slice 2 (2026-09-29): same fix as readAwiaVirtualStaffRelational above -- fires
+// all 6 queries concurrently via the pool instead of one after another on one connection.
+async function readQuotationAwiaRelational(tenantId = null) {
+  const pool = getPool();
+  const tenantWhere = tenantId ? " where tenant_id = $1" : "";
+  const tenantParams = tenantId ? [tenantId] : [];
+  const results = await Promise.all(
+    QUOTATION_AWIA_RELATIONAL_TABLES.map((collection) => pool.query(`select record from ${collection}${tenantWhere} order by created_at, id`, tenantParams))
+  );
   const result = {};
-  for (const collection of QUOTATION_AWIA_RELATIONAL_TABLES) {
-    const { rows } = await client.query(`select record from ${collection} order by created_at, id`);
-    result[collection] = rows.map((row) => row.record);
-  }
+  QUOTATION_AWIA_RELATIONAL_TABLES.forEach((collection, i) => {
+    result[collection] = results[i].rows.map((row) => row.record);
+  });
   return result;
 }
 
-async function persistAdministrationFromStore(client, store) {
-  for(const x of store.administration_skill_bindings??[]) if(uuidOrNull(x.id)) await client.query(`insert into administration_skill_bindings (id,tenant_id,firm_id,worker_template_code,role_skill_ref,worker_skill_ref,input_schema_ref,output_schema_ref,supervisor_actor_id,permissions,forbidden_actions,status,version,created_at,metadata) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13,$14,$15::jsonb) on conflict(id) do update set status=excluded.status,metadata=excluded.metadata`,[x.id,x.tenant_id,x.firm_id,x.worker_template_code,x.role_skill_ref,x.worker_skill_ref,x.input_schema_ref,x.output_schema_ref,x.supervisor_actor_id,JSON.stringify(x.permissions),JSON.stringify(x.forbidden_actions),x.status,x.version,x.created_at,JSON.stringify(x.metadata??{})]);
-  for(const x of store.correspondence_records??[]) if(uuidOrNull(x.id)) await client.query(`insert into correspondence_records (id,tenant_id,firm_id,relationship_id,project_id,direction,channel,subject,correspondent,received_or_drafted_at,status,owner_actor_id,response_due_at,source_ref,created_at,updated_at,metadata) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17::jsonb) on conflict(id) do update set status=excluded.status,response_due_at=excluded.response_due_at,updated_at=excluded.updated_at,metadata=excluded.metadata`,[x.id,x.tenant_id,x.firm_id,uuidOrNull(x.relationship_id),uuidOrNull(x.project_id),x.direction,x.channel,x.subject,x.correspondent,x.received_or_drafted_at,x.status,uuidOrNull(x.owner_actor_id),x.response_due_at,x.source_ref,x.created_at,x.updated_at,JSON.stringify(x.metadata??{})]);
-  for(const x of store.document_register_entries??[]) if(uuidOrNull(x.id)) await client.query(`insert into document_register_entries (id,tenant_id,firm_id,relationship_id,project_id,document_number,title,document_type,discipline,classification,status,current_revision_id,owner_actor_id,created_at,updated_at,metadata) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,null,$12,$13,$14,$15::jsonb) on conflict(id) do update set status=excluded.status,updated_at=excluded.updated_at,metadata=excluded.metadata`,[x.id,x.tenant_id,x.firm_id,uuidOrNull(x.relationship_id),uuidOrNull(x.project_id),x.document_number,x.title,x.document_type,x.discipline,x.classification,x.status,uuidOrNull(x.owner_actor_id),x.created_at,x.updated_at,JSON.stringify(x.metadata??{})]);
-  for(const x of store.document_revision_records??[]) if(uuidOrNull(x.id)) await client.query(`insert into document_revision_records (id,tenant_id,firm_id,document_register_entry_id,revision,version_label,storage_ref,content_hash,status,supersedes_revision_id,created_by_actor_id,created_at,metadata) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb) on conflict(id) do update set status=excluded.status,metadata=excluded.metadata`,[x.id,x.tenant_id,x.firm_id,x.document_register_entry_id,x.revision,x.version_label,x.storage_ref,x.content_hash,x.status,uuidOrNull(x.supersedes_revision_id),uuidOrNull(x.created_by_actor_id),x.created_at,JSON.stringify(x.metadata??{})]);
-  for(const x of store.document_register_entries??[]) if(uuidOrNull(x.id)&&uuidOrNull(x.current_revision_id)) await client.query("update document_register_entries set current_revision_id=$1, updated_at=$2 where id=$3",[x.current_revision_id,x.updated_at,x.id]);
-  for(const x of store.administrative_deadlines??[]) if(uuidOrNull(x.id)) await client.query(`insert into administrative_deadlines (id,tenant_id,firm_id,project_id,relationship_id,title,due_at,priority,status,assigned_actor_or_worker_ref,source_ref,created_at,updated_at,completed_at,metadata) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15::jsonb) on conflict(id) do update set status=excluded.status,updated_at=excluded.updated_at,completed_at=excluded.completed_at,metadata=excluded.metadata`,[x.id,x.tenant_id,x.firm_id,uuidOrNull(x.project_id),uuidOrNull(x.relationship_id),x.title,x.due_at,x.priority,x.status,uuidOrNull(x.assigned_actor_or_worker_ref),x.source_ref,x.created_at,x.updated_at,x.completed_at,JSON.stringify(x.metadata??{})]);
-  for(const x of store.transmittal_drafts??[]) if(uuidOrNull(x.id)) await client.query(`insert into transmittal_drafts (id,tenant_id,firm_id,project_id,relationship_id,recipient,subject,document_revision_refs,message_body,status,requires_principal_approval,prepared_by_actor_id,approved_by_actor_id,issued_at,created_at,updated_at,metadata) values($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,true,$11,$12,$13,$14,$15,$16::jsonb) on conflict(id) do update set subject=excluded.subject,message_body=excluded.message_body,status=excluded.status,updated_at=excluded.updated_at,metadata=excluded.metadata`,[x.id,x.tenant_id,x.firm_id,uuidOrNull(x.project_id),uuidOrNull(x.relationship_id),x.recipient,x.subject,JSON.stringify(x.document_revision_refs),x.message_body,x.status,uuidOrNull(x.prepared_by_actor_id),uuidOrNull(x.approved_by_actor_id),x.issued_at,x.created_at,x.updated_at,JSON.stringify(x.metadata??{})]);
+// ADR-089 W1 (B1, 2026-09-30): Firm operating workflow tables. Same generic
+// (id, natural_key, tenant_id, firm_id, record jsonb) shape as QUOTATION_AWIA_RELATIONAL_TABLES,
+// created by migration 0048_work_intake_file_objects.sql. W2 will add work_requests here.
+const WORK_INTAKE_RELATIONAL_TABLES = ["file_objects", "work_requests"];
+
+async function persistWorkIntakeFromStore(client, store, recordBaseline) {
+  for (const collection of WORK_INTAKE_RELATIONAL_TABLES) {
+    for (const record of changedRecords(store, collection, recordBaseline)) {
+      const naturalKey = record?.id;
+      const tenantId = uuidOrNull(record?.tenant_id);
+      const firmId = uuidOrNull(record?.firm_id);
+      if (!naturalKey || !tenantId || !firmId) continue;
+      const pgId = uuidOrNull(naturalKey) ?? deterministicUuid(naturalKey);
+      await client.query(
+        `insert into ${collection} (id, natural_key, tenant_id, firm_id, record, created_at, updated_at)
+         values ($1, $2, $3, $4, $5::jsonb, coalesce($6, now()), now())
+         on conflict (id) do update set record = excluded.record, updated_at = now()`,
+        [pgId, String(naturalKey), tenantId, firmId, JSON.stringify(record), record?.created_at ?? null]
+      );
+    }
+  }
+}
+
+async function readWorkIntakeRelational(tenantId = null) {
+  const pool = getPool();
+  const tenantWhere = tenantId ? " where tenant_id = $1" : "";
+  const tenantParams = tenantId ? [tenantId] : [];
+  const results = await Promise.all(
+    WORK_INTAKE_RELATIONAL_TABLES.map((collection) => pool.query(`select record from ${collection}${tenantWhere} order by created_at, id`, tenantParams))
+  );
+  const result = {};
+  WORK_INTAKE_RELATIONAL_TABLES.forEach((collection, i) => {
+    result[collection] = results[i].rows.map((row) => row.record);
+  });
+  return result;
+}
+
+async function persistAdministrationFromStore(client, store, recordBaseline) {
+  // HM-S7 Phase 4d, slice 6 (2026-09-29): same reasoning as persistTechnicalDeliveryFromStore
+  // (slice 4) -- each collection can hold rows from many tenants in the same shared
+  // savePostgresStore() transaction, so setTenantContext() is called fresh before every single
+  // upsert/update to scope that one row's RLS check to its own tenant.
+  // HM-S7 Phase 4f, slice 7 (2026-09-29): every store.X ?? [] loop below now iterates
+  // changedRecords(store, "X", recordBaseline) instead -- same content-diff dedup as the other
+  // persist*FromStore functions, just applied to this one's hand-rolled per-column insert
+  // statements instead of a generic record-jsonb loop. administration_skill_bindings,
+  // administrative_deadlines and transmittal_drafts are create-only (push, never mutated
+  // afterward); correspondence_records is mutated in place elsewhere (e.g.
+  // issueQuotationDraftPackRecord's `correspondence.status = "ISSUED_BY_HUMAN"`);
+  // document_register_entries and document_revision_records are both mutated in place by
+  // addDocumentRevisionRecord (`entry.current_revision_id = revision.id`,
+  // `previous.status = "SUPERSEDED"`). All handled correctly by the same content-diff mechanism.
+  for(const x of changedRecords(store,"administration_skill_bindings",recordBaseline)) if(uuidOrNull(x.id)){await setTenantContext(client,x.tenant_id);await client.query(`insert into administration_skill_bindings (id,tenant_id,firm_id,worker_template_code,role_skill_ref,worker_skill_ref,input_schema_ref,output_schema_ref,supervisor_actor_id,permissions,forbidden_actions,status,version,created_at,metadata) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13,$14,$15::jsonb) on conflict(id) do update set status=excluded.status,metadata=excluded.metadata`,[x.id,x.tenant_id,x.firm_id,x.worker_template_code,x.role_skill_ref,x.worker_skill_ref,x.input_schema_ref,x.output_schema_ref,x.supervisor_actor_id,JSON.stringify(x.permissions),JSON.stringify(x.forbidden_actions),x.status,x.version,x.created_at,JSON.stringify(x.metadata??{})]);}
+  for(const x of changedRecords(store,"correspondence_records",recordBaseline)) if(uuidOrNull(x.id)){await setTenantContext(client,x.tenant_id);await client.query(`insert into correspondence_records (id,tenant_id,firm_id,relationship_id,project_id,direction,channel,subject,correspondent,received_or_drafted_at,status,owner_actor_id,response_due_at,source_ref,created_at,updated_at,metadata) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17::jsonb) on conflict(id) do update set status=excluded.status,response_due_at=excluded.response_due_at,updated_at=excluded.updated_at,metadata=excluded.metadata`,[x.id,x.tenant_id,x.firm_id,uuidOrNull(x.relationship_id),uuidOrNull(x.project_id),x.direction,x.channel,x.subject,x.correspondent,x.received_or_drafted_at,x.status,uuidOrNull(x.owner_actor_id),x.response_due_at,x.source_ref,x.created_at,x.updated_at,JSON.stringify(x.metadata??{})]);}
+  for(const x of changedRecords(store,"document_register_entries",recordBaseline)) if(uuidOrNull(x.id)){await setTenantContext(client,x.tenant_id);await client.query(`insert into document_register_entries (id,tenant_id,firm_id,relationship_id,project_id,document_number,title,document_type,discipline,classification,status,current_revision_id,owner_actor_id,created_at,updated_at,metadata) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,null,$12,$13,$14,$15::jsonb) on conflict(id) do update set status=excluded.status,updated_at=excluded.updated_at,metadata=excluded.metadata`,[x.id,x.tenant_id,x.firm_id,uuidOrNull(x.relationship_id),uuidOrNull(x.project_id),x.document_number,x.title,x.document_type,x.discipline,x.classification,x.status,uuidOrNull(x.owner_actor_id),x.created_at,x.updated_at,JSON.stringify(x.metadata??{})]);}
+  for(const x of changedRecords(store,"document_revision_records",recordBaseline)) if(uuidOrNull(x.id)){await setTenantContext(client,x.tenant_id);await client.query(`insert into document_revision_records (id,tenant_id,firm_id,document_register_entry_id,revision,version_label,storage_ref,content_hash,status,supersedes_revision_id,created_by_actor_id,created_at,metadata) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb) on conflict(id) do update set status=excluded.status,metadata=excluded.metadata`,[x.id,x.tenant_id,x.firm_id,x.document_register_entry_id,x.revision,x.version_label,x.storage_ref,x.content_hash,x.status,uuidOrNull(x.supersedes_revision_id),uuidOrNull(x.created_by_actor_id),x.created_at,JSON.stringify(x.metadata??{})]);}
+  for(const x of changedRecords(store,"document_register_entries",recordBaseline)) if(uuidOrNull(x.id)&&uuidOrNull(x.current_revision_id)){await setTenantContext(client,x.tenant_id);await client.query("update document_register_entries set current_revision_id=$1, updated_at=$2 where id=$3",[x.current_revision_id,x.updated_at,x.id]);}
+  for(const x of changedRecords(store,"administrative_deadlines",recordBaseline)) if(uuidOrNull(x.id)){await setTenantContext(client,x.tenant_id);await client.query(`insert into administrative_deadlines (id,tenant_id,firm_id,project_id,relationship_id,title,due_at,priority,status,assigned_actor_or_worker_ref,source_ref,created_at,updated_at,completed_at,metadata) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15::jsonb) on conflict(id) do update set status=excluded.status,updated_at=excluded.updated_at,completed_at=excluded.completed_at,metadata=excluded.metadata`,[x.id,x.tenant_id,x.firm_id,uuidOrNull(x.project_id),uuidOrNull(x.relationship_id),x.title,x.due_at,x.priority,x.status,uuidOrNull(x.assigned_actor_or_worker_ref),x.source_ref,x.created_at,x.updated_at,x.completed_at,JSON.stringify(x.metadata??{})]);}
+  for(const x of changedRecords(store,"transmittal_drafts",recordBaseline)) if(uuidOrNull(x.id)){await setTenantContext(client,x.tenant_id);await client.query(`insert into transmittal_drafts (id,tenant_id,firm_id,project_id,relationship_id,recipient,subject,document_revision_refs,message_body,status,requires_principal_approval,prepared_by_actor_id,approved_by_actor_id,issued_at,created_at,updated_at,metadata) values($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,true,$11,$12,$13,$14,$15,$16::jsonb) on conflict(id) do update set subject=excluded.subject,message_body=excluded.message_body,status=excluded.status,updated_at=excluded.updated_at,metadata=excluded.metadata`,[x.id,x.tenant_id,x.firm_id,uuidOrNull(x.project_id),uuidOrNull(x.relationship_id),x.recipient,x.subject,JSON.stringify(x.document_revision_refs),x.message_body,x.status,uuidOrNull(x.prepared_by_actor_id),uuidOrNull(x.approved_by_actor_id),x.issued_at,x.created_at,x.updated_at,JSON.stringify(x.metadata??{})]);}
 }
 
 
-async function persistCommercialOperationsFromStore(client,store){
-  for(const x of store.commercial_skill_bindings??[])if(uuidOrNull(x.id))await client.query(`insert into commercial_skill_bindings(id,tenant_id,firm_id,worker_template_code,role_skill_ref,worker_skill_ref,input_schema_ref,output_schema_ref,supervisor_actor_id,permissions,forbidden_actions,status,version,created_at,metadata) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13,$14,$15::jsonb) on conflict(id) do update set status=excluded.status,metadata=excluded.metadata`,[x.id,x.tenant_id,x.firm_id,x.worker_template_code,x.role_skill_ref,x.worker_skill_ref,x.input_schema_ref,x.output_schema_ref,x.supervisor_actor_id,JSON.stringify(x.permissions),JSON.stringify(x.forbidden_actions),x.status,x.version,x.created_at,JSON.stringify(x.metadata??{})]);
-  for(const x of store.sales_pipeline_records??[])if(uuidOrNull(x.id))await client.query(`insert into sales_pipeline_records(id,tenant_id,firm_id,enquiry_id,relationship_id,intake_session_id,proposal_id,opportunity_name,stage,estimated_value,currency,probability_percent,owner_actor_id,next_action,next_action_due_at,lost_reason,created_at,updated_at,metadata) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19::jsonb) on conflict(id) do update set proposal_id=excluded.proposal_id,stage=excluded.stage,estimated_value=excluded.estimated_value,probability_percent=excluded.probability_percent,next_action=excluded.next_action,next_action_due_at=excluded.next_action_due_at,lost_reason=excluded.lost_reason,updated_at=excluded.updated_at,metadata=excluded.metadata`,[x.id,x.tenant_id,x.firm_id,uuidOrNull(x.enquiry_id),uuidOrNull(x.relationship_id),uuidOrNull(x.intake_session_id),uuidOrNull(x.proposal_id),x.opportunity_name,x.stage,x.estimated_value,x.currency,x.probability_percent,uuidOrNull(x.owner_actor_id),x.next_action,x.next_action_due_at,x.lost_reason,x.created_at,x.updated_at,JSON.stringify(x.metadata??{})]);
-  for(const x of store.proposal_dispatch_records??[])if(uuidOrNull(x.id))await client.query(`insert into proposal_dispatch_records(id,tenant_id,firm_id,proposal_id,recipient,channel,dispatch_status,dispatched_by_actor_id,commercial_approval_id,document_ref,dispatched_at,created_at,metadata) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb) on conflict(id) do nothing`,[x.id,x.tenant_id,x.firm_id,x.proposal_id,x.recipient,x.channel,x.dispatch_status,x.dispatched_by_actor_id,x.commercial_approval_id,x.document_ref,x.dispatched_at,x.created_at,JSON.stringify(x.metadata??{})]);
-  for(const x of store.proposal_dispatch_records??[])await client.query("update proposals set proposal_status='SENT',issued_document_ref=$1,updated_at=$2 where id=$3 and commercial_approval_id=$4",[x.document_ref,x.dispatched_at,x.proposal_id,x.commercial_approval_id]);
-  for(const x of store.expense_records??[])if(uuidOrNull(x.id))await client.query(`insert into expense_records(id,tenant_id,firm_id,project_id,supplier,description,category,amount,currency,expense_date,receipt_ref,status,prepared_by_actor_id,approved_by_actor_id,approved_at,payment_instruction_ref,created_at,updated_at,metadata) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19::jsonb) on conflict(id) do update set status=excluded.status,approved_by_actor_id=excluded.approved_by_actor_id,approved_at=excluded.approved_at,updated_at=excluded.updated_at,metadata=excluded.metadata`,[x.id,x.tenant_id,x.firm_id,uuidOrNull(x.project_id),x.supplier,x.description,x.category,x.amount,x.currency,x.expense_date,x.receipt_ref,x.status,uuidOrNull(x.prepared_by_actor_id),uuidOrNull(x.approved_by_actor_id),x.approved_at,null,x.created_at,x.updated_at,JSON.stringify(x.metadata??{})]);
-  for(const x of store.receivable_follow_ups??[])if(uuidOrNull(x.id))await client.query(`insert into receivable_follow_ups(id,tenant_id,firm_id,invoice_id,channel,subject,message_body,status,requires_human_review,prepared_by_actor_id,approved_by_actor_id,sent_at,created_at,updated_at,metadata) values($1,$2,$3,$4,$5,$6,$7,$8,true,$9,$10,$11,$12,$13,$14::jsonb) on conflict(id) do update set subject=excluded.subject,message_body=excluded.message_body,status=excluded.status,updated_at=excluded.updated_at,metadata=excluded.metadata`,[x.id,x.tenant_id,x.firm_id,x.invoice_id,x.channel,x.subject,x.message_body,x.status,uuidOrNull(x.prepared_by_actor_id),uuidOrNull(x.approved_by_actor_id),x.sent_at,x.created_at,x.updated_at,JSON.stringify(x.metadata??{})]);
+async function persistCommercialOperationsFromStore(client,store,recordBaseline){
+  // HM-S7 Phase 4d, slice 7 (2026-09-29): same reasoning as persistTechnicalDeliveryFromStore
+  // (slice 4) / persistAdministrationFromStore (slice 6) -- setTenantContext() called fresh
+  // before every row's statement, since each collection can hold rows from many tenants in
+  // savePostgresStore()'s one shared transaction. The `update proposals` statement also gets
+  // setTenantContext even though `proposals` itself has no RLS policy yet (Sales & Intake is a
+  // separate, not-yet-done domain) -- harmless now, and keeps this call site already correct
+  // for whenever that domain's own RLS slice lands.
+  // HM-S7 Phase 4f, slice 8 (2026-09-29): every store.X ?? [] loop below now iterates
+  // changedRecords(store, "X", recordBaseline) instead. commercial_skill_bindings,
+  // proposal_dispatch_records (on conflict do nothing -- create-only by construction) and
+  // receivable_follow_ups are create-only; sales_pipeline_records and expense_records are
+  // mutated in place elsewhere (dispatchProposalRecord's `opportunity.stage = "PROPOSAL_SENT"`,
+  // approveExpenseRecord's `item.status = "APPROVED"`). The `update proposals` loop below is
+  // keyed off proposal_dispatch_records too: since that collection is create-only, once a
+  // dispatch record's initial write has landed, changedRecords() correctly stops re-running this
+  // UPDATE against `proposals` on every subsequent, unrelated save -- previously it ran once per
+  // historical dispatch record on every single write anywhere in the app.
+  for(const x of changedRecords(store,"commercial_skill_bindings",recordBaseline))if(uuidOrNull(x.id)){await setTenantContext(client,x.tenant_id);await client.query(`insert into commercial_skill_bindings(id,tenant_id,firm_id,worker_template_code,role_skill_ref,worker_skill_ref,input_schema_ref,output_schema_ref,supervisor_actor_id,permissions,forbidden_actions,status,version,created_at,metadata) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13,$14,$15::jsonb) on conflict(id) do update set status=excluded.status,metadata=excluded.metadata`,[x.id,x.tenant_id,x.firm_id,x.worker_template_code,x.role_skill_ref,x.worker_skill_ref,x.input_schema_ref,x.output_schema_ref,x.supervisor_actor_id,JSON.stringify(x.permissions),JSON.stringify(x.forbidden_actions),x.status,x.version,x.created_at,JSON.stringify(x.metadata??{})]);}
+  for(const x of changedRecords(store,"sales_pipeline_records",recordBaseline))if(uuidOrNull(x.id)){await setTenantContext(client,x.tenant_id);await client.query(`insert into sales_pipeline_records(id,tenant_id,firm_id,enquiry_id,relationship_id,intake_session_id,proposal_id,opportunity_name,stage,estimated_value,currency,probability_percent,owner_actor_id,next_action,next_action_due_at,lost_reason,created_at,updated_at,metadata) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19::jsonb) on conflict(id) do update set proposal_id=excluded.proposal_id,stage=excluded.stage,estimated_value=excluded.estimated_value,probability_percent=excluded.probability_percent,next_action=excluded.next_action,next_action_due_at=excluded.next_action_due_at,lost_reason=excluded.lost_reason,updated_at=excluded.updated_at,metadata=excluded.metadata`,[x.id,x.tenant_id,x.firm_id,uuidOrNull(x.enquiry_id),uuidOrNull(x.relationship_id),uuidOrNull(x.intake_session_id),uuidOrNull(x.proposal_id),x.opportunity_name,x.stage,x.estimated_value,x.currency,x.probability_percent,uuidOrNull(x.owner_actor_id),x.next_action,x.next_action_due_at,x.lost_reason,x.created_at,x.updated_at,JSON.stringify(x.metadata??{})]);}
+  for(const x of changedRecords(store,"proposal_dispatch_records",recordBaseline))if(uuidOrNull(x.id)){await setTenantContext(client,x.tenant_id);await client.query(`insert into proposal_dispatch_records(id,tenant_id,firm_id,proposal_id,recipient,channel,dispatch_status,dispatched_by_actor_id,commercial_approval_id,document_ref,dispatched_at,created_at,metadata) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb) on conflict(id) do nothing`,[x.id,x.tenant_id,x.firm_id,x.proposal_id,x.recipient,x.channel,x.dispatch_status,x.dispatched_by_actor_id,x.commercial_approval_id,x.document_ref,x.dispatched_at,x.created_at,JSON.stringify(x.metadata??{})]);}
+  for(const x of changedRecords(store,"proposal_dispatch_records",recordBaseline)){await setTenantContext(client,x.tenant_id);await client.query("update proposals set proposal_status='SENT',issued_document_ref=$1,updated_at=$2 where id=$3 and commercial_approval_id=$4",[x.document_ref,x.dispatched_at,x.proposal_id,x.commercial_approval_id]);}
+  for(const x of changedRecords(store,"expense_records",recordBaseline))if(uuidOrNull(x.id)){await setTenantContext(client,x.tenant_id);await client.query(`insert into expense_records(id,tenant_id,firm_id,project_id,supplier,description,category,amount,currency,expense_date,receipt_ref,status,prepared_by_actor_id,approved_by_actor_id,approved_at,payment_instruction_ref,created_at,updated_at,metadata) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19::jsonb) on conflict(id) do update set status=excluded.status,approved_by_actor_id=excluded.approved_by_actor_id,approved_at=excluded.approved_at,updated_at=excluded.updated_at,metadata=excluded.metadata`,[x.id,x.tenant_id,x.firm_id,uuidOrNull(x.project_id),x.supplier,x.description,x.category,x.amount,x.currency,x.expense_date,x.receipt_ref,x.status,uuidOrNull(x.prepared_by_actor_id),uuidOrNull(x.approved_by_actor_id),x.approved_at,null,x.created_at,x.updated_at,JSON.stringify(x.metadata??{})]);}
+  for(const x of changedRecords(store,"receivable_follow_ups",recordBaseline))if(uuidOrNull(x.id)){await setTenantContext(client,x.tenant_id);await client.query(`insert into receivable_follow_ups(id,tenant_id,firm_id,invoice_id,channel,subject,message_body,status,requires_human_review,prepared_by_actor_id,approved_by_actor_id,sent_at,created_at,updated_at,metadata) values($1,$2,$3,$4,$5,$6,$7,$8,true,$9,$10,$11,$12,$13,$14::jsonb) on conflict(id) do update set subject=excluded.subject,message_body=excluded.message_body,status=excluded.status,updated_at=excluded.updated_at,metadata=excluded.metadata`,[x.id,x.tenant_id,x.firm_id,x.invoice_id,x.channel,x.subject,x.message_body,x.status,uuidOrNull(x.prepared_by_actor_id),uuidOrNull(x.approved_by_actor_id),x.sent_at,x.created_at,x.updated_at,JSON.stringify(x.metadata??{})]);}
 }
 async function persistPilotHandoffFromStore(client,store){
   for(const x of store.pilot_handoff_records??[])if(uuidOrNull(x.id))await client.query(`insert into pilot_handoff_records(id,tenant_id,firm_id,accepted_by_actor_id,rehearsal_ref,handoff_status,checklist,evidence_refs,decision_summary,accepted_at,created_at,metadata) values($1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb,$9,$10,$11,$12::jsonb) on conflict(id) do update set handoff_status=excluded.handoff_status,checklist=excluded.checklist,evidence_refs=excluded.evidence_refs,decision_summary=excluded.decision_summary,metadata=excluded.metadata`,[x.id,x.tenant_id,x.firm_id,uuidOrNull(x.accepted_by_actor_id),x.rehearsal_ref,x.handoff_status,JSON.stringify(x.checklist??[]),JSON.stringify(x.evidence_refs??[]),x.decision_summary,x.accepted_at,x.created_at,JSON.stringify(x.metadata??{})]);
 }
 
-async function persistTechnicalDeliveryFromStore(client,store){
-  for(const x of store.technical_skill_bindings??[])if(uuidOrNull(x.id))await client.query(`insert into technical_skill_bindings(id,tenant_id,firm_id,worker_template_code,role_skill_ref,worker_skill_ref,input_schema_ref,output_schema_ref,supervisor_actor_id,permissions,forbidden_actions,status,version,created_at,metadata) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13,$14,$15::jsonb) on conflict(id) do update set status=excluded.status,metadata=excluded.metadata`,[x.id,x.tenant_id,x.firm_id,x.worker_template_code,x.role_skill_ref,x.worker_skill_ref,x.input_schema_ref,x.output_schema_ref,uuidOrNull(x.supervisor_actor_id),JSON.stringify(x.permissions??[]),JSON.stringify(x.forbidden_actions??[]),x.status,x.version,x.created_at,JSON.stringify(x.metadata??{})]);
-  for(const x of store.drawing_review_records??[])if(uuidOrNull(x.id))await client.query(`insert into drawing_review_records(id,tenant_id,firm_id,project_id,document_register_entry_id,base_revision_id,compared_revision_id,check_results,status,prepared_by_actor_id,requires_professional_review,created_at,metadata) values($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,true,$11,$12::jsonb) on conflict(id) do update set check_results=excluded.check_results,status=excluded.status,metadata=excluded.metadata`,[x.id,x.tenant_id,x.firm_id,x.project_id,x.document_register_entry_id,x.base_revision_id,x.compared_revision_id,JSON.stringify(x.check_results??[]),x.status,uuidOrNull(x.prepared_by_actor_id),x.created_at,JSON.stringify(x.metadata??{})]);
-  for(const x of store.calculation_input_sets??[])if(uuidOrNull(x.id))await client.query(`insert into calculation_input_sets(id,tenant_id,firm_id,project_id,intake_session_id,source_revision_refs,input_values,unit_system,validation_results,validation_status,deterministic_engine_ref,prepared_by_actor_id,created_at,updated_at,metadata) values($1,$2,$3,$4,$5,$6::jsonb,$7::jsonb,$8,$9::jsonb,$10,$11,$12,$13,$14,$15::jsonb) on conflict(id) do update set input_values=excluded.input_values,validation_results=excluded.validation_results,validation_status=excluded.validation_status,updated_at=excluded.updated_at,metadata=excluded.metadata`,[x.id,x.tenant_id,x.firm_id,x.project_id,uuidOrNull(x.intake_session_id),JSON.stringify(x.source_revision_refs??[]),JSON.stringify(x.input_values??{}),x.unit_system,x.validation_results?JSON.stringify(x.validation_results):"[]",x.validation_status,x.deterministic_engine_ref,uuidOrNull(x.prepared_by_actor_id),x.created_at,x.updated_at,JSON.stringify(x.metadata??{})]);
-  for(const x of store.technical_qa_findings??[])if(uuidOrNull(x.id))await client.query(`insert into technical_qa_findings(id,tenant_id,firm_id,project_id,subject_type,subject_id,finding_code,severity,description,status,raised_by_actor_id,resolved_by_actor_id,resolution_summary,created_at,updated_at,resolved_at,metadata) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17::jsonb) on conflict(id) do update set status=excluded.status,resolved_by_actor_id=excluded.resolved_by_actor_id,resolution_summary=excluded.resolution_summary,updated_at=excluded.updated_at,resolved_at=excluded.resolved_at,metadata=excluded.metadata`,[x.id,x.tenant_id,x.firm_id,x.project_id,x.subject_type,x.subject_id,x.finding_code,x.severity,x.description,x.status,uuidOrNull(x.raised_by_actor_id),uuidOrNull(x.resolved_by_actor_id),x.resolution_summary,x.created_at,x.updated_at,x.resolved_at,JSON.stringify(x.metadata??{})]);
-  for(const x of store.delivery_package_records??[])if(uuidOrNull(x.id))await client.query(`insert into delivery_package_records(id,tenant_id,firm_id,project_id,drawing_revision_refs,calculation_input_set_id,qa_finding_refs,evidence_refs,readiness_checks,package_status,requires_professional_review,prepared_by_actor_id,professional_approval_id,issued_document_version_id,created_at,updated_at,metadata) values($1,$2,$3,$4,$5::jsonb,$6,$7::jsonb,$8::jsonb,$9::jsonb,$10,true,$11,$12,$13,$14,$15,$16::jsonb) on conflict(id) do update set qa_finding_refs=excluded.qa_finding_refs,readiness_checks=excluded.readiness_checks,package_status=excluded.package_status,updated_at=excluded.updated_at,metadata=excluded.metadata`,[x.id,x.tenant_id,x.firm_id,x.project_id,JSON.stringify(x.drawing_revision_refs??[]),x.calculation_input_set_id,JSON.stringify(x.qa_finding_refs??[]),JSON.stringify(x.evidence_refs??[]),JSON.stringify(x.readiness_checks??[]),x.package_status,uuidOrNull(x.prepared_by_actor_id),uuidOrNull(x.professional_approval_id),uuidOrNull(x.issued_document_version_id),x.created_at,x.updated_at,JSON.stringify(x.metadata??{})]);
+async function persistTechnicalDeliveryFromStore(client,store,recordBaseline){
+  // HM-S7 Phase 4d, slice 4 (2026-09-29): each of these 5 collections can hold rows from many
+  // different tenants in the same in-memory store, and this whole function runs inside one
+  // shared, multi-tenant transaction (savePostgresStore's). setTenantContext() is called fresh
+  // before every single upsert, scoping the RLS insert/update check to that one row's own
+  // tenant -- set_config(..., true) is transaction-local but can be changed as many times as
+  // needed within one transaction, so this is safe to do per-row rather than once per call.
+  // HM-S7 Phase 4f, slice 9 (2026-09-29): every store.X ?? [] loop below now iterates
+  // changedRecords(store, "X", recordBaseline) instead. Audit found all 5 collections here are
+  // create-only -- no in-place mutation after creation was found anywhere in the file for
+  // technical_skill_bindings, drawing_review_records, calculation_input_sets,
+  // technical_qa_findings or delivery_package_records (no resolve/approve/close function exists
+  // for any of them yet). changedRecords() still applies correctly (a create-only collection is
+  // the simplest case: only genuinely new rows differ from their -- nonexistent -- baseline).
+  for(const x of changedRecords(store,"technical_skill_bindings",recordBaseline))if(uuidOrNull(x.id)){await setTenantContext(client,x.tenant_id);await client.query(`insert into technical_skill_bindings(id,tenant_id,firm_id,worker_template_code,role_skill_ref,worker_skill_ref,input_schema_ref,output_schema_ref,supervisor_actor_id,permissions,forbidden_actions,status,version,created_at,metadata) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13,$14,$15::jsonb) on conflict(id) do update set status=excluded.status,metadata=excluded.metadata`,[x.id,x.tenant_id,x.firm_id,x.worker_template_code,x.role_skill_ref,x.worker_skill_ref,x.input_schema_ref,x.output_schema_ref,uuidOrNull(x.supervisor_actor_id),JSON.stringify(x.permissions??[]),JSON.stringify(x.forbidden_actions??[]),x.status,x.version,x.created_at,JSON.stringify(x.metadata??{})]);}
+  for(const x of changedRecords(store,"drawing_review_records",recordBaseline))if(uuidOrNull(x.id)){await setTenantContext(client,x.tenant_id);await client.query(`insert into drawing_review_records(id,tenant_id,firm_id,project_id,document_register_entry_id,base_revision_id,compared_revision_id,check_results,status,prepared_by_actor_id,requires_professional_review,created_at,metadata) values($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,true,$11,$12::jsonb) on conflict(id) do update set check_results=excluded.check_results,status=excluded.status,metadata=excluded.metadata`,[x.id,x.tenant_id,x.firm_id,x.project_id,x.document_register_entry_id,x.base_revision_id,x.compared_revision_id,JSON.stringify(x.check_results??[]),x.status,uuidOrNull(x.prepared_by_actor_id),x.created_at,JSON.stringify(x.metadata??{})]);}
+  for(const x of changedRecords(store,"calculation_input_sets",recordBaseline))if(uuidOrNull(x.id)){await setTenantContext(client,x.tenant_id);await client.query(`insert into calculation_input_sets(id,tenant_id,firm_id,project_id,intake_session_id,source_revision_refs,input_values,unit_system,validation_results,validation_status,deterministic_engine_ref,prepared_by_actor_id,created_at,updated_at,metadata) values($1,$2,$3,$4,$5,$6::jsonb,$7::jsonb,$8,$9::jsonb,$10,$11,$12,$13,$14,$15::jsonb) on conflict(id) do update set input_values=excluded.input_values,validation_results=excluded.validation_results,validation_status=excluded.validation_status,updated_at=excluded.updated_at,metadata=excluded.metadata`,[x.id,x.tenant_id,x.firm_id,x.project_id,uuidOrNull(x.intake_session_id),JSON.stringify(x.source_revision_refs??[]),JSON.stringify(x.input_values??{}),x.unit_system,x.validation_results?JSON.stringify(x.validation_results):"[]",x.validation_status,x.deterministic_engine_ref,uuidOrNull(x.prepared_by_actor_id),x.created_at,x.updated_at,JSON.stringify(x.metadata??{})]);}
+  for(const x of changedRecords(store,"technical_qa_findings",recordBaseline))if(uuidOrNull(x.id)){await setTenantContext(client,x.tenant_id);await client.query(`insert into technical_qa_findings(id,tenant_id,firm_id,project_id,subject_type,subject_id,finding_code,severity,description,status,raised_by_actor_id,resolved_by_actor_id,resolution_summary,created_at,updated_at,resolved_at,metadata) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17::jsonb) on conflict(id) do update set status=excluded.status,resolved_by_actor_id=excluded.resolved_by_actor_id,resolution_summary=excluded.resolution_summary,updated_at=excluded.updated_at,resolved_at=excluded.resolved_at,metadata=excluded.metadata`,[x.id,x.tenant_id,x.firm_id,x.project_id,x.subject_type,x.subject_id,x.finding_code,x.severity,x.description,x.status,uuidOrNull(x.raised_by_actor_id),uuidOrNull(x.resolved_by_actor_id),x.resolution_summary,x.created_at,x.updated_at,x.resolved_at,JSON.stringify(x.metadata??{})]);}
+  for(const x of changedRecords(store,"delivery_package_records",recordBaseline))if(uuidOrNull(x.id)){await setTenantContext(client,x.tenant_id);await client.query(`insert into delivery_package_records(id,tenant_id,firm_id,project_id,drawing_revision_refs,calculation_input_set_id,qa_finding_refs,evidence_refs,readiness_checks,package_status,requires_professional_review,prepared_by_actor_id,professional_approval_id,issued_document_version_id,created_at,updated_at,metadata) values($1,$2,$3,$4,$5::jsonb,$6,$7::jsonb,$8::jsonb,$9::jsonb,$10,true,$11,$12,$13,$14,$15,$16::jsonb) on conflict(id) do update set qa_finding_refs=excluded.qa_finding_refs,readiness_checks=excluded.readiness_checks,package_status=excluded.package_status,updated_at=excluded.updated_at,metadata=excluded.metadata`,[x.id,x.tenant_id,x.firm_id,x.project_id,JSON.stringify(x.drawing_revision_refs??[]),x.calculation_input_set_id,JSON.stringify(x.qa_finding_refs??[]),JSON.stringify(x.evidence_refs??[]),JSON.stringify(x.readiness_checks??[]),x.package_status,uuidOrNull(x.prepared_by_actor_id),uuidOrNull(x.professional_approval_id),uuidOrNull(x.issued_document_version_id),x.created_at,x.updated_at,JSON.stringify(x.metadata??{})]);}
 }
 
 async function upsertPolicyDecision(client, decision) {
@@ -517,97 +1368,106 @@ async function seedWorkerTemplates(client) {
     await client.query(`insert into worker_templates (id, code, name, version, default_tools, default_budget, risk_envelope, status)
       values ($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7::jsonb,'ACTIVE') on conflict (code) do nothing`, [template.id, template.code, template.name, template.version, JSON.stringify(template.default_tools), JSON.stringify(template.default_budget), JSON.stringify(template.risk_envelope)]);
   }
-}async function readRelationalStore(client) {
-  const servicePacks = await client.query(`select id::text, code, name, discipline, status, version, description, configuration, created_at, updated_at from service_packs order by created_at, id`);
-  const serviceSkus = await client.query(`select id::text, service_pack_id::text, code, name, status, pricing_model, created_at, updated_at from service_skus order by created_at, id`);
-  await seedWorkerTemplates(client);
-  const workerTemplates = await client.query(`select id::text, code, name, version, default_tools, default_budget, risk_envelope, status, created_at, updated_at from worker_templates order by created_at, id`);
-  const workerInstances = await client.query(`select id::text, tenant_id::text, firm_id::text, worker_template_id::text, actor_id::text, name, assigned_services, tool_allowlist, budget_envelope, risk_limits, runtime_status, created_at, updated_at from worker_instances order by created_at, id`);
-  const taskOutputs = await client.query(`select id::text, tenant_id::text, firm_id::text, project_id::text, task_id::text, worker_instance_id::text, output_ref, output_schema_ref, evidence_refs, quality_flags, requires_human_review, status, created_at from task_outputs order by created_at, id`);
-  const toolInvocations = await client.query(`select id::text, tenant_id::text, firm_id::text, worker_instance_id::text, task_id::text, tool_name, invocation_status, input_summary, output_ref, cost_estimate, created_at, completed_at from tool_invocations order by created_at, id`);
-  const memberships = await client.query(`select id::text, tenant_id::text, firm_id::text, actor_id::text, person_id::text, role, permissions, status, created_at, updated_at from firm_memberships order by created_at, id`);
-  const professionalProfiles = await client.query(`select id::text, tenant_id::text, person_id::text, disciplines, specializations, jurisdictions, credential_refs, professional_status, created_at, updated_at from professional_profiles order by created_at, id`);
-  const professionalAuthorities = await client.query(`select id::text, tenant_id::text, firm_id::text, professional_id::text, practice_id::text, service_scope, jurisdiction_id::text, permitted_actions, risk_limits, credential_refs, valid_from, valid_to, status, policy_basis_ref, created_at, updated_at from professional_authorities order by created_at, id`);
-  const tenants = await client.query(`select id::text, name, status, isolation_policy_id::text, default_region, data_residency_policy, billing_account_ref, created_at, metadata from tenants order by created_at, id`);
-  const persons = await client.query(`select id::text, tenant_id::text, identity_provider_subject, legal_name, preferred_name, contact_refs, status, created_at, updated_at, metadata from persons order by created_at, id`);
-  const actors = await client.query(`select id::text, id::text as actor_id, actor_type, person_id::text, worker_instance_id::text, system_id, external_service_id, tenant_id::text, firm_id::text, display_name, status, created_at, metadata from actors order by created_at, id`);
-  const firms = await client.query(`select id::text, tenant_id::text, name, brand_id::text, business_entity_id::text, primary_principal_assignment_id::text, lifecycle_state, lifecycle_state_reason, active_practices, configuration_version, status, version, created_at, created_by_actor_id::text, updated_at, updated_by_actor_id::text, data_classification, provenance, metadata from firms order by created_at, id`);
-  const clients = await client.query(`select id::text, tenant_id::text, firm_id::text, client_type, name, primary_contact_id::text, confidentiality_class, status, version, created_at, updated_at, metadata from clients order by created_at, id`);
-  const relationships = await client.query(`select id::text, tenant_id::text, firm_id::text, client_id::text, relationship_type, status, origin, responsible_owner_actor_id::text, contracting_business_entity_id::text, consent_or_legal_basis_ref, conflict_check_ref, created_at, updated_at from firm_client_relationships order by created_at, id`);
-  const leads = await client.query(`select id::text, tenant_id::text, firm_id::text, relationship_id::text, source_channel, requested_service_hint, urgency, qualification_status, assigned_actor_id::text, created_from_conversation_ref, created_at, metadata from leads order by created_at, id`);
-  const intakeSessions = await client.query(`select id::text, tenant_id::text, firm_id::text, lead_id::text, service_id::text, required_inputs, provided_inputs, missing_information_items, intake_status, created_at, updated_at from intake_sessions order by created_at, id`);
-  const prices = await client.query(`select id::text, tenant_id::text, firm_id::text, service_sku_id::text, scope_inputs, human_effort_estimate, ai_runtime_estimate, specialist_cost_estimate, tool_cost_estimate, risk_contingency, platform_fee, margin_target, final_price, approval_required, created_at from price_build_ups order by created_at, id`);
-  const proposals = await client.query(`select id::text, tenant_id::text, firm_id::text, relationship_id::text, service_id::text, scope_summary, price_build_up_id::text, commercial_approval_id::text, proposal_status, valid_until, issued_document_ref, version, created_at, updated_at from proposals order by created_at, id`);
-  const approvals = await client.query(`select id::text, tenant_id::text, firm_id::text, subject_type, subject_id::text, subject_version_or_hash, requested_by_actor_id::text, approver_actor_id::text, approver_professional_id::text, authority_id::text, decision, conditions, evidence_bundle_id::text, authentication_strength, decided_at, audit_event_id::text, created_at from approvals order by created_at, id`);
-  const engagements = await client.query(`select id::text, tenant_id::text, firm_id::text, relationship_id::text, proposal_id::text, contract_ref, scope_ref, commercial_terms_ref, acceptance_criteria_ref, status, created_at, updated_at from engagements order by created_at, id`);
-  const projects = await client.query(`select id::text, tenant_id::text, firm_id::text, relationship_id::text, engagement_id::text, service_id::text, project_name, project_state, risk_class, responsible_professional_id::text, created_at, updated_at from projects order by created_at, id`);
-  const workPackages = await client.query(`select id::text, tenant_id::text, firm_id::text, project_id::text, service_step, assigned_worker_instance_id::text, assigned_human_actor_id::text, state, required_evidence, approval_requirement_id::text, created_at, updated_at from work_packages order by created_at, id`);
-  const frontDeskEnquiries = await client.query(`select id::text, tenant_id::text, firm_id::text, source_channel, contact_name, organization_name, contact_email, contact_phone, enquiry_summary, requested_service_hint, urgency, status, qualification_reason, consent_or_legal_basis_ref, conflict_check_status, conflict_check_ref, assigned_actor_id::text, client_id::text, relationship_id::text, lead_id::text, intake_session_id::text, created_at, updated_at, metadata from front_desk_enquiries order by created_at, id`);
-  const communicationDrafts = await client.query(`select id::text, tenant_id::text, firm_id::text, enquiry_id::text, channel, subject, body, status, requires_human_review, prepared_by_actor_id::text, approved_by_actor_id::text, sent_at, created_at, updated_at, metadata from client_communication_drafts order by created_at, id`);
-  const tasks = await client.query(`select id::text, tenant_id::text, firm_id::text, project_id::text, work_package_id::text, task_type, input_ref, output_ref, assigned_actor_or_worker_ref::text, state, risk_class, due_at, created_at, updated_at from tasks order by created_at, id`);
-  const documents = await client.query(`select id::text, tenant_id::text, firm_id::text, project_id::text, relationship_id::text, document_type, title, current_version_id::text, status, classification, created_at from documents order by created_at, id`);
-  const documentVersions = await client.query(`select id::text, tenant_id::text, firm_id::text, document_id::text, version_label, revision, storage_ref, hash, created_by_actor_id::text, approved_by_approval_id::text, supersedes_version_id::text, status, created_at from document_versions order by created_at, id`);
-  const administrationSkillBindings=await client.query(`select id::text,tenant_id::text,firm_id::text,worker_template_code,role_skill_ref,worker_skill_ref,input_schema_ref,output_schema_ref,supervisor_actor_id::text,permissions,forbidden_actions,status,version,created_at,metadata from administration_skill_bindings order by created_at,id`);
-  const correspondenceRecords=await client.query(`select id::text,tenant_id::text,firm_id::text,relationship_id::text,project_id::text,direction,channel,subject,correspondent,received_or_drafted_at,status,owner_actor_id::text,response_due_at,source_ref,created_at,updated_at,metadata from correspondence_records order by created_at,id`);
-  const documentRegisterEntries=await client.query(`select id::text,tenant_id::text,firm_id::text,relationship_id::text,project_id::text,document_number,title,document_type,discipline,classification,status,current_revision_id::text,owner_actor_id::text,created_at,updated_at,metadata from document_register_entries order by created_at,id`);
-  const documentRevisionRecords=await client.query(`select id::text,tenant_id::text,firm_id::text,document_register_entry_id::text,revision,version_label,storage_ref,content_hash,status,supersedes_revision_id::text,created_by_actor_id::text,created_at,metadata from document_revision_records order by created_at,id`);
-  const administrativeDeadlines=await client.query(`select id::text,tenant_id::text,firm_id::text,project_id::text,relationship_id::text,title,due_at,priority,status,assigned_actor_or_worker_ref::text,source_ref,created_at,updated_at,completed_at,metadata from administrative_deadlines order by due_at,id`);
-  const transmittalDrafts=await client.query(`select id::text,tenant_id::text,firm_id::text,project_id::text,relationship_id::text,recipient,subject,document_revision_refs,message_body,status,requires_principal_approval,prepared_by_actor_id::text,approved_by_actor_id::text,issued_at,created_at,updated_at,metadata from transmittal_drafts order by created_at,id`);
-  const evidence = await client.query(`select id::text, tenant_id::text, firm_id::text, project_id::text, subject_type, subject_id::text, source_document_refs, input_refs, calculation_refs, qa_check_refs, policy_check_refs, review_notes_ref, final_output_ref, bundle_hash, status, created_at from evidence_bundles order by created_at, id`);
-  const invoices = await client.query(`select id::text, tenant_id::text, firm_id::text, relationship_id::text, engagement_id::text, project_id::text, invoice_number, currency, line_items, tax_summary, status, due_at, created_at, updated_at from invoices order by created_at, id`);
-  const paymentStatuses = await client.query(`select id::text, tenant_id::text, firm_id::text, invoice_id::text, amount, currency, provider_ref, payment_status, received_at, created_at, updated_at from payment_statuses order by created_at, id`);
-  const marketplaceListings = await client.query(`select id::text, tenant_id::text, firm_id::text, service_pack_id::text, listing_scope, title, description, qualification_requirements, commercial_model, visibility, status, created_at, updated_at from marketplace_listings order by created_at, id`);
-  const capacityOffers = await client.query(`select id::text, tenant_id::text, firm_id::text, service_pack_id::text, capacity_type, pce_units, available_from, available_until, jurisdiction_refs, constraints, status, created_at, updated_at from capacity_offers order by created_at, id`);
-  const collaborationRequests = await client.query(`select id::text, tenant_id::text, requesting_firm_id::text, provider_firm_id::text, service_pack_id::text, project_id::text, capacity_offer_id::text, request_summary, data_room_policy, status, created_at, updated_at, metadata from collaboration_requests order by created_at, id`);
-  const directoryReviewBoardDecisions = await client.query(`select id::text, tenant_id::text, provider_firm_id::text, listing_id::text, qualification_gate_id::text, board_ref, decision, decision_summary, evidence_refs, decided_by_actor_id::text, decided_at, created_at, metadata from directory_review_board_decisions order by created_at, id`);
-  const directoryPrivateEnquiries = await client.query(`select id::text, tenant_id::text, requesting_firm_id::text, provider_firm_id::text, listing_id::text, enquiry_summary, status, matching_mode, no_live_matching, no_ranking, no_award, created_by_actor_id::text, created_at, updated_at, metadata from directory_private_enquiries order by created_at, id`);
-  const qualificationRenewalReviews = await client.query(`select id::text, tenant_id::text, provider_firm_id::text, qualification_gate_id::text, listing_id::text, credential_id::text, jurisdiction_ref, review_status, expires_at, next_review_due_at, evidence_refs, reviewed_by_actor_id::text, reviewed_at, created_at, metadata from qualification_renewal_reviews order by created_at, id`);
-  const networkProfessionalProfiles = await client.query(`select id::text, tenant_id::text, firm_id::text, person_id::text, professional_profile_id::text, display_name, profile_scope, network_status, authority_grant, jurisdiction_refs, credential_refs, capability_refs, created_by_actor_id::text, created_at, updated_at, metadata from network_professional_profiles order by created_at, id`);
-  const networkFirmProfiles = await client.query(`select id::text, tenant_id::text, firm_id::text, display_name, profile_scope, network_status, jurisdiction_refs, capability_refs, created_by_actor_id::text, created_at, updated_at, metadata from network_firm_profiles order by created_at, id`);
-  const networkCapabilities = await client.query(`select id::text, tenant_id::text, firm_id::text, professional_network_profile_id::text, firm_network_profile_id::text, capability_code, service_pack_ref, jurisdiction_refs, visibility, qualification_required, status, created_by_actor_id::text, created_at, updated_at, metadata from network_capabilities order by created_at, id`);
-  const networkCredentials = await client.query(`select id::text, tenant_id::text, firm_id::text, professional_network_profile_id::text, credential_type, credential_name, issuer, jurisdiction_refs, verification_status, verified_by_actor_id::text, verified_at, valid_from, valid_until, evidence_refs, authority_grant, created_by_actor_id::text, created_at, updated_at, metadata from network_credentials order by created_at, id`);
-  const networkTrustSignals = await client.query(`select id::text, tenant_id::text, firm_id::text, subject_type, subject_id::text, signal_type, signal_summary, evidence_refs, trust_weight, substitutes_for_credential, status, created_by_actor_id::text, created_at, updated_at, metadata from network_trust_signals order by created_at, id`);
-  const networkConflictChecks = await client.query(`select id::text, tenant_id::text, requesting_firm_id::text, provider_firm_id::text, subject_profile_id::text, check_status, conflict_summary, evidence_refs, checked_by_actor_id::text, created_at, metadata from network_conflict_checks order by created_at, id`);
-  const networkQualificationGates = await client.query(`select id::text, tenant_id::text, requesting_firm_id::text, provider_firm_id::text, professional_network_profile_id::text, firm_network_profile_id::text, capability_id::text, credential_id::text, conflict_check_id::text, jurisdiction_ref, credential_status, jurisdiction_status, insurance_status, conflict_status, capacity_status, policy_status, gate_status, denial_reasons, created_by_actor_id::text, created_at, updated_at, metadata from network_qualification_gates order by created_at, id`);
-  const specialistInvitations = await client.query(`select id::text, tenant_id::text, requesting_firm_id::text, provider_firm_id::text, qualification_gate_id::text, capability_id::text, invitation_status, denial_reasons, invited_by_actor_id::text, created_at, updated_at, metadata from specialist_invitations order by created_at, id`);
-  const collaborationWorkspaces = await client.query(`select id::text, tenant_id::text, requesting_firm_id::text, provider_firm_id::text, specialist_invitation_id::text, qualification_gate_id::text, workspace_status, data_room_policy, permitted_evidence_refs, created_by_actor_id::text, created_at, updated_at, metadata from collaboration_workspaces order by created_at, id`);
-  const collaborationWorkspaceParticipants = await client.query(`select id::text, tenant_id::text, workspace_id::text, firm_id::text, actor_id::text, participant_role, access_status, permissions, granted_by_actor_id::text, granted_at, revoked_by_actor_id::text, revoked_at, metadata from collaboration_workspace_participants order by granted_at, id`);
-  const collaborationWorkspaceEvidence = await client.query(`select id::text, tenant_id::text, workspace_id::text, participant_id::text, evidence_ref, evidence_type, access_scope, added_by_actor_id::text, added_at, metadata from collaboration_workspace_evidence order by added_at, id`);
-  const responsibilityMatrices = await client.query(`select id::text, tenant_id::text, workspace_id::text, requesting_firm_id::text, provider_firm_id::text, accountable_firm_id::text, responsible_professional_actor_id::text, reviewer_actor_id::text, approver_actor_id::text, permitted_worker_actions, regulated_scope, approval_required, matrix_status, created_by_actor_id::text, created_at, updated_at, metadata from responsibility_matrices order by created_at, id`);
-  const specialistAssignments = await client.query(`select id::text, tenant_id::text, workspace_id::text, responsibility_matrix_id::text, requesting_firm_id::text, provider_firm_id::text, assignment_title, assignment_scope, assignment_status, requested_by_actor_id::text, accepted_by_actor_id::text, started_by_actor_id::text, delivered_by_actor_id::text, reviewed_by_actor_id::text, approved_by_actor_id::text, closed_by_actor_id::text, evidence_refs, review_summary, approval_summary, requested_at, accepted_at, started_at, delivered_at, reviewed_at, approved_at, closed_at, updated_at, metadata from specialist_assignments order by requested_at, id`);
-  const observatorySnapshots = await client.query(`select id::text, tenant_id::text, firm_id::text, snapshot_scope, metrics, privacy_class, generated_at from observatory_snapshots order by generated_at, id`);
-  const pilotUsers = await client.query(`select id::text, tenant_id::text, firm_id::text, person_id::text, actor_id::text, email, display_name, pilot_role, invite_status, auth_provider, external_subject, invited_at, activated_at, revoked_at, metadata from pilot_users order by invited_at, id`);
-  const commercialSkillBindings=await client.query(`select id::text,tenant_id::text,firm_id::text,worker_template_code,role_skill_ref,worker_skill_ref,input_schema_ref,output_schema_ref,supervisor_actor_id::text,permissions,forbidden_actions,status,version,created_at,metadata from commercial_skill_bindings order by created_at,id`);
-  const salesPipelineRecords=await client.query(`select id::text,tenant_id::text,firm_id::text,enquiry_id::text,relationship_id::text,intake_session_id::text,proposal_id::text,opportunity_name,stage,estimated_value,currency,probability_percent,owner_actor_id::text,next_action,next_action_due_at,lost_reason,created_at,updated_at,metadata from sales_pipeline_records order by created_at,id`);
-  const proposalDispatchRecords=await client.query(`select id::text,tenant_id::text,firm_id::text,proposal_id::text,recipient,channel,dispatch_status,dispatched_by_actor_id::text,commercial_approval_id::text,document_ref,dispatched_at,created_at,metadata from proposal_dispatch_records order by created_at,id`);
-  const expenseRecords=await client.query(`select id::text,tenant_id::text,firm_id::text,project_id::text,supplier,description,category,amount,currency,expense_date,receipt_ref,status,prepared_by_actor_id::text,approved_by_actor_id::text,approved_at,payment_instruction_ref,created_at,updated_at,metadata from expense_records order by expense_date,id`);
-  const receivableFollowUps=await client.query(`select id::text,tenant_id::text,firm_id::text,invoice_id::text,channel,subject,message_body,status,requires_human_review,prepared_by_actor_id::text,approved_by_actor_id::text,sent_at,created_at,updated_at,metadata from receivable_follow_ups order by created_at,id`);
-  const supportCases = await client.query(`select id::text, tenant_id::text, firm_id::text, opened_by_actor_id::text, related_pilot_user_id::text, case_type, severity, status, subject, description, resolution_summary, created_at, updated_at, closed_at, metadata from support_cases order by created_at, id`);
-  const technicalSkillBindings=await client.query(`select id::text,tenant_id::text,firm_id::text,worker_template_code,role_skill_ref,worker_skill_ref,input_schema_ref,output_schema_ref,supervisor_actor_id::text,permissions,forbidden_actions,status,version,created_at,metadata from technical_skill_bindings order by created_at,id`);
-  const drawingReviewRecords=await client.query(`select id::text,tenant_id::text,firm_id::text,project_id::text,document_register_entry_id::text,base_revision_id::text,compared_revision_id::text,check_results,status,prepared_by_actor_id::text,requires_professional_review,created_at,metadata from drawing_review_records order by created_at,id`);
-  const calculationInputSets=await client.query(`select id::text,tenant_id::text,firm_id::text,project_id::text,intake_session_id::text,source_revision_refs,input_values,unit_system,validation_results,validation_status,deterministic_engine_ref,prepared_by_actor_id::text,created_at,updated_at,metadata from calculation_input_sets order by created_at,id`);
-  const technicalQaFindings=await client.query(`select id::text,tenant_id::text,firm_id::text,project_id::text,subject_type,subject_id::text,finding_code,severity,description,status,raised_by_actor_id::text,resolved_by_actor_id::text,resolution_summary,created_at,updated_at,resolved_at,metadata from technical_qa_findings order by created_at,id`);
-  const deliveryPackageRecords=await client.query(`select id::text,tenant_id::text,firm_id::text,project_id::text,drawing_revision_refs,calculation_input_set_id::text,qa_finding_refs,evidence_refs,readiness_checks,package_status,requires_professional_review,prepared_by_actor_id::text,professional_approval_id::text,issued_document_version_id::text,created_at,updated_at,metadata from delivery_package_records order by created_at,id`);
-  const pilotIncidents = await client.query(`select id::text, tenant_id::text, firm_id::text, support_case_id::text, project_id::text, opened_by_actor_id::text, incident_type, severity, status, title, description, detection_source, impact_summary, mitigation_summary, root_cause_summary, created_at, updated_at, resolved_at, metadata from pilot_incidents order by created_at, id`);
-  const pilotFeedback = await client.query(`select id::text, tenant_id::text, firm_id::text, pilot_user_id::text, project_id::text, submitted_by_actor_id::text, feedback_type, sentiment, rating, subject, feedback_text, created_at, metadata from pilot_feedback order by created_at, id`);
-  const acceptanceReviews = await client.query(`select id::text, tenant_id::text, firm_id::text, reviewed_by_actor_id::text, review_scope, criteria, decision, evidence_refs, notes, created_at, updated_at, metadata from pilot_acceptance_reviews order by created_at, id`);
-  const improvementItems = await client.query(`select id::text, tenant_id::text, firm_id::text, feedback_id::text, acceptance_review_id::text, owner_actor_id::text, item_type, priority, status, title, description, target_stage, created_at, updated_at, closed_at, metadata from pilot_improvement_items order by created_at, id`);
-  const reportPacks = await client.query(`select id::text, tenant_id::text, firm_id::text, generated_by_actor_id::text, report_scope, report_status, summary, export_manifest, created_at, metadata from pilot_report_packs order by created_at, id`);
-  const reviewBoards = await client.query(`select id::text, tenant_id::text, firm_id::text, report_pack_id::text, chaired_by_actor_id::text, board_name, review_status, agenda, attendees, scheduled_at, created_at, updated_at, closed_at, metadata from stakeholder_review_boards order by created_at, id`);
-  const reviewDecisions = await client.query(`select id::text, tenant_id::text, firm_id::text, board_id::text, decided_by_actor_id::text, decision, decision_summary, conditions, next_stage, decided_at, metadata from stakeholder_review_decisions order by decided_at, id`);
-  const expansionCohorts = await client.query(`select id::text, tenant_id::text, firm_id::text, stakeholder_decision_id::text, created_by_actor_id::text, cohort_name, expansion_status, max_tenants, max_pilot_users, entry_criteria, risk_controls, created_at, updated_at, metadata from pilot_expansion_cohorts order by created_at, id`);
-  const onboardingPlans = await client.query(`select id::text, tenant_id::text, firm_id::text, expansion_cohort_id::text, assigned_operator_actor_id::text, onboarding_status, onboarding_steps, readiness_checks, target_start_at, created_at, updated_at, completed_at, metadata from tenant_onboarding_plans order by created_at, id`);
-  const rcGates = await client.query(`select id::text, tenant_id::text, firm_id::text, expansion_cohort_id::text, reviewed_by_actor_id::text, release_candidate, gate_status, required_checks, evidence_refs, decision_summary, created_at, decided_at, metadata from release_candidate_gates order by created_at, id`);
-  const pilotControls = await client.query(`select id::text, tenant_id::text, firm_id::text, created_by_actor_id::text, control_status, plan_code, limits, billing_readiness, created_at, updated_at, metadata from tenant_pilot_controls order by created_at, id`);
-  const usageEvents = await client.query(`select id::text, tenant_id::text, firm_id::text, actor_id::text, usage_type, quantity, unit, source_ref, recorded_at, metadata from tenant_usage_events order by recorded_at, id`);
-  const billingReviews = await client.query(`select id::text, tenant_id::text, firm_id::text, reviewed_by_actor_id::text, readiness_status, pricing_model, checks, decision_summary, created_at, metadata from billing_readiness_reviews order by created_at, id`);
-  const paymentProviderConfigs = await client.query(`select id::text, tenant_id::text, firm_id::text, configured_by_actor_id::text, provider_name, provider_mode, config_status, capabilities, required_env, created_at, updated_at, metadata from payment_provider_configs order by created_at, id`);
-  const subscriptionPackages = await client.query(`select id::text, tenant_id::text, firm_id::text, created_by_actor_id::text, package_code, package_name, package_status, pricing_model, base_price, currency, usage_limits, features, created_at, updated_at, metadata from subscription_packages order by created_at, id`);
-  const commercialLaunchControls = await client.query(`select id::text, tenant_id::text, firm_id::text, payment_provider_config_id::text, subscription_package_id::text, reviewed_by_actor_id::text, launch_status, required_controls, decision_summary, created_at, decided_at, metadata from commercial_launch_controls order by created_at, id`);
-  const pilotHandoffRecords = await client.query(`select id::text, tenant_id::text, firm_id::text, accepted_by_actor_id::text, rehearsal_ref, handoff_status, checklist, evidence_refs, decision_summary, accepted_at, created_at, metadata from pilot_handoff_records order by created_at, id`);
-  const policyDecisions = await client.query(`select id::text, tenant_id::text, firm_id::text, policy_id, policy_version, actor_id::text, action, resource_type, resource_id::text, context_ref, result, reasons, created_at from policy_decisions order by created_at, id`);
-  const events = await client.query(`select id::text, event_type, event_version, occurred_at, recorded_at, actor_id::text, actor_type, tenant_id::text, firm_id::text, aggregate_type, aggregate_id::text, aggregate_version, correlation_id::text, causation_id::text, idempotency_key, payload, payload_ref, payload_summary, policy_decision_id::text, audit_event_id::text, provenance from event_log order by occurred_at, id`);
-  const audits = await client.query(`select id::text, tenant_id::text, firm_id::text, actor_id::text, action, resource_type, resource_id::text, resource_version, policy_decision_id::text, correlation_id::text, causation_id::text, occurred_at, summary, evidence_ref from audit_events order by occurred_at, id`);
+}
+// HM-S7 Phase 4f, slice 2 (2026-09-29): no longer takes a `client` param -- see loadPostgresStore's
+// comment above for why (this now fires its queries across the pool, not one held connection).
+// seedWorkerTemplates() runs through the pool too; it's an idempotent (on conflict do nothing)
+// one-time upsert, so it doesn't need a dedicated connection or transaction.
+async function readRelationalStore(tenantId = null) {
+  const pool = getPool();
+  const scope = tenantId ? { where: " where tenant_id = $1", params: [tenantId] } : { where: "", params: [] };
+  const servicePacks$p = pool.query(`select id::text, code, name, discipline, status, version, description, configuration, created_at, updated_at from service_packs order by created_at, id`);
+  const serviceSkus$p = pool.query(`select id::text, service_pack_id::text, code, name, status, pricing_model, created_at, updated_at from service_skus order by created_at, id`);
+  await seedWorkerTemplates(pool);
+  const workerTemplates$p = pool.query(`select id::text, code, name, version, default_tools, default_budget, risk_envelope, status, created_at, updated_at from worker_templates order by created_at, id`);
+  const workerInstances$p = pool.query(`select id::text, tenant_id::text, firm_id::text, worker_template_id::text, actor_id::text, name, assigned_services, tool_allowlist, budget_envelope, risk_limits, runtime_status, created_at, updated_at from worker_instances${scope.where} order by created_at, id`, scope.params);
+  const taskOutputs$p = pool.query(`select id::text, tenant_id::text, firm_id::text, project_id::text, task_id::text, worker_instance_id::text, output_ref, output_schema_ref, evidence_refs, quality_flags, requires_human_review, status, created_at from task_outputs${scope.where} order by created_at, id`, scope.params);
+  const toolInvocations$p = pool.query(`select id::text, tenant_id::text, firm_id::text, worker_instance_id::text, task_id::text, tool_name, invocation_status, input_summary, output_ref, cost_estimate, created_at, completed_at from tool_invocations${scope.where} order by created_at, id`, scope.params);
+  const memberships$p = pool.query(`select id::text, tenant_id::text, firm_id::text, actor_id::text, person_id::text, role, permissions, status, created_at, updated_at from firm_memberships${scope.where} order by created_at, id`, scope.params);
+  const professionalProfiles$p = pool.query(`select id::text, tenant_id::text, person_id::text, disciplines, specializations, jurisdictions, credential_refs, professional_status, created_at, updated_at from professional_profiles${scope.where} order by created_at, id`, scope.params);
+  const professionalAuthorities$p = pool.query(`select id::text, tenant_id::text, firm_id::text, professional_id::text, practice_id::text, service_scope, jurisdiction_id::text, permitted_actions, risk_limits, credential_refs, valid_from, valid_to, status, policy_basis_ref, created_at, updated_at from professional_authorities${scope.where} order by created_at, id`, scope.params);
+  const tenants$p = pool.query(`select id::text, name, status, isolation_policy_id::text, default_region, data_residency_policy, billing_account_ref, created_at, metadata from tenants order by created_at, id`);
+  const persons$p = pool.query(`select id::text, tenant_id::text, identity_provider_subject, legal_name, preferred_name, contact_refs, status, created_at, updated_at, metadata from persons${scope.where} order by created_at, id`, scope.params);
+  const actors$p = pool.query(`select id::text, id::text as actor_id, actor_type, person_id::text, worker_instance_id::text, system_id, external_service_id, tenant_id::text, firm_id::text, display_name, status, created_at, metadata from actors${scope.where} order by created_at, id`, scope.params);
+  const firms$p = pool.query(`select id::text, tenant_id::text, name, brand_id::text, business_entity_id::text, primary_principal_assignment_id::text, lifecycle_state, lifecycle_state_reason, active_practices, configuration_version, status, version, created_at, created_by_actor_id::text, updated_at, updated_by_actor_id::text, data_classification, provenance, metadata from firms${scope.where} order by created_at, id`, scope.params);
+  const clients$p = pool.query(`select id::text, tenant_id::text, firm_id::text, client_type, name, primary_contact_id::text, confidentiality_class, status, version, created_at, updated_at, metadata from clients${scope.where} order by created_at, id`, scope.params);
+  const relationships$p = pool.query(`select id::text, tenant_id::text, firm_id::text, client_id::text, relationship_type, status, origin, responsible_owner_actor_id::text, contracting_business_entity_id::text, consent_or_legal_basis_ref, conflict_check_ref, created_at, updated_at from firm_client_relationships${scope.where} order by created_at, id`, scope.params);
+  const leads$p = pool.query(`select id::text, tenant_id::text, firm_id::text, relationship_id::text, source_channel, requested_service_hint, urgency, qualification_status, assigned_actor_id::text, created_from_conversation_ref, created_at, metadata from leads${scope.where} order by created_at, id`, scope.params);
+  const intakeSessions$p = pool.query(`select id::text, tenant_id::text, firm_id::text, lead_id::text, service_id::text, required_inputs, provided_inputs, missing_information_items, intake_status, created_at, updated_at from intake_sessions${scope.where} order by created_at, id`, scope.params);
+  const prices$p = pool.query(`select id::text, tenant_id::text, firm_id::text, service_sku_id::text, scope_inputs, human_effort_estimate, ai_runtime_estimate, specialist_cost_estimate, tool_cost_estimate, risk_contingency, platform_fee, margin_target, final_price, approval_required, created_at from price_build_ups${scope.where} order by created_at, id`, scope.params);
+  const proposals$p = pool.query(`select id::text, tenant_id::text, firm_id::text, relationship_id::text, service_id::text, scope_summary, price_build_up_id::text, commercial_approval_id::text, proposal_status, valid_until, issued_document_ref, version, created_at, updated_at from proposals${scope.where} order by created_at, id`, scope.params);
+  const approvals$p = pool.query(`select id::text, tenant_id::text, firm_id::text, subject_type, subject_id::text, subject_version_or_hash, requested_by_actor_id::text, approver_actor_id::text, approver_professional_id::text, authority_id::text, decision, conditions, evidence_bundle_id::text, authentication_strength, decided_at, audit_event_id::text, created_at from approvals${scope.where} order by created_at, id`, scope.params);
+  const engagements$p = pool.query(`select id::text, tenant_id::text, firm_id::text, relationship_id::text, proposal_id::text, contract_ref, scope_ref, commercial_terms_ref, acceptance_criteria_ref, status, created_at, updated_at from engagements${scope.where} order by created_at, id`, scope.params);
+  const projects$p = pool.query(`select id::text, tenant_id::text, firm_id::text, relationship_id::text, engagement_id::text, service_id::text, project_name, project_state, risk_class, responsible_professional_id::text, created_at, updated_at from projects${scope.where} order by created_at, id`, scope.params);
+  const workPackages$p = pool.query(`select id::text, tenant_id::text, firm_id::text, project_id::text, service_step, assigned_worker_instance_id::text, assigned_human_actor_id::text, state, required_evidence, approval_requirement_id::text, created_at, updated_at from work_packages${scope.where} order by created_at, id`, scope.params);
+  const frontDeskEnquiries$p = pool.query(`select id::text, tenant_id::text, firm_id::text, source_channel, contact_name, organization_name, contact_email, contact_phone, enquiry_summary, requested_service_hint, urgency, status, qualification_reason, consent_or_legal_basis_ref, conflict_check_status, conflict_check_ref, assigned_actor_id::text, client_id::text, relationship_id::text, lead_id::text, intake_session_id::text, created_at, updated_at, metadata from front_desk_enquiries${scope.where} order by created_at, id`, scope.params);
+  const communicationDrafts$p = pool.query(`select id::text, tenant_id::text, firm_id::text, enquiry_id::text, channel, subject, body, status, requires_human_review, prepared_by_actor_id::text, approved_by_actor_id::text, sent_at, created_at, updated_at, metadata from client_communication_drafts${scope.where} order by created_at, id`, scope.params);
+  const tasks$p = pool.query(`select id::text, tenant_id::text, firm_id::text, project_id::text, work_package_id::text, task_type, input_ref, output_ref, assigned_actor_or_worker_ref::text, state, risk_class, due_at, created_at, updated_at from tasks${scope.where} order by created_at, id`, scope.params);
+  const documents$p = pool.query(`select id::text, tenant_id::text, firm_id::text, project_id::text, relationship_id::text, document_type, title, current_version_id::text, status, classification, created_at from documents${scope.where} order by created_at, id`, scope.params);
+  const documentVersions$p = pool.query(`select id::text, tenant_id::text, firm_id::text, document_id::text, version_label, revision, storage_ref, hash, created_by_actor_id::text, approved_by_approval_id::text, supersedes_version_id::text, status, created_at from document_versions${scope.where} order by created_at, id`, scope.params);
+  const administrationSkillBindings$p = pool.query(`select id::text,tenant_id::text,firm_id::text,worker_template_code,role_skill_ref,worker_skill_ref,input_schema_ref,output_schema_ref,supervisor_actor_id::text,permissions,forbidden_actions,status,version,created_at,metadata from administration_skill_bindings${scope.where} order by created_at,id`, scope.params);
+  const correspondenceRecords$p = pool.query(`select id::text,tenant_id::text,firm_id::text,relationship_id::text,project_id::text,direction,channel,subject,correspondent,received_or_drafted_at,status,owner_actor_id::text,response_due_at,source_ref,created_at,updated_at,metadata from correspondence_records${scope.where} order by created_at,id`, scope.params);
+  const documentRegisterEntries$p = pool.query(`select id::text,tenant_id::text,firm_id::text,relationship_id::text,project_id::text,document_number,title,document_type,discipline,classification,status,current_revision_id::text,owner_actor_id::text,created_at,updated_at,metadata from document_register_entries${scope.where} order by created_at,id`, scope.params);
+  const documentRevisionRecords$p = pool.query(`select id::text,tenant_id::text,firm_id::text,document_register_entry_id::text,revision,version_label,storage_ref,content_hash,status,supersedes_revision_id::text,created_by_actor_id::text,created_at,metadata from document_revision_records${scope.where} order by created_at,id`, scope.params);
+  const administrativeDeadlines$p = pool.query(`select id::text,tenant_id::text,firm_id::text,project_id::text,relationship_id::text,title,due_at,priority,status,assigned_actor_or_worker_ref::text,source_ref,created_at,updated_at,completed_at,metadata from administrative_deadlines${scope.where} order by due_at,id`, scope.params);
+  const transmittalDrafts$p = pool.query(`select id::text,tenant_id::text,firm_id::text,project_id::text,relationship_id::text,recipient,subject,document_revision_refs,message_body,status,requires_principal_approval,prepared_by_actor_id::text,approved_by_actor_id::text,issued_at,created_at,updated_at,metadata from transmittal_drafts${scope.where} order by created_at,id`, scope.params);
+  const evidence$p = pool.query(`select id::text, tenant_id::text, firm_id::text, project_id::text, subject_type, subject_id::text, source_document_refs, input_refs, calculation_refs, qa_check_refs, policy_check_refs, review_notes_ref, final_output_ref, bundle_hash, status, created_at from evidence_bundles${scope.where} order by created_at, id`, scope.params);
+  const invoices$p = pool.query(`select id::text, tenant_id::text, firm_id::text, relationship_id::text, engagement_id::text, project_id::text, invoice_number, currency, line_items, tax_summary, status, due_at, created_at, updated_at from invoices${scope.where} order by created_at, id`, scope.params);
+  const paymentStatuses$p = pool.query(`select id::text, tenant_id::text, firm_id::text, invoice_id::text, amount, currency, provider_ref, payment_status, received_at, created_at, updated_at from payment_statuses${scope.where} order by created_at, id`, scope.params);
+  const marketplaceListings$p = pool.query(`select id::text, tenant_id::text, firm_id::text, service_pack_id::text, listing_scope, title, description, qualification_requirements, commercial_model, visibility, status, created_at, updated_at from marketplace_listings${scope.where} order by created_at, id`, scope.params);
+  const capacityOffers$p = pool.query(`select id::text, tenant_id::text, firm_id::text, service_pack_id::text, capacity_type, pce_units, available_from, available_until, jurisdiction_refs, constraints, status, created_at, updated_at from capacity_offers${scope.where} order by created_at, id`, scope.params);
+  const collaborationRequests$p = pool.query(`select id::text, tenant_id::text, requesting_firm_id::text, provider_firm_id::text, service_pack_id::text, project_id::text, capacity_offer_id::text, request_summary, data_room_policy, status, created_at, updated_at, metadata from collaboration_requests${scope.where} order by created_at, id`, scope.params);
+  const directoryReviewBoardDecisions$p = pool.query(`select id::text, tenant_id::text, provider_firm_id::text, listing_id::text, qualification_gate_id::text, board_ref, decision, decision_summary, evidence_refs, decided_by_actor_id::text, decided_at, created_at, metadata from directory_review_board_decisions${scope.where} order by created_at, id`, scope.params);
+  const directoryPrivateEnquiries$p = pool.query(`select id::text, tenant_id::text, requesting_firm_id::text, provider_firm_id::text, listing_id::text, enquiry_summary, status, matching_mode, no_live_matching, no_ranking, no_award, created_by_actor_id::text, created_at, updated_at, metadata from directory_private_enquiries${scope.where} order by created_at, id`, scope.params);
+  const qualificationRenewalReviews$p = pool.query(`select id::text, tenant_id::text, provider_firm_id::text, qualification_gate_id::text, listing_id::text, credential_id::text, jurisdiction_ref, review_status, expires_at, next_review_due_at, evidence_refs, reviewed_by_actor_id::text, reviewed_at, created_at, metadata from qualification_renewal_reviews${scope.where} order by created_at, id`, scope.params);
+  const networkProfessionalProfiles$p = pool.query(`select id::text, tenant_id::text, firm_id::text, person_id::text, professional_profile_id::text, display_name, profile_scope, network_status, authority_grant, jurisdiction_refs, credential_refs, capability_refs, created_by_actor_id::text, created_at, updated_at, metadata from network_professional_profiles${scope.where} order by created_at, id`, scope.params);
+  const networkFirmProfiles$p = pool.query(`select id::text, tenant_id::text, firm_id::text, display_name, profile_scope, network_status, jurisdiction_refs, capability_refs, created_by_actor_id::text, created_at, updated_at, metadata from network_firm_profiles${scope.where} order by created_at, id`, scope.params);
+  const networkCapabilities$p = pool.query(`select id::text, tenant_id::text, firm_id::text, professional_network_profile_id::text, firm_network_profile_id::text, capability_code, service_pack_ref, jurisdiction_refs, visibility, qualification_required, status, created_by_actor_id::text, created_at, updated_at, metadata from network_capabilities${scope.where} order by created_at, id`, scope.params);
+  const networkCredentials$p = pool.query(`select id::text, tenant_id::text, firm_id::text, professional_network_profile_id::text, credential_type, credential_name, issuer, jurisdiction_refs, verification_status, verified_by_actor_id::text, verified_at, valid_from, valid_until, evidence_refs, authority_grant, created_by_actor_id::text, created_at, updated_at, metadata from network_credentials${scope.where} order by created_at, id`, scope.params);
+  const networkTrustSignals$p = pool.query(`select id::text, tenant_id::text, firm_id::text, subject_type, subject_id::text, signal_type, signal_summary, evidence_refs, trust_weight, substitutes_for_credential, status, created_by_actor_id::text, created_at, updated_at, metadata from network_trust_signals${scope.where} order by created_at, id`, scope.params);
+  const networkConflictChecks$p = pool.query(`select id::text, tenant_id::text, requesting_firm_id::text, provider_firm_id::text, subject_profile_id::text, check_status, conflict_summary, evidence_refs, checked_by_actor_id::text, created_at, metadata from network_conflict_checks${scope.where} order by created_at, id`, scope.params);
+  const networkQualificationGates$p = pool.query(`select id::text, tenant_id::text, requesting_firm_id::text, provider_firm_id::text, professional_network_profile_id::text, firm_network_profile_id::text, capability_id::text, credential_id::text, conflict_check_id::text, jurisdiction_ref, credential_status, jurisdiction_status, insurance_status, conflict_status, capacity_status, policy_status, gate_status, denial_reasons, created_by_actor_id::text, created_at, updated_at, metadata from network_qualification_gates${scope.where} order by created_at, id`, scope.params);
+  const specialistInvitations$p = pool.query(`select id::text, tenant_id::text, requesting_firm_id::text, provider_firm_id::text, qualification_gate_id::text, capability_id::text, invitation_status, denial_reasons, invited_by_actor_id::text, created_at, updated_at, metadata from specialist_invitations${scope.where} order by created_at, id`, scope.params);
+  const collaborationWorkspaces$p = pool.query(`select id::text, tenant_id::text, requesting_firm_id::text, provider_firm_id::text, specialist_invitation_id::text, qualification_gate_id::text, workspace_status, data_room_policy, permitted_evidence_refs, created_by_actor_id::text, created_at, updated_at, metadata from collaboration_workspaces${scope.where} order by created_at, id`, scope.params);
+  const collaborationWorkspaceParticipants$p = pool.query(`select id::text, tenant_id::text, workspace_id::text, firm_id::text, actor_id::text, participant_role, access_status, permissions, granted_by_actor_id::text, granted_at, revoked_by_actor_id::text, revoked_at, metadata from collaboration_workspace_participants${scope.where} order by granted_at, id`, scope.params);
+  const collaborationWorkspaceEvidence$p = pool.query(`select id::text, tenant_id::text, workspace_id::text, participant_id::text, evidence_ref, evidence_type, access_scope, added_by_actor_id::text, added_at, metadata from collaboration_workspace_evidence${scope.where} order by added_at, id`, scope.params);
+  const responsibilityMatrices$p = pool.query(`select id::text, tenant_id::text, workspace_id::text, requesting_firm_id::text, provider_firm_id::text, accountable_firm_id::text, responsible_professional_actor_id::text, reviewer_actor_id::text, approver_actor_id::text, permitted_worker_actions, regulated_scope, approval_required, matrix_status, created_by_actor_id::text, created_at, updated_at, metadata from responsibility_matrices${scope.where} order by created_at, id`, scope.params);
+  const specialistAssignments$p = pool.query(`select id::text, tenant_id::text, workspace_id::text, responsibility_matrix_id::text, requesting_firm_id::text, provider_firm_id::text, assignment_title, assignment_scope, assignment_status, requested_by_actor_id::text, accepted_by_actor_id::text, started_by_actor_id::text, delivered_by_actor_id::text, reviewed_by_actor_id::text, approved_by_actor_id::text, closed_by_actor_id::text, evidence_refs, review_summary, approval_summary, requested_at, accepted_at, started_at, delivered_at, reviewed_at, approved_at, closed_at, updated_at, metadata from specialist_assignments${scope.where} order by requested_at, id`, scope.params);
+  const observatorySnapshots$p = pool.query(`select id::text, tenant_id::text, firm_id::text, snapshot_scope, metrics, privacy_class, generated_at from observatory_snapshots${scope.where} order by generated_at, id`, scope.params);
+  const pilotUsers$p = pool.query(`select id::text, tenant_id::text, firm_id::text, person_id::text, actor_id::text, email, display_name, pilot_role, invite_status, auth_provider, external_subject, invited_at, activated_at, revoked_at, metadata from pilot_users${scope.where} order by invited_at, id`, scope.params);
+  const commercialSkillBindings$p = pool.query(`select id::text,tenant_id::text,firm_id::text,worker_template_code,role_skill_ref,worker_skill_ref,input_schema_ref,output_schema_ref,supervisor_actor_id::text,permissions,forbidden_actions,status,version,created_at,metadata from commercial_skill_bindings${scope.where} order by created_at,id`, scope.params);
+  const salesPipelineRecords$p = pool.query(`select id::text,tenant_id::text,firm_id::text,enquiry_id::text,relationship_id::text,intake_session_id::text,proposal_id::text,opportunity_name,stage,estimated_value,currency,probability_percent,owner_actor_id::text,next_action,next_action_due_at,lost_reason,created_at,updated_at,metadata from sales_pipeline_records${scope.where} order by created_at,id`, scope.params);
+  const proposalDispatchRecords$p = pool.query(`select id::text,tenant_id::text,firm_id::text,proposal_id::text,recipient,channel,dispatch_status,dispatched_by_actor_id::text,commercial_approval_id::text,document_ref,dispatched_at,created_at,metadata from proposal_dispatch_records${scope.where} order by created_at,id`, scope.params);
+  const expenseRecords$p = pool.query(`select id::text,tenant_id::text,firm_id::text,project_id::text,supplier,description,category,amount,currency,expense_date,receipt_ref,status,prepared_by_actor_id::text,approved_by_actor_id::text,approved_at,payment_instruction_ref,created_at,updated_at,metadata from expense_records${scope.where} order by expense_date,id`, scope.params);
+  const receivableFollowUps$p = pool.query(`select id::text,tenant_id::text,firm_id::text,invoice_id::text,channel,subject,message_body,status,requires_human_review,prepared_by_actor_id::text,approved_by_actor_id::text,sent_at,created_at,updated_at,metadata from receivable_follow_ups${scope.where} order by created_at,id`, scope.params);
+  const supportCases$p = pool.query(`select id::text, tenant_id::text, firm_id::text, opened_by_actor_id::text, related_pilot_user_id::text, case_type, severity, status, subject, description, resolution_summary, created_at, updated_at, closed_at, metadata from support_cases${scope.where} order by created_at, id`, scope.params);
+  const technicalSkillBindings$p = pool.query(`select id::text,tenant_id::text,firm_id::text,worker_template_code,role_skill_ref,worker_skill_ref,input_schema_ref,output_schema_ref,supervisor_actor_id::text,permissions,forbidden_actions,status,version,created_at,metadata from technical_skill_bindings${scope.where} order by created_at,id`, scope.params);
+  const drawingReviewRecords$p = pool.query(`select id::text,tenant_id::text,firm_id::text,project_id::text,document_register_entry_id::text,base_revision_id::text,compared_revision_id::text,check_results,status,prepared_by_actor_id::text,requires_professional_review,created_at,metadata from drawing_review_records${scope.where} order by created_at,id`, scope.params);
+  const calculationInputSets$p = pool.query(`select id::text,tenant_id::text,firm_id::text,project_id::text,intake_session_id::text,source_revision_refs,input_values,unit_system,validation_results,validation_status,deterministic_engine_ref,prepared_by_actor_id::text,created_at,updated_at,metadata from calculation_input_sets${scope.where} order by created_at,id`, scope.params);
+  const technicalQaFindings$p = pool.query(`select id::text,tenant_id::text,firm_id::text,project_id::text,subject_type,subject_id::text,finding_code,severity,description,status,raised_by_actor_id::text,resolved_by_actor_id::text,resolution_summary,created_at,updated_at,resolved_at,metadata from technical_qa_findings${scope.where} order by created_at,id`, scope.params);
+  const deliveryPackageRecords$p = pool.query(`select id::text,tenant_id::text,firm_id::text,project_id::text,drawing_revision_refs,calculation_input_set_id::text,qa_finding_refs,evidence_refs,readiness_checks,package_status,requires_professional_review,prepared_by_actor_id::text,professional_approval_id::text,issued_document_version_id::text,created_at,updated_at,metadata from delivery_package_records${scope.where} order by created_at,id`, scope.params);
+  const pilotIncidents$p = pool.query(`select id::text, tenant_id::text, firm_id::text, support_case_id::text, project_id::text, opened_by_actor_id::text, incident_type, severity, status, title, description, detection_source, impact_summary, mitigation_summary, root_cause_summary, created_at, updated_at, resolved_at, metadata from pilot_incidents${scope.where} order by created_at, id`, scope.params);
+  const pilotFeedback$p = pool.query(`select id::text, tenant_id::text, firm_id::text, pilot_user_id::text, project_id::text, submitted_by_actor_id::text, feedback_type, sentiment, rating, subject, feedback_text, created_at, metadata from pilot_feedback${scope.where} order by created_at, id`, scope.params);
+  const acceptanceReviews$p = pool.query(`select id::text, tenant_id::text, firm_id::text, reviewed_by_actor_id::text, review_scope, criteria, decision, evidence_refs, notes, created_at, updated_at, metadata from pilot_acceptance_reviews${scope.where} order by created_at, id`, scope.params);
+  const improvementItems$p = pool.query(`select id::text, tenant_id::text, firm_id::text, feedback_id::text, acceptance_review_id::text, owner_actor_id::text, item_type, priority, status, title, description, target_stage, created_at, updated_at, closed_at, metadata from pilot_improvement_items${scope.where} order by created_at, id`, scope.params);
+  const reportPacks$p = pool.query(`select id::text, tenant_id::text, firm_id::text, generated_by_actor_id::text, report_scope, report_status, summary, export_manifest, created_at, metadata from pilot_report_packs${scope.where} order by created_at, id`, scope.params);
+  const reviewBoards$p = pool.query(`select id::text, tenant_id::text, firm_id::text, report_pack_id::text, chaired_by_actor_id::text, board_name, review_status, agenda, attendees, scheduled_at, created_at, updated_at, closed_at, metadata from stakeholder_review_boards${scope.where} order by created_at, id`, scope.params);
+  const reviewDecisions$p = pool.query(`select id::text, tenant_id::text, firm_id::text, board_id::text, decided_by_actor_id::text, decision, decision_summary, conditions, next_stage, decided_at, metadata from stakeholder_review_decisions${scope.where} order by decided_at, id`, scope.params);
+  const expansionCohorts$p = pool.query(`select id::text, tenant_id::text, firm_id::text, stakeholder_decision_id::text, created_by_actor_id::text, cohort_name, expansion_status, max_tenants, max_pilot_users, entry_criteria, risk_controls, created_at, updated_at, metadata from pilot_expansion_cohorts${scope.where} order by created_at, id`, scope.params);
+  const onboardingPlans$p = pool.query(`select id::text, tenant_id::text, firm_id::text, expansion_cohort_id::text, assigned_operator_actor_id::text, onboarding_status, onboarding_steps, readiness_checks, target_start_at, created_at, updated_at, completed_at, metadata from tenant_onboarding_plans${scope.where} order by created_at, id`, scope.params);
+  const rcGates$p = pool.query(`select id::text, tenant_id::text, firm_id::text, expansion_cohort_id::text, reviewed_by_actor_id::text, release_candidate, gate_status, required_checks, evidence_refs, decision_summary, created_at, decided_at, metadata from release_candidate_gates${scope.where} order by created_at, id`, scope.params);
+  const pilotControls$p = pool.query(`select id::text, tenant_id::text, firm_id::text, created_by_actor_id::text, control_status, plan_code, limits, billing_readiness, created_at, updated_at, metadata from tenant_pilot_controls${scope.where} order by created_at, id`, scope.params);
+  const usageEvents$p = pool.query(`select id::text, tenant_id::text, firm_id::text, actor_id::text, usage_type, quantity, unit, source_ref, recorded_at, metadata from tenant_usage_events${scope.where} order by recorded_at, id`, scope.params);
+  const billingReviews$p = pool.query(`select id::text, tenant_id::text, firm_id::text, reviewed_by_actor_id::text, readiness_status, pricing_model, checks, decision_summary, created_at, metadata from billing_readiness_reviews${scope.where} order by created_at, id`, scope.params);
+  const paymentProviderConfigs$p = pool.query(`select id::text, tenant_id::text, firm_id::text, configured_by_actor_id::text, provider_name, provider_mode, config_status, capabilities, required_env, created_at, updated_at, metadata from payment_provider_configs${scope.where} order by created_at, id`, scope.params);
+  const subscriptionPackages$p = pool.query(`select id::text, tenant_id::text, firm_id::text, created_by_actor_id::text, package_code, package_name, package_status, pricing_model, base_price, currency, usage_limits, features, created_at, updated_at, metadata from subscription_packages${scope.where} order by created_at, id`, scope.params);
+  const commercialLaunchControls$p = pool.query(`select id::text, tenant_id::text, firm_id::text, payment_provider_config_id::text, subscription_package_id::text, reviewed_by_actor_id::text, launch_status, required_controls, decision_summary, created_at, decided_at, metadata from commercial_launch_controls${scope.where} order by created_at, id`, scope.params);
+  const pilotHandoffRecords$p = pool.query(`select id::text, tenant_id::text, firm_id::text, accepted_by_actor_id::text, rehearsal_ref, handoff_status, checklist, evidence_refs, decision_summary, accepted_at, created_at, metadata from pilot_handoff_records${scope.where} order by created_at, id`, scope.params);
+  const policyDecisions$p = pool.query(`select id::text, tenant_id::text, firm_id::text, policy_id, policy_version, actor_id::text, action, resource_type, resource_id::text, context_ref, result, reasons, created_at from policy_decisions${scope.where} order by created_at, id`, scope.params);
+  const events$p = pool.query(`select id::text, event_type, event_version, occurred_at, recorded_at, actor_id::text, actor_type, tenant_id::text, firm_id::text, aggregate_type, aggregate_id::text, aggregate_version, correlation_id::text, causation_id::text, idempotency_key, payload, payload_ref, payload_summary, policy_decision_id::text, audit_event_id::text, provenance from event_log${scope.where} order by occurred_at, id`, scope.params);
+  const audits$p = pool.query(`select id::text, tenant_id::text, firm_id::text, actor_id::text, action, resource_type, resource_id::text, resource_version, policy_decision_id::text, correlation_id::text, causation_id::text, occurred_at, summary, evidence_ref from audit_events${scope.where} order by occurred_at, id`, scope.params);
+
+  const [servicePacks, serviceSkus, workerTemplates, workerInstances, taskOutputs, toolInvocations, memberships, professionalProfiles, professionalAuthorities, tenants, persons, actors, firms, clients, relationships, leads, intakeSessions, prices, proposals, approvals, engagements, projects, workPackages, frontDeskEnquiries, communicationDrafts, tasks, documents, documentVersions, administrationSkillBindings, correspondenceRecords, documentRegisterEntries, documentRevisionRecords, administrativeDeadlines, transmittalDrafts, evidence, invoices, paymentStatuses, marketplaceListings, capacityOffers, collaborationRequests, directoryReviewBoardDecisions, directoryPrivateEnquiries, qualificationRenewalReviews, networkProfessionalProfiles, networkFirmProfiles, networkCapabilities, networkCredentials, networkTrustSignals, networkConflictChecks, networkQualificationGates, specialistInvitations, collaborationWorkspaces, collaborationWorkspaceParticipants, collaborationWorkspaceEvidence, responsibilityMatrices, specialistAssignments, observatorySnapshots, pilotUsers, commercialSkillBindings, salesPipelineRecords, proposalDispatchRecords, expenseRecords, receivableFollowUps, supportCases, technicalSkillBindings, drawingReviewRecords, calculationInputSets, technicalQaFindings, deliveryPackageRecords, pilotIncidents, pilotFeedback, acceptanceReviews, improvementItems, reportPacks, reviewBoards, reviewDecisions, expansionCohorts, onboardingPlans, rcGates, pilotControls, usageEvents, billingReviews, paymentProviderConfigs, subscriptionPackages, commercialLaunchControls, pilotHandoffRecords, policyDecisions, events, audits] = await Promise.all([servicePacks$p, serviceSkus$p, workerTemplates$p, workerInstances$p, taskOutputs$p, toolInvocations$p, memberships$p, professionalProfiles$p, professionalAuthorities$p, tenants$p, persons$p, actors$p, firms$p, clients$p, relationships$p, leads$p, intakeSessions$p, prices$p, proposals$p, approvals$p, engagements$p, projects$p, workPackages$p, frontDeskEnquiries$p, communicationDrafts$p, tasks$p, documents$p, documentVersions$p, administrationSkillBindings$p, correspondenceRecords$p, documentRegisterEntries$p, documentRevisionRecords$p, administrativeDeadlines$p, transmittalDrafts$p, evidence$p, invoices$p, paymentStatuses$p, marketplaceListings$p, capacityOffers$p, collaborationRequests$p, directoryReviewBoardDecisions$p, directoryPrivateEnquiries$p, qualificationRenewalReviews$p, networkProfessionalProfiles$p, networkFirmProfiles$p, networkCapabilities$p, networkCredentials$p, networkTrustSignals$p, networkConflictChecks$p, networkQualificationGates$p, specialistInvitations$p, collaborationWorkspaces$p, collaborationWorkspaceParticipants$p, collaborationWorkspaceEvidence$p, responsibilityMatrices$p, specialistAssignments$p, observatorySnapshots$p, pilotUsers$p, commercialSkillBindings$p, salesPipelineRecords$p, proposalDispatchRecords$p, expenseRecords$p, receivableFollowUps$p, supportCases$p, technicalSkillBindings$p, drawingReviewRecords$p, calculationInputSets$p, technicalQaFindings$p, deliveryPackageRecords$p, pilotIncidents$p, pilotFeedback$p, acceptanceReviews$p, improvementItems$p, reportPacks$p, reviewBoards$p, reviewDecisions$p, expansionCohorts$p, onboardingPlans$p, rcGates$p, pilotControls$p, usageEvents$p, billingReviews$p, paymentProviderConfigs$p, subscriptionPackages$p, commercialLaunchControls$p, pilotHandoffRecords$p, policyDecisions$p, events$p, audits$p]);
   return {
     tenants: tenants.rows.map(mapDbDates),
     service_packs: servicePacks.rows.map(mapDbDates),
@@ -731,9 +1591,15 @@ export async function createPolicyDecisionRecord(input, decision) {
   if (!uuidOrNull(record.tenant_id) || !uuidOrNull(record.actor_id) || !uuidOrNull(record.resource_id) || !record.action || !record.resource_type || !record.result) return null;
   const client = await getPool().connect();
   try {
+    await client.query("begin");
+    await setTenantContext(client, record.tenant_id);
     await ensureSystemActor(client);
-    await upsertPolicyDecision(client, record);
+    await createPolicyDecision({ ...record, firm_id: uuidOrNull(record.firm_id) }, client);
+    await client.query("commit");
     return record;
+  } catch (error) {
+    await client.query("rollback");
+    throw error;
   } finally {
     client.release();
   }
@@ -753,14 +1619,12 @@ export async function createTenantRecord(body) {
     await client.query("begin");
     const timestamp = now();
     const tenant = buildTenant(body, { id: newUuid(), isolation_policy_id: body.isolation_policy_id ?? newUuid(), created_at: timestamp });
-    const result = await client.query(
-      `insert into tenants (id, name, status, isolation_policy_id, default_region, data_residency_policy, billing_account_ref, created_at, metadata)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)
-       returning id::text, name, status, isolation_policy_id::text, default_region, data_residency_policy, billing_account_ref, created_at, metadata`,
-      [tenant.id, tenant.name, tenant.status, tenant.isolation_policy_id, tenant.default_region, tenant.data_residency_policy, tenant.billing_account_ref, tenant.created_at, JSON.stringify(tenant.metadata)]
-    );
+    // HM-S7 Phase 4c (2026-09-28): repositories/directory-firm-setup.repo.mjs's createTenant()
+    // replaces the hand-written insert, running on this same client so it still participates
+    // in this handler's existing begin/commit transaction.
+    const savedRow = await createTenant(tenant, client);
     await client.query("commit");
-    const savedTenant = mapDbDates(result.rows[0]);
+    const savedTenant = mapDbDates(savedRow);
     await withAppState((store) => {
       appendEventAndAudit(store, { event_type: "tenant.created", actor: systemActor(savedTenant.id), tenant_id: savedTenant.id, aggregate_type: "Tenant", aggregate_id: savedTenant.id, payload: savedTenant, summary: "Tenant created." });
       return savedTenant;
@@ -795,30 +1659,31 @@ export async function createFirmRecord(body) {
   const client = await getPool().connect();
   try {
     await client.query("begin");
+    await setTenantContext(client, body.tenant_id);
     const tenantResult = await client.query("select id from tenants where id = $1", [body.tenant_id]);
     if (tenantResult.rowCount === 0) throwNotFound("tenants", body.tenant_id);
 
     const { person, actor, firm } = buildFirmFoundation(body, { ids: "uuid" });
-    await client.query(
-      `insert into persons (id, tenant_id, identity_provider_subject, legal_name, preferred_name, contact_refs, status, created_at, updated_at, metadata)
-       values ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10::jsonb)`,
-      [person.id, person.tenant_id, person.identity_provider_subject ?? null, person.legal_name, person.preferred_name, JSON.stringify(person.contact_refs ?? []), person.status, person.created_at, person.updated_at, JSON.stringify(person.metadata ?? {})]
-    );
-    await client.query(
-      `insert into actors (id, actor_type, person_id, worker_instance_id, system_id, external_service_id, tenant_id, firm_id, display_name, status, created_at, metadata)
-       values ($1, $2, $3, $4, $5, $6, $7, null, $8, $9, $10, $11::jsonb)`,
-      [actor.id, actor.actor_type, actor.person_id, actor.worker_instance_id ?? null, actor.system_id ?? null, actor.external_service_id ?? null, actor.tenant_id, actor.display_name, actor.status, actor.created_at, JSON.stringify(actor.metadata ?? {})]
-    );
-    await client.query(
-      `insert into firms (id, tenant_id, name, brand_id, business_entity_id, primary_principal_assignment_id, lifecycle_state, lifecycle_state_reason, active_practices, configuration_version, status, version, created_at, created_by_actor_id, updated_at, updated_by_actor_id, data_classification, provenance, metadata)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12, $13, $14, $15, $16, $17, $18::jsonb, $19::jsonb)`,
-      [firm.id, firm.tenant_id, firm.name, firm.brand_id ?? null, firm.business_entity_id ?? null, firm.primary_principal_assignment_id ?? null, firm.lifecycle_state, firm.lifecycle_state_reason, JSON.stringify(firm.active_practices), firm.configuration_version, firm.status, firm.version, firm.created_at, firm.created_by_actor_id, firm.updated_at, firm.updated_by_actor_id, firm.data_classification, JSON.stringify(firm.provenance), JSON.stringify(firm.metadata)]
-    );
-    await client.query("update actors set firm_id = $1 where id = $2", [firm.id, actor.id]);
+    // HM-S7 Phase 4c (2026-09-28): repositories/directory-firm-setup.repo.mjs's createPerson/
+    // createActor/updateActor/createFirm/createFirmMembership/createProfessionalProfile/
+    // createProfessionalAuthority replace the hand-written inserts below, all running on this
+    // same `client` so they still participate in this handler's existing begin/commit
+    // transaction (see shared/db.mjs's optional trailing `client` parameter, added in 4b).
+    await createPerson(person, client);
+    // buildFirmFoundation() already mutated actor.firm_id to the real firm id before returning
+    // (see the end of that function), but firms.created_by_actor_id references actors(id) and
+    // actors.firm_id references firms(id) -- a circular FK. The original hand-written insert
+    // resolved this by hardcoding a literal `null` for firm_id in the SQL text regardless of
+    // the object's value; this insertRow-based call has to do the same explicitly (a shallow
+    // copy, not mutating `actor`, since its real firm_id is still needed for the update below
+    // and for the return payload).
+    await createActor({ ...actor, firm_id: null }, client);
+    await createFirm(firm, client);
+    await updateActor(actor.id, { firm_id: firm.id }, client);
     const { membership, professionalProfile, professionalAuthority } = buildPrincipalGovernance(body, person, { ...actor, firm_id: firm.id }, firm, { ids: "uuid" });
-    await client.query(`insert into firm_memberships (id, tenant_id, firm_id, actor_id, person_id, role, permissions, status, created_at, updated_at) values ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10)`, [membership.id, membership.tenant_id, membership.firm_id, membership.actor_id, membership.person_id, membership.role, JSON.stringify(membership.permissions), membership.status, membership.created_at, membership.updated_at]);
-    await client.query(`insert into professional_profiles (id, tenant_id, person_id, disciplines, specializations, jurisdictions, credential_refs, professional_status, created_at, updated_at) values ($1,$2,$3,$4::jsonb,$5::jsonb,$6::jsonb,$7::jsonb,$8,$9,$10)`, [professionalProfile.id, professionalProfile.tenant_id, professionalProfile.person_id, JSON.stringify(professionalProfile.disciplines), JSON.stringify(professionalProfile.specializations), JSON.stringify(professionalProfile.jurisdictions), JSON.stringify(professionalProfile.credential_refs), professionalProfile.professional_status, professionalProfile.created_at, professionalProfile.updated_at]);
-    await client.query(`insert into professional_authorities (id, tenant_id, firm_id, professional_id, practice_id, service_scope, jurisdiction_id, permitted_actions, risk_limits, credential_refs, valid_from, valid_to, status, policy_basis_ref, created_at, updated_at) values ($1,$2,$3,$4,$5,$6::jsonb,$7,$8::jsonb,$9::jsonb,$10::jsonb,$11,$12,$13,$14,$15,$16)`, [professionalAuthority.id, professionalAuthority.tenant_id, professionalAuthority.firm_id, professionalAuthority.professional_id, professionalAuthority.practice_id, JSON.stringify(professionalAuthority.service_scope), professionalAuthority.jurisdiction_id, JSON.stringify(professionalAuthority.permitted_actions), JSON.stringify(professionalAuthority.risk_limits), JSON.stringify(professionalAuthority.credential_refs), professionalAuthority.valid_from, professionalAuthority.valid_to, professionalAuthority.status, professionalAuthority.policy_basis_ref, professionalAuthority.created_at, professionalAuthority.updated_at]);
+    await createFirmMembership(membership, client);
+    await createProfessionalProfile(professionalProfile, client);
+    await createProfessionalAuthority(professionalAuthority, client);
     await client.query("commit");
 
     actor.firm_id = firm.id;
@@ -884,38 +1749,28 @@ export async function purgeTestFirmRecord(body) {
     const firmResult = await client.query("select name from firms where id = $1 and tenant_id = $2", [firmId, tenantId]);
     if (firmResult.rowCount === 0) throwNotFound("firms", firmId);
     assertPurgeableTestFirmName(firmResult.rows[0].name);
-    await client.query("delete from pilot_users where tenant_id = $1", [tenantId]);
-    await client.query("delete from policy_decisions where tenant_id = $1", [tenantId]);
-    await client.query("delete from event_log where tenant_id = $1", [tenantId]);
-    await client.query("delete from audit_events where tenant_id = $1", [tenantId]);
-    await client.query("delete from professional_authorities where tenant_id = $1", [tenantId]);
-    await client.query("delete from professional_profiles where tenant_id = $1", [tenantId]);
-    await client.query("delete from firm_memberships where firm_id = $1", [firmId]);
-    // Discovered via HM-S3 item 7's verification run (2026-09-20): a test firm that
-    // hired any AWIA virtual staff (via provision-from-template or single hire) left
-    // rows in these relational tables (migration 0024_awia_virtual_staff_persistence.sql),
-    // and the firm delete below violated their firm_id FK because nothing purged them
-    // first. Item 5's original test never hired staff, so this never surfaced before.
-    await client.query("delete from awia_virtual_staff_provisioning_runs where firm_id = $1", [firmId]);
-    await client.query("delete from awia_virtual_staff_seats where firm_id = $1", [firmId]);
-    await client.query("delete from awia_virtual_staff_members where firm_id = $1", [firmId]);
-    await client.query("delete from awia_staff_role_assignments where firm_id = $1", [firmId]);
-    await client.query("delete from awia_staff_package_bindings where firm_id = $1", [firmId]);
-    await client.query("delete from awia_staff_lifecycle_events where firm_id = $1", [firmId]);
-    await client.query("delete from awia_staff_authority_decisions where firm_id = $1", [firmId]);
-    await client.query("delete from awia_staff_evidence_packs where firm_id = $1", [firmId]);
-    await client.query("delete from awia_staff_task_readiness_records where firm_id = $1", [firmId]);
-    await client.query("delete from awia_staff_workdesk_items where firm_id = $1", [firmId]);
-    await client.query("delete from awia_staff_output_drafts where firm_id = $1", [firmId]);
-    await client.query("delete from awia_staff_output_reviews where firm_id = $1", [firmId]);
-    await client.query("delete from awia_client_delivery_drafts where firm_id = $1", [firmId]);
-    await client.query("delete from awia_staff_memory_entries where firm_id = $1", [firmId]);
-    await client.query("delete from awia_staff_conversation_threads where firm_id = $1", [firmId]);
-    await client.query("delete from awia_staff_conversation_messages where firm_id = $1", [firmId]);
-    await client.query("delete from awia_staff_seat_billing_events where firm_id = $1", [firmId]);
-    await client.query("delete from firms where id = $1", [firmId]);
-    await client.query("delete from actors where tenant_id = $1", [tenantId]);
-    await client.query("delete from persons where tenant_id = $1", [tenantId]);
+    // Fixed (2026-09-30): the old version hand-listed every table to delete from, curated once during
+    // HM-S3 (2026-09-20). Every domain added since (Front Desk, Administration, Commercial Operations,
+    // Technical Delivery, Client Engagements & Projects, Documents & Correspondence, Network &
+    // Marketplace, Pilot & Observatory, Finance & Commercial, Firm Factory, Quotation, AWIA Tier 2, ...)
+    // was never added to that list, so purging a test firm that had touched any of those domains failed
+    // outright with a foreign-key violation (confirmed live while verifying this session's auth-check
+    // fix on this same function). Replaced the hand-maintained list with a dynamic one: find every table
+    // with a `tenant_id` column (this function's existing dominant pattern -- almost every original
+    // delete was already tenant-wide, on the assumption a purgeable test tenant has exactly one firm)
+    // and delete that tenant's rows from all of them, plus `set local session_replication_role =
+    // replica` to bypass FK-ordering entirely for the duration of this one transaction -- safe here
+    // specifically because this whole path only runs when VFIRM_ALLOW_TEST_FIRM_PURGE=true, the actor
+    // check just added above passed, and the target firm's name matches the fixed test-firm prefix. This
+    // can no longer silently rot as new domains/tables are added.
+    await client.query("set local session_replication_role = replica");
+    const tenantScopedTables = await client.query(
+      `select table_name from information_schema.columns
+       where table_schema = 'public' and column_name = 'tenant_id' and table_name <> 'tenants'`
+    );
+    for (const { table_name: tableName } of tenantScopedTables.rows) {
+      await client.query(`delete from "${tableName}" where tenant_id = $1`, [tenantId]);
+    }
     await client.query("delete from tenants where id = $1", [tenantId]);
     await client.query("commit");
     return { purged: true, tenant_id: tenantId, firm_id: firmId };
@@ -1009,20 +1864,16 @@ export async function createClientRecord(body) {
   const clientConn = await getPool().connect();
   try {
     await clientConn.query("begin");
+    await setTenantContext(clientConn, body.tenant_id);
     const firmResult = await clientConn.query("select id from firms where id = $1 and tenant_id = $2", [body.firm_id, body.tenant_id]);
     if (firmResult.rowCount === 0) throwNotFound("firms", body.firm_id);
     const actor = body.actor ?? systemActor(body.tenant_id, body.firm_id);
     const { client, relationship } = buildClientFrontdoor(body, actor, { ids: "uuid" });
-    await clientConn.query(
-      `insert into clients (id, tenant_id, firm_id, client_type, name, primary_contact_id, confidentiality_class, status, version, created_at, updated_at, metadata)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb)`,
-      [client.id, client.tenant_id, client.firm_id, client.client_type, client.name, client.primary_contact_id, client.confidentiality_class, client.status, client.version, client.created_at, client.updated_at, JSON.stringify(client.metadata)]
-    );
-    await clientConn.query(
-      `insert into firm_client_relationships (id, tenant_id, firm_id, client_id, relationship_type, status, origin, responsible_owner_actor_id, contracting_business_entity_id, consent_or_legal_basis_ref, conflict_check_ref, created_at, updated_at)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
-      [relationship.id, relationship.tenant_id, relationship.firm_id, relationship.client_id, relationship.relationship_type, relationship.status, relationship.origin, relationship.responsible_owner_actor_id, relationship.contracting_business_entity_id ?? null, relationship.consent_or_legal_basis_ref ?? null, relationship.conflict_check_ref ?? null, relationship.created_at, relationship.updated_at]
-    );
+    // HM-S7 Phase 4c (2026-09-28): repositories/sales-intake.repo.mjs's createClient()/
+    // createFirmClientRelationship() replace the hand-written inserts, running on this same
+    // clientConn so they still participate in this handler's existing begin/commit transaction.
+    await createClient(client, clientConn);
+    await createFirmClientRelationship(relationship, clientConn);
     await clientConn.query("commit");
     await withAppState((store) => {
       appendEventAndAudit(store, { event_type: "client.created", actor, tenant_id: client.tenant_id, firm_id: client.firm_id, aggregate_type: "Client", aggregate_id: client.id, payload: { client_id: client.id, relationship_id: relationship.id }, summary: "Client and firm relationship created." });
@@ -1332,9 +2183,15 @@ export async function createPilotHandoffRecord(body, actor = systemActor(body.te
   if (storeBackend !== "postgres") return withStore((nextStore) => { nextStore.pilot_handoff_records.push(record); appendEventAndAudit(nextStore, { event_type: "pilot_handoff.accepted", actor, tenant_id: record.tenant_id, firm_id: record.firm_id, aggregate_type: "PilotHandoffRecord", aggregate_id: record.id, payload: record, summary: "SF-S6 pilot handoff acceptance recorded." }); return record; });
   const clientConn = await getPool().connect();
   try {
+    await clientConn.query("begin");
+    await setTenantContext(clientConn, record.tenant_id);
     await clientConn.query("insert into pilot_handoff_records(id,tenant_id,firm_id,accepted_by_actor_id,rehearsal_ref,handoff_status,checklist,evidence_refs,decision_summary,accepted_at,created_at,metadata) values($1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb,$9,$10,$11,$12::jsonb)", [record.id, record.tenant_id, record.firm_id, uuidOrNull(record.accepted_by_actor_id), record.rehearsal_ref, record.handoff_status, JSON.stringify(record.checklist), JSON.stringify(record.evidence_refs), record.decision_summary, record.accepted_at, record.created_at, JSON.stringify(record.metadata)]);
+    await clientConn.query("commit");
     await withAppState((nextStore) => { appendEventAndAudit(nextStore, { event_type: "pilot_handoff.accepted", actor, tenant_id: record.tenant_id, firm_id: record.firm_id, aggregate_type: "PilotHandoffRecord", aggregate_id: record.id, payload: record, summary: "SF-S6 pilot handoff acceptance recorded." }); return record; });
     return record;
+  } catch (error) {
+    await clientConn.query("rollback");
+    throw error;
   } finally {
     clientConn.release();
   }
@@ -1369,16 +2226,8 @@ export async function createIntakeSessionRecord(body) {
     if (relationshipResult.rowCount === 0) throwNotFound("firm_client_relationships", body.relationship_id);
     const actor = body.actor ?? systemActor(body.tenant_id, body.firm_id);
     const { lead, intake, missing } = buildIntakeFrontdoor(body, actor, { ids: "uuid" });
-    await clientConn.query(
-      `insert into leads (id, tenant_id, firm_id, relationship_id, source_channel, requested_service_hint, urgency, qualification_status, assigned_actor_id, created_from_conversation_ref, created_at, metadata)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb)`,
-      [lead.id, lead.tenant_id, lead.firm_id, lead.relationship_id, lead.source_channel, lead.requested_service_hint, lead.urgency, lead.qualification_status, lead.assigned_actor_id, lead.created_from_conversation_ref ?? null, lead.created_at, JSON.stringify(lead.metadata)]
-    );
-    await clientConn.query(
-      `insert into intake_sessions (id, tenant_id, firm_id, lead_id, service_id, required_inputs, provided_inputs, missing_information_items, intake_status, created_at, updated_at)
-       values ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb, $9, $10, $11)`,
-      [intake.id, intake.tenant_id, intake.firm_id, intake.lead_id, uuidOrNull(intake.service_id), JSON.stringify(intake.required_inputs), JSON.stringify(intake.provided_inputs), JSON.stringify(intake.missing_information_items), intake.intake_status, intake.created_at, intake.updated_at]
-    );
+    await createLead({ ...lead, relationship_id: uuidOrNull(lead.relationship_id), assigned_actor_id: uuidOrNull(lead.assigned_actor_id), created_from_conversation_ref: lead.created_from_conversation_ref ?? null }, clientConn);
+    await createIntakeSession({ ...intake, lead_id: uuidOrNull(intake.lead_id), service_id: uuidOrNull(intake.service_id) }, clientConn);
     await clientConn.query("commit");
     await withAppState((store) => {
       appendEventAndAudit(store, { event_type: missing.length > 0 ? "intake.missing_information_detected" : "intake.completed", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "IntakeSession", aggregate_id: intake.id, payload: { intake_id: intake.id, missing_information_items: missing }, summary: missing.length > 0 ? "Intake created with missing information." : "Intake completed." });
@@ -1416,16 +2265,8 @@ export async function createProposalRecord(body) {
     if (relationshipResult.rowCount === 0) throwNotFound("firm_client_relationships", body.relationship_id);
     const actor = body.actor ?? systemActor(body.tenant_id, body.firm_id);
     const { price, proposal } = buildCommercialProposal(body, { ids: "uuid" });
-    await clientConn.query(
-      `insert into price_build_ups (id, tenant_id, firm_id, service_sku_id, scope_inputs, human_effort_estimate, ai_runtime_estimate, specialist_cost_estimate, tool_cost_estimate, risk_contingency, platform_fee, margin_target, final_price, approval_required, created_at)
-       values ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
-      [price.id, price.tenant_id, price.firm_id, uuidOrNull(price.service_sku_id), JSON.stringify(price.scope_inputs), price.human_effort_estimate, price.ai_runtime_estimate, price.specialist_cost_estimate, price.tool_cost_estimate, price.risk_contingency, price.platform_fee, price.margin_target, price.final_price, price.approval_required, price.created_at]
-    );
-    await clientConn.query(
-      `insert into proposals (id, tenant_id, firm_id, relationship_id, service_id, scope_summary, price_build_up_id, commercial_approval_id, proposal_status, valid_until, issued_document_ref, version, created_at, updated_at)
-       values ($1, $2, $3, $4, $5, $6, $7, null, $8, $9, $10, $11, $12, $13)`,
-      [proposal.id, proposal.tenant_id, proposal.firm_id, proposal.relationship_id, proposal.service_id, proposal.scope_summary, proposal.price_build_up_id, proposal.proposal_status, proposal.valid_until, proposal.issued_document_ref ?? null, proposal.version, proposal.created_at, proposal.updated_at]
-    );
+    await createPriceBuildUp({ ...price, service_sku_id: uuidOrNull(price.service_sku_id) }, clientConn);
+    await createProposal({ ...proposal, relationship_id: uuidOrNull(proposal.relationship_id), service_id: uuidOrNull(proposal.service_id), price_build_up_id: uuidOrNull(proposal.price_build_up_id), commercial_approval_id: null, issued_document_ref: proposal.issued_document_ref ?? null }, clientConn);
     await clientConn.query("commit");
     await withAppState((store) => {
       appendEventAndAudit(store, { event_type: "proposal.created", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "Proposal", aggregate_id: proposal.id, payload: { proposal_id: proposal.id, price_build_up_id: price.id }, summary: "Proposal created." });
@@ -1850,11 +2691,10 @@ export async function approveProposalRecord(body, actor, decision) {
     if (proposalResult.rowCount === 0) throwNotFound("proposals", body.proposal_id);
     const proposal = mapDbDates(proposalResult.rows[0]);
     const approval = buildApproval(body, actor, proposal, { ids: "uuid" });
-    await clientConn.query(
-      `insert into approvals (id, tenant_id, firm_id, subject_type, subject_id, subject_version_or_hash, requested_by_actor_id, approver_actor_id, approver_professional_id, authority_id, decision, conditions, evidence_bundle_id, authentication_strength, decided_at, audit_event_id, created_at)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13, $14, $15, $16, $17)`,
-      [approval.id, approval.tenant_id, approval.firm_id, approval.subject_type, approval.subject_id, approval.subject_version_or_hash, approval.requested_by_actor_id, approval.approver_actor_id, approval.approver_professional_id, approval.authority_id, approval.decision, JSON.stringify(approval.conditions), approval.evidence_bundle_id, approval.authentication_strength, approval.decided_at, approval.audit_event_id, approval.created_at]
-    );
+    // HM-S7 Phase 4b (2026-09-28): repositories/approvals.repo.mjs's createApproval() replaces the
+    // hand-written insert here, running on this same clientConn so it still participates in this
+    // handler's existing begin/commit transaction.
+    await createApproval(approval, clientConn);
     await clientConn.query("update proposals set proposal_status = 'APPROVED', commercial_approval_id = $1, updated_at = $2 where id = $3", [approval.id, now(), proposal.id]);
     await clientConn.query("commit");
     const updatedProposal = { ...proposal, proposal_status: "APPROVED", commercial_approval_id: approval.id, updated_at: now() };
@@ -1889,6 +2729,7 @@ export async function acceptProposalRecord(body, actor) {
   const clientConn = await getPool().connect();
   try {
     await clientConn.query("begin");
+    await setTenantContext(clientConn, body.tenant_id);
     const proposalResult = await clientConn.query("select id::text, tenant_id::text, firm_id::text, relationship_id::text, service_id::text, scope_summary, price_build_up_id::text, commercial_approval_id::text, proposal_status, valid_until, issued_document_ref, version, created_at, updated_at from proposals where id = $1 and tenant_id = $2 and firm_id = $3", [body.proposal_id, body.tenant_id, body.firm_id]);
     if (proposalResult.rowCount === 0) throwNotFound("proposals", body.proposal_id);
     const proposal = mapDbDates(proposalResult.rows[0]);
@@ -1896,11 +2737,7 @@ export async function acceptProposalRecord(body, actor) {
     const { engagement } = buildEngagement(body, proposal, { ids: "uuid" });
     const timestamp = now();
     await clientConn.query("update proposals set proposal_status = 'ACCEPTED', updated_at = $1 where id = $2", [timestamp, proposal.id]);
-    await clientConn.query(
-      `insert into engagements (id, tenant_id, firm_id, relationship_id, proposal_id, contract_ref, scope_ref, commercial_terms_ref, acceptance_criteria_ref, status, created_at, updated_at)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
-      [engagement.id, engagement.tenant_id, engagement.firm_id, engagement.relationship_id, engagement.proposal_id, engagement.contract_ref, engagement.scope_ref, engagement.commercial_terms_ref, engagement.acceptance_criteria_ref, engagement.status, engagement.created_at, engagement.updated_at]
-    );
+    await createEngagement(engagement, clientConn);
     await clientConn.query("commit");
     const updatedProposal = { ...proposal, proposal_status: "ACCEPTED", updated_at: timestamp };
     await withAppState((store) => {
@@ -1931,24 +2768,13 @@ export async function openProjectDeliveryRecord(body, actor, requiredEvidence = 
   const clientConn = await getPool().connect();
   try {
     await clientConn.query("begin");
+    await setTenantContext(clientConn, body.tenant_id);
     const engagementResult = await clientConn.query("select id::text, tenant_id::text, firm_id::text, relationship_id::text, proposal_id::text from engagements where id = $1 and tenant_id = $2 and firm_id = $3", [body.engagement.id, body.tenant_id, body.firm_id]);
     if (engagementResult.rowCount === 0) throwNotFound("engagements", body.engagement.id);
     const { project, workPackage, task } = buildDeliveryPackage(body, actor, body.engagement, requiredEvidence, { ids: "uuid" });
-    await clientConn.query(
-      `insert into projects (id, tenant_id, firm_id, relationship_id, engagement_id, service_id, project_name, project_state, risk_class, responsible_professional_id, created_at, updated_at)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
-      [project.id, project.tenant_id, project.firm_id, project.relationship_id, project.engagement_id, project.service_id, project.project_name, project.project_state, project.risk_class, project.responsible_professional_id, project.created_at, project.updated_at]
-    );
-    await clientConn.query(
-      `insert into work_packages (id, tenant_id, firm_id, project_id, service_step, assigned_worker_instance_id, assigned_human_actor_id, state, required_evidence, approval_requirement_id, created_at, updated_at)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12)`,
-      [workPackage.id, workPackage.tenant_id, workPackage.firm_id, workPackage.project_id, workPackage.service_step, workPackage.assigned_worker_instance_id, workPackage.assigned_human_actor_id, workPackage.state, JSON.stringify(workPackage.required_evidence), workPackage.approval_requirement_id, workPackage.created_at, workPackage.updated_at]
-    );
-    await clientConn.query(
-      `insert into tasks (id, tenant_id, firm_id, project_id, work_package_id, task_type, input_ref, output_ref, assigned_actor_or_worker_ref, state, risk_class, due_at, created_at, updated_at)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
-      [task.id, task.tenant_id, task.firm_id, task.project_id, task.work_package_id, task.task_type, task.input_ref, task.output_ref, task.assigned_actor_or_worker_ref, task.state, task.risk_class, task.due_at, task.created_at, task.updated_at]
-    );
+    await createProject(project, clientConn);
+    await createWorkPackage(workPackage, clientConn);
+    await createTask(task, clientConn);
     await clientConn.query("commit");
     await withAppState((store) => {
       appendEventAndAudit(store, { event_type: "project.opened", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "Project", aggregate_id: project.id, payload: { project_id: project.id, engagement_id: body.engagement.id }, summary: "Project opened from accepted proposal." });
@@ -1979,15 +2805,12 @@ export async function createEvidenceBundleRecord(body) {
   const clientConn = await getPool().connect();
   try {
     await clientConn.query("begin");
+    await setTenantContext(clientConn, body.tenant_id);
     const projectResult = await clientConn.query("select id from projects where id = $1 and tenant_id = $2 and firm_id = $3", [body.project_id, body.tenant_id, body.firm_id]);
     if (projectResult.rowCount === 0) throwNotFound("projects", body.project_id);
     const actor = body.actor ?? systemActor(body.tenant_id, body.firm_id);
     const evidence = buildEvidenceBundle(body, { ids: "uuid" });
-    await clientConn.query(
-      `insert into evidence_bundles (id, tenant_id, firm_id, project_id, subject_type, subject_id, source_document_refs, input_refs, calculation_refs, qa_check_refs, policy_check_refs, review_notes_ref, final_output_ref, bundle_hash, status, created_at)
-       values ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9::jsonb, $10::jsonb, $11::jsonb, $12, $13, $14, $15, $16)`,
-      [evidence.id, evidence.tenant_id, evidence.firm_id, evidence.project_id, evidence.subject_type, evidence.subject_id, JSON.stringify(evidence.source_document_refs), JSON.stringify(evidence.input_refs), JSON.stringify(evidence.calculation_refs), JSON.stringify(evidence.qa_check_refs), JSON.stringify(evidence.policy_check_refs), evidence.review_notes_ref, evidence.final_output_ref, evidence.bundle_hash, evidence.status, evidence.created_at]
-    );
+    await createEvidenceBundle(evidence, clientConn);
     await clientConn.query("commit");
     await withAppState((store) => {
       appendEventAndAudit(store, { event_type: "evidence_bundle.created", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "EvidenceBundle", aggregate_id: evidence.id, payload: { evidence_bundle_id: evidence.id }, summary: "Evidence bundle created." });
@@ -2018,12 +2841,18 @@ export async function startTaskRecord(body) {
   }
   const clientConn = await getPool().connect();
   try {
+    await clientConn.query("begin");
+    await setTenantContext(clientConn, body.tenant_id);
     const timestamp = now();
     const result = await clientConn.query("update tasks set state = 'IN_PROGRESS', updated_at = $1 where id = $2 and tenant_id = $3 and firm_id = $4 and state in ('CREATED','READY') returning id::text, tenant_id::text, firm_id::text, project_id::text, work_package_id::text, task_type, input_ref, output_ref, assigned_actor_or_worker_ref::text, state, risk_class, due_at, created_at, updated_at", [timestamp, body.task_id, body.tenant_id, body.firm_id]);
     if (result.rowCount === 0) throwNotFound("tasks", body.task_id);
+    await clientConn.query("commit");
     const task = mapDbDates(result.rows[0]);
     await withAppState((store) => { appendEventAndAudit(store, { event_type: "task.started", actor: body.actor ?? systemActor(body.tenant_id, body.firm_id), tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "Task", aggregate_id: task.id, payload: { task_id: task.id }, summary: "Delivery task started." }); return task; });
     return task;
+  } catch (error) {
+    await clientConn.query("rollback");
+    throw error;
   } finally {
     clientConn.release();
   }
@@ -2045,13 +2874,19 @@ export async function completeTaskRecord(body) {
   }
   const clientConn = await getPool().connect();
   try {
+    await clientConn.query("begin");
+    await setTenantContext(clientConn, body.tenant_id);
     const timestamp = now();
     const outputRef = body.output_ref ?? `task-output:${body.task_id}`;
     const result = await clientConn.query("update tasks set state = 'COMPLETE', output_ref = $1, updated_at = $2 where id = $3 and tenant_id = $4 and firm_id = $5 and state in ('IN_PROGRESS','CREATED','READY') returning id::text, tenant_id::text, firm_id::text, project_id::text, work_package_id::text, task_type, input_ref, output_ref, assigned_actor_or_worker_ref::text, state, risk_class, due_at, created_at, updated_at", [outputRef, timestamp, body.task_id, body.tenant_id, body.firm_id]);
     if (result.rowCount === 0) throwNotFound("tasks", body.task_id);
+    await clientConn.query("commit");
     const task = mapDbDates(result.rows[0]);
     await withAppState((store) => { appendEventAndAudit(store, { event_type: "task.completed", actor: body.actor ?? systemActor(body.tenant_id, body.firm_id), tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "Task", aggregate_id: task.id, payload: { task_id: task.id, output_ref: task.output_ref }, summary: "Delivery task completed." }); return task; });
     return task;
+  } catch (error) {
+    await clientConn.query("rollback");
+    throw error;
   } finally {
     clientConn.release();
   }
@@ -2113,11 +2948,12 @@ export async function createDeliverableDraftRecord(body, actor) {
   const clientConn = await getPool().connect();
   try {
     await clientConn.query("begin");
+    await setTenantContext(clientConn, body.tenant_id);
     const projectResult = await clientConn.query("select id from projects where id = $1 and tenant_id = $2 and firm_id = $3", [body.project_id, body.tenant_id, body.firm_id]);
     if (projectResult.rowCount === 0) throwNotFound("projects", body.project_id);
     const records = buildDeliverableDraft(body, actor, { ids: "uuid" });
-    await clientConn.query("insert into documents (id, tenant_id, firm_id, project_id, relationship_id, document_type, title, current_version_id, status, classification, created_at) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)", [records.document.id, records.document.tenant_id, records.document.firm_id, records.document.project_id, uuidOrNull(records.document.relationship_id), records.document.document_type, records.document.title, records.document.current_version_id, records.document.status, records.document.classification, records.document.created_at]);
-    await clientConn.query("insert into document_versions (id, tenant_id, firm_id, document_id, version_label, revision, storage_ref, hash, created_by_actor_id, approved_by_approval_id, supersedes_version_id, status, created_at) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)", [records.document_version.id, records.document_version.tenant_id, records.document_version.firm_id, records.document_version.document_id, records.document_version.version_label, records.document_version.revision, records.document_version.storage_ref, records.document_version.hash, records.document_version.created_by_actor_id, records.document_version.approved_by_approval_id, records.document_version.supersedes_version_id, records.document_version.status, records.document_version.created_at]);
+    await createDocument({ ...records.document, relationship_id: uuidOrNull(records.document.relationship_id) }, clientConn);
+    await createDocumentVersion(records.document_version, clientConn);
     await clientConn.query("commit");
     await withAppState((store) => { appendEventAndAudit(store, { event_type: "document.version_created", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "DocumentVersion", aggregate_id: records.document_version.id, payload: { document_id: records.document.id, document_version_id: records.document_version.id }, summary: "Deliverable draft version created." }); return records; });
     return records;
@@ -2152,6 +2988,7 @@ export async function reviewDeliverableRecord(body, actor, authorityCheck, decis
   const clientConn = await getPool().connect();
   try {
     await clientConn.query("begin");
+    await setTenantContext(clientConn, body.tenant_id);
     const versionResult = await clientConn.query("select id::text, tenant_id::text, firm_id::text, document_id::text, version_label, revision, storage_ref, hash, created_by_actor_id::text, approved_by_approval_id::text, supersedes_version_id::text, status, created_at from document_versions where id = $1 and tenant_id = $2 and firm_id = $3", [body.document_version_id, body.tenant_id, body.firm_id]);
     if (versionResult.rowCount === 0) throwNotFound("document_versions", body.document_version_id);
     const evidenceResult = await clientConn.query("select id::text, tenant_id::text, firm_id::text, project_id::text, subject_type, subject_id::text, source_document_refs, input_refs, calculation_refs, qa_check_refs, policy_check_refs, review_notes_ref, final_output_ref, bundle_hash, status, created_at from evidence_bundles where id = $1 and tenant_id = $2 and firm_id = $3 and project_id = $4", [body.evidence_bundle_id, body.tenant_id, body.firm_id, body.project_id]);
@@ -2162,7 +2999,8 @@ export async function reviewDeliverableRecord(body, actor, authorityCheck, decis
     if (!completeness.complete) invalidState(`Evidence bundle is incomplete. Missing: ${completeness.missing.join(", ")}`);
     const version = mapDbDates(versionResult.rows[0]);
     const approval = buildApproval({ ...body, proposal_id: version.id, authority_id: authorityCheck.professional_authority?.id, approver_professional_id: authorityCheck.professional_profile?.id, evidence_bundle_id: evidence.id }, actor, { id: version.id, version: version.hash }, { ids: "uuid", subject_type: "DocumentVersion" });
-    await clientConn.query("insert into approvals (id, tenant_id, firm_id, subject_type, subject_id, subject_version_or_hash, requested_by_actor_id, approver_actor_id, approver_professional_id, authority_id, decision, conditions, evidence_bundle_id, authentication_strength, decided_at, audit_event_id, created_at) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13,$14,$15,$16,$17)", [approval.id, approval.tenant_id, approval.firm_id, approval.subject_type, approval.subject_id, approval.subject_version_or_hash, approval.requested_by_actor_id, approval.approver_actor_id, approval.approver_professional_id, approval.authority_id, approval.decision, JSON.stringify(approval.conditions), approval.evidence_bundle_id, approval.authentication_strength, approval.decided_at, approval.audit_event_id, approval.created_at]);
+    // HM-S7 Phase 4b (2026-09-28): same createApproval() swap as approveProposalRecord above.
+    await createApproval(approval, clientConn);
     await clientConn.query("update document_versions set status = 'APPROVED', approved_by_approval_id = $1 where id = $2", [approval.id, version.id]);
     await clientConn.query("update evidence_bundles set status = 'APPROVED', final_output_ref = $1 where id = $2", [version.id, evidence.id]);
     await clientConn.query("commit");
@@ -2204,6 +3042,7 @@ export async function issueDeliverableRecord(body, actor, policyDecision) {
     const version = mapDbDates(versionResult.rows[0]);
     const approvalResult = await clientConn.query("select id::text from approvals where id = $1 and subject_id = $2 and decision = 'APPROVED'", [body.approval_id, version.id]);
     if (approvalResult.rowCount === 0) invalidState("Approved deliverable review is required before issue.");
+    await setTenantContext(clientConn, body.tenant_id);
     await clientConn.query("update document_versions set status = 'ISSUED' where id = $1", [version.id]);
     const documentResult = await clientConn.query("update documents set status = 'ISSUED', current_version_id = $1 where id = $2 returning id::text, tenant_id::text, firm_id::text, project_id::text, relationship_id::text, document_type, title, current_version_id::text, status, classification, created_at", [version.id, version.document_id]);
     const projectResult = await clientConn.query("update projects set project_state = 'DELIVERABLE_ISSUED', updated_at = $1 where id = $2 returning id::text, tenant_id::text, firm_id::text, relationship_id::text, engagement_id::text, service_id::text, project_name, project_state, risk_class, responsible_professional_id::text, created_at, updated_at", [now(), body.project_id]);
@@ -2234,16 +3073,13 @@ export async function createInvoiceRecord(body) {
   const clientConn = await getPool().connect();
   try {
     await clientConn.query("begin");
+    await setTenantContext(clientConn, body.tenant_id);
     const relationshipResult = await clientConn.query("select id from firm_client_relationships where id = $1 and tenant_id = $2 and firm_id = $3", [body.relationship_id, body.tenant_id, body.firm_id]);
     if (relationshipResult.rowCount === 0) throwNotFound("firm_client_relationships", body.relationship_id);
     const countResult = await clientConn.query("select count(*)::int as count from invoices where tenant_id = $1 and firm_id = $2", [body.tenant_id, body.firm_id]);
     const actor = body.actor ?? systemActor(body.tenant_id, body.firm_id);
     const invoice = buildInvoice(body, Number(countResult.rows[0].count) + 1, { ids: "uuid" });
-    await clientConn.query(
-      `insert into invoices (id, tenant_id, firm_id, relationship_id, engagement_id, project_id, invoice_number, currency, line_items, tax_summary, status, due_at, created_at, updated_at)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb, $11, $12, $13, $14)`,
-      [invoice.id, invoice.tenant_id, invoice.firm_id, invoice.relationship_id, invoice.engagement_id, invoice.project_id, invoice.invoice_number, invoice.currency, JSON.stringify(invoice.line_items), JSON.stringify(invoice.tax_summary), invoice.status, invoice.due_at, invoice.created_at, invoice.updated_at]
-    );
+    await createInvoice(invoice, clientConn);
     await clientConn.query("commit");
     await withAppState((store) => {
       appendEventAndAudit(store, { event_type: "invoice.created", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "Invoice", aggregate_id: invoice.id, payload: { invoice_id: invoice.id }, summary: "Invoice created." });
@@ -2283,28 +3119,28 @@ export async function createPilotFeedbackRecord(body, actor = systemActor(body.t
   const feedback = buildPilotFeedback(body, actor);
   if (storeBackend !== "postgres") return withStore((store)=>{ store.pilot_feedback.push(feedback); appendEventAndAudit(store,{event_type:"pilot_feedback.submitted",actor,tenant_id:feedback.tenant_id,firm_id:feedback.firm_id,aggregate_type:"PilotFeedback",aggregate_id:feedback.id,payload:feedback,summary:"Pilot feedback submitted."}); return feedback; });
   const clientConn = await getPool().connect();
-  try { await clientConn.query("insert into pilot_feedback (id, tenant_id, firm_id, pilot_user_id, project_id, submitted_by_actor_id, feedback_type, sentiment, rating, subject, feedback_text, created_at, metadata) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb)",[feedback.id,feedback.tenant_id,uuidOrNull(feedback.firm_id),uuidOrNull(feedback.pilot_user_id),uuidOrNull(feedback.project_id),uuidOrNull(feedback.submitted_by_actor_id),feedback.feedback_type,feedback.sentiment,feedback.rating,feedback.subject,feedback.feedback_text,feedback.created_at,JSON.stringify(feedback.metadata)]); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"pilot_feedback.submitted",actor,tenant_id:feedback.tenant_id,firm_id:feedback.firm_id,aggregate_type:"PilotFeedback",aggregate_id:feedback.id,payload:feedback,summary:"Pilot feedback submitted."}); return feedback;}); return feedback; } finally { clientConn.release(); }
+  try { await clientConn.query("begin"); await setTenantContext(clientConn, feedback.tenant_id); await createPilotFeedback({ ...feedback, firm_id: uuidOrNull(feedback.firm_id), pilot_user_id: uuidOrNull(feedback.pilot_user_id), project_id: uuidOrNull(feedback.project_id), submitted_by_actor_id: uuidOrNull(feedback.submitted_by_actor_id) }, clientConn); await clientConn.query("commit"); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"pilot_feedback.submitted",actor,tenant_id:feedback.tenant_id,firm_id:feedback.firm_id,aggregate_type:"PilotFeedback",aggregate_id:feedback.id,payload:feedback,summary:"Pilot feedback submitted."}); return feedback;}); return feedback; } catch (error) { await clientConn.query("rollback"); throw error; } finally { clientConn.release(); }
 }
 
 export async function createPilotAcceptanceReviewRecord(body, actor = systemActor(body.tenant_id, body.firm_id)) {
   const review = buildAcceptanceReview(body, actor);
   if (storeBackend !== "postgres") return withStore((store)=>{ store.pilot_acceptance_reviews.push(review); appendEventAndAudit(store,{event_type:"pilot_acceptance.reviewed",actor,tenant_id:review.tenant_id,firm_id:review.firm_id,aggregate_type:"PilotAcceptanceReview",aggregate_id:review.id,payload:review,summary:"Pilot acceptance reviewed."}); return review; });
   const clientConn = await getPool().connect();
-  try { await clientConn.query("insert into pilot_acceptance_reviews (id, tenant_id, firm_id, reviewed_by_actor_id, review_scope, criteria, decision, evidence_refs, notes, created_at, updated_at, metadata) values ($1,$2,$3,$4,$5,$6::jsonb,$7,$8::jsonb,$9,$10,$11,$12::jsonb)",[review.id,review.tenant_id,uuidOrNull(review.firm_id),uuidOrNull(review.reviewed_by_actor_id),review.review_scope,JSON.stringify(review.criteria),review.decision,JSON.stringify(review.evidence_refs),review.notes,review.created_at,review.updated_at,JSON.stringify(review.metadata)]); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"pilot_acceptance.reviewed",actor,tenant_id:review.tenant_id,firm_id:review.firm_id,aggregate_type:"PilotAcceptanceReview",aggregate_id:review.id,payload:review,summary:"Pilot acceptance reviewed."}); return review;}); return review; } finally { clientConn.release(); }
+  try { await clientConn.query("begin"); await setTenantContext(clientConn, review.tenant_id); await createPilotAcceptanceReview({ ...review, firm_id: uuidOrNull(review.firm_id), reviewed_by_actor_id: uuidOrNull(review.reviewed_by_actor_id) }, clientConn); await clientConn.query("commit"); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"pilot_acceptance.reviewed",actor,tenant_id:review.tenant_id,firm_id:review.firm_id,aggregate_type:"PilotAcceptanceReview",aggregate_id:review.id,payload:review,summary:"Pilot acceptance reviewed."}); return review;}); return review; } catch (error) { await clientConn.query("rollback"); throw error; } finally { clientConn.release(); }
 }
 
 export async function createPilotImprovementItemRecord(body, actor = systemActor(body.tenant_id, body.firm_id)) {
   const item = buildImprovementItem(body, actor);
   if (storeBackend !== "postgres") return withStore((store)=>{ store.pilot_improvement_items.push(item); appendEventAndAudit(store,{event_type:"pilot_improvement.created",actor,tenant_id:item.tenant_id,firm_id:item.firm_id,aggregate_type:"PilotImprovementItem",aggregate_id:item.id,payload:item,summary:"Pilot improvement item created."}); return item; });
   const clientConn = await getPool().connect();
-  try { await clientConn.query("insert into pilot_improvement_items (id, tenant_id, firm_id, feedback_id, acceptance_review_id, owner_actor_id, item_type, priority, status, title, description, target_stage, created_at, updated_at, closed_at, metadata) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::jsonb)",[item.id,item.tenant_id,uuidOrNull(item.firm_id),uuidOrNull(item.feedback_id),uuidOrNull(item.acceptance_review_id),uuidOrNull(item.owner_actor_id),item.item_type,item.priority,item.status,item.title,item.description,item.target_stage,item.created_at,item.updated_at,item.closed_at,JSON.stringify(item.metadata)]); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"pilot_improvement.created",actor,tenant_id:item.tenant_id,firm_id:item.firm_id,aggregate_type:"PilotImprovementItem",aggregate_id:item.id,payload:item,summary:"Pilot improvement item created."}); return item;}); return item; } finally { clientConn.release(); }
+  try { await clientConn.query("begin"); await setTenantContext(clientConn, item.tenant_id); await createPilotImprovementItem({ ...item, firm_id: uuidOrNull(item.firm_id), feedback_id: uuidOrNull(item.feedback_id), acceptance_review_id: uuidOrNull(item.acceptance_review_id), owner_actor_id: uuidOrNull(item.owner_actor_id) }, clientConn); await clientConn.query("commit"); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"pilot_improvement.created",actor,tenant_id:item.tenant_id,firm_id:item.firm_id,aggregate_type:"PilotImprovementItem",aggregate_id:item.id,payload:item,summary:"Pilot improvement item created."}); return item;}); return item; } catch (error) { await clientConn.query("rollback"); throw error; } finally { clientConn.release(); }
 }
 
 export async function updatePilotImprovementItemRecord(body, actor = systemActor(body.tenant_id, body.firm_id)) {
   const timestamp = now();
   if (storeBackend !== "postgres") return withStore((store)=>{ const item=store.pilot_improvement_items.find((record)=>record.id===body.improvement_item_id && record.tenant_id===body.tenant_id); if(!item) throwNotFound("pilot_improvement_items", body.improvement_item_id); item.status=body.status ?? item.status; item.priority=body.priority ?? item.priority; item.updated_at=timestamp; item.closed_at=["DONE","CLOSED"].includes(body.status) ? timestamp : item.closed_at; appendEventAndAudit(store,{event_type:"pilot_improvement.updated",actor,tenant_id:item.tenant_id,firm_id:item.firm_id,aggregate_type:"PilotImprovementItem",aggregate_id:item.id,payload:item,summary:"Pilot improvement item updated."}); return item; });
   const clientConn = await getPool().connect();
-  try { const result=await clientConn.query("update pilot_improvement_items set status=coalesce($1,status), priority=coalesce($2,priority), updated_at=$3, closed_at=case when $1 in ('DONE','CLOSED') then $3 else closed_at end where id=$4 and tenant_id=$5 returning id::text, tenant_id::text, firm_id::text, feedback_id::text, acceptance_review_id::text, owner_actor_id::text, item_type, priority, status, title, description, target_stage, created_at, updated_at, closed_at, metadata",[body.status??null,body.priority??null,timestamp,body.improvement_item_id,body.tenant_id]); if(result.rowCount===0) throwNotFound("pilot_improvement_items", body.improvement_item_id); const item=mapDbDates(result.rows[0]); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"pilot_improvement.updated",actor,tenant_id:item.tenant_id,firm_id:item.firm_id,aggregate_type:"PilotImprovementItem",aggregate_id:item.id,payload:item,summary:"Pilot improvement item updated."}); return item;}); return item; } finally { clientConn.release(); }
+  try { await clientConn.query("begin"); await setTenantContext(clientConn, body.tenant_id); const result=await clientConn.query("update pilot_improvement_items set status=coalesce($1,status), priority=coalesce($2,priority), updated_at=$3, closed_at=case when $1 in ('DONE','CLOSED') then $3 else closed_at end where id=$4 and tenant_id=$5 returning id::text, tenant_id::text, firm_id::text, feedback_id::text, acceptance_review_id::text, owner_actor_id::text, item_type, priority, status, title, description, target_stage, created_at, updated_at, closed_at, metadata",[body.status??null,body.priority??null,timestamp,body.improvement_item_id,body.tenant_id]); if(result.rowCount===0) throwNotFound("pilot_improvement_items", body.improvement_item_id); const item=mapDbDates(result.rows[0]); await clientConn.query("commit"); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"pilot_improvement.updated",actor,tenant_id:item.tenant_id,firm_id:item.firm_id,aggregate_type:"PilotImprovementItem",aggregate_id:item.id,payload:item,summary:"Pilot improvement item updated."}); return item;}); return item; } catch (error) { await clientConn.query("rollback"); throw error; } finally { clientConn.release(); }
 }
 
 
@@ -2332,19 +3168,19 @@ function buildCommercialLaunchControl(body, actor = {}) {
 export async function createPaymentProviderConfigRecord(body, actor = systemActor(body.tenant_id, body.firm_id)) {
   const config = buildPaymentProviderConfig(body, actor);
   if (storeBackend !== "postgres") return withStore((store)=>{ store.payment_provider_configs.push(config); appendEventAndAudit(store,{event_type:"payment_provider.config_created",actor,tenant_id:config.tenant_id,firm_id:config.firm_id,aggregate_type:"PaymentProviderConfig",aggregate_id:config.id,payload:config,summary:"Payment provider configuration prepared."}); return config; });
-  const c=await getPool().connect(); try{ await c.query("insert into payment_provider_configs (id, tenant_id, firm_id, configured_by_actor_id, provider_name, provider_mode, config_status, capabilities, required_env, created_at, updated_at, metadata) values ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb,$10,$11,$12::jsonb)",[config.id,config.tenant_id,uuidOrNull(config.firm_id),uuidOrNull(config.configured_by_actor_id),config.provider_name,config.provider_mode,config.config_status,JSON.stringify(config.capabilities),JSON.stringify(config.required_env),config.created_at,config.updated_at,JSON.stringify(config.metadata)]); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"payment_provider.config_created",actor,tenant_id:config.tenant_id,firm_id:config.firm_id,aggregate_type:"PaymentProviderConfig",aggregate_id:config.id,payload:config,summary:"Payment provider configuration prepared."}); return config;}); return config;} finally{c.release();}
+  const c=await getPool().connect(); try{ await c.query("begin"); await setTenantContext(c, config.tenant_id); await createPaymentProviderConfig({ ...config, firm_id: uuidOrNull(config.firm_id), configured_by_actor_id: uuidOrNull(config.configured_by_actor_id) }, c); await c.query("commit"); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"payment_provider.config_created",actor,tenant_id:config.tenant_id,firm_id:config.firm_id,aggregate_type:"PaymentProviderConfig",aggregate_id:config.id,payload:config,summary:"Payment provider configuration prepared."}); return config;}); return config;} catch (error) { await c.query("rollback"); throw error; } finally{c.release();}
 }
 
 export async function createSubscriptionPackageRecord(body, actor = systemActor(body.tenant_id, body.firm_id)) {
   const pack = buildSubscriptionPackage(body, actor);
   if (storeBackend !== "postgres") return withStore((store)=>{ store.subscription_packages.push(pack); appendEventAndAudit(store,{event_type:"subscription_package.created",actor,tenant_id:pack.tenant_id,firm_id:pack.firm_id,aggregate_type:"SubscriptionPackage",aggregate_id:pack.id,payload:pack,summary:"Subscription package created."}); return pack; });
-  const c=await getPool().connect(); try{ await c.query("insert into subscription_packages (id, tenant_id, firm_id, created_by_actor_id, package_code, package_name, package_status, pricing_model, base_price, currency, usage_limits, features, created_at, updated_at, metadata) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12::jsonb,$13,$14,$15::jsonb)",[pack.id,pack.tenant_id,uuidOrNull(pack.firm_id),uuidOrNull(pack.created_by_actor_id),pack.package_code,pack.package_name,pack.package_status,pack.pricing_model,pack.base_price,pack.currency,JSON.stringify(pack.usage_limits),JSON.stringify(pack.features),pack.created_at,pack.updated_at,JSON.stringify(pack.metadata)]); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"subscription_package.created",actor,tenant_id:pack.tenant_id,firm_id:pack.firm_id,aggregate_type:"SubscriptionPackage",aggregate_id:pack.id,payload:pack,summary:"Subscription package created."}); return pack;}); return pack;} finally{c.release();}
+  const c=await getPool().connect(); try{ await c.query("begin"); await setTenantContext(c, pack.tenant_id); await createSubscriptionPackage({ ...pack, firm_id: uuidOrNull(pack.firm_id), created_by_actor_id: uuidOrNull(pack.created_by_actor_id) }, c); await c.query("commit"); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"subscription_package.created",actor,tenant_id:pack.tenant_id,firm_id:pack.firm_id,aggregate_type:"SubscriptionPackage",aggregate_id:pack.id,payload:pack,summary:"Subscription package created."}); return pack;}); return pack;} catch (error) { await c.query("rollback"); throw error; } finally{c.release();}
 }
 
 export async function createCommercialLaunchControlRecord(body, actor = systemActor(body.tenant_id, body.firm_id)) {
   const control = buildCommercialLaunchControl(body, actor);
   if (storeBackend !== "postgres") return withStore((store)=>{ store.commercial_launch_controls.push(control); appendEventAndAudit(store,{event_type:"commercial_launch.control_recorded",actor,tenant_id:control.tenant_id,firm_id:control.firm_id,aggregate_type:"CommercialLaunchControl",aggregate_id:control.id,payload:control,summary:"Commercial launch control recorded."}); return control; });
-  const c=await getPool().connect(); try{ await c.query("insert into commercial_launch_controls (id, tenant_id, firm_id, payment_provider_config_id, subscription_package_id, reviewed_by_actor_id, launch_status, required_controls, decision_summary, created_at, decided_at, metadata) values ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11,$12::jsonb)",[control.id,control.tenant_id,uuidOrNull(control.firm_id),uuidOrNull(control.payment_provider_config_id),uuidOrNull(control.subscription_package_id),uuidOrNull(control.reviewed_by_actor_id),control.launch_status,JSON.stringify(control.required_controls),control.decision_summary,control.created_at,control.decided_at,JSON.stringify(control.metadata)]); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"commercial_launch.control_recorded",actor,tenant_id:control.tenant_id,firm_id:control.firm_id,aggregate_type:"CommercialLaunchControl",aggregate_id:control.id,payload:control,summary:"Commercial launch control recorded."}); return control;}); return control;} finally{c.release();}
+  const c=await getPool().connect(); try{ await c.query("begin"); await setTenantContext(c, control.tenant_id); await createCommercialLaunchControl({ ...control, firm_id: uuidOrNull(control.firm_id), payment_provider_config_id: uuidOrNull(control.payment_provider_config_id), subscription_package_id: uuidOrNull(control.subscription_package_id), reviewed_by_actor_id: uuidOrNull(control.reviewed_by_actor_id) }, c); await c.query("commit"); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"commercial_launch.control_recorded",actor,tenant_id:control.tenant_id,firm_id:control.firm_id,aggregate_type:"CommercialLaunchControl",aggregate_id:control.id,payload:control,summary:"Commercial launch control recorded."}); return control;}); return control;} catch (error) { await c.query("rollback"); throw error; } finally{c.release();}
 }
 function buildTenantPilotControl(body, actor = {}) {
   const relational = storeBackend === "postgres";
@@ -2365,19 +3201,19 @@ function buildBillingReadinessReview(body, actor = {}) {
 export async function createTenantPilotControlRecord(body, actor = systemActor(body.tenant_id, body.firm_id)) {
   const control = buildTenantPilotControl(body, actor);
   if (storeBackend !== "postgres") return withStore((store)=>{ store.tenant_pilot_controls.push(control); appendEventAndAudit(store,{event_type:"tenant_pilot_control.created",actor,tenant_id:control.tenant_id,firm_id:control.firm_id,aggregate_type:"TenantPilotControl",aggregate_id:control.id,payload:control,summary:"Tenant pilot control created."}); return control; });
-  const c=await getPool().connect(); try{ await c.query("insert into tenant_pilot_controls (id, tenant_id, firm_id, created_by_actor_id, control_status, plan_code, limits, billing_readiness, created_at, updated_at, metadata) values ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10,$11::jsonb)",[control.id,control.tenant_id,uuidOrNull(control.firm_id),uuidOrNull(control.created_by_actor_id),control.control_status,control.plan_code,JSON.stringify(control.limits),control.billing_readiness,control.created_at,control.updated_at,JSON.stringify(control.metadata)]); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"tenant_pilot_control.created",actor,tenant_id:control.tenant_id,firm_id:control.firm_id,aggregate_type:"TenantPilotControl",aggregate_id:control.id,payload:control,summary:"Tenant pilot control created."}); return control;}); return control;} finally{c.release();}
+  const c=await getPool().connect(); try{ await c.query("begin"); await setTenantContext(c, control.tenant_id); await createTenantPilotControl({ ...control, firm_id: uuidOrNull(control.firm_id), created_by_actor_id: uuidOrNull(control.created_by_actor_id) }, c); await c.query("commit"); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"tenant_pilot_control.created",actor,tenant_id:control.tenant_id,firm_id:control.firm_id,aggregate_type:"TenantPilotControl",aggregate_id:control.id,payload:control,summary:"Tenant pilot control created."}); return control;}); return control;} catch (error) { await c.query("rollback"); throw error; } finally{c.release();}
 }
 
 export async function recordTenantUsageEventRecord(body, actor = systemActor(body.tenant_id, body.firm_id)) {
   const usage = buildTenantUsageEvent(body, actor);
   if (storeBackend !== "postgres") return withStore((store)=>{ store.tenant_usage_events.push(usage); appendEventAndAudit(store,{event_type:"tenant_usage.recorded",actor,tenant_id:usage.tenant_id,firm_id:usage.firm_id,aggregate_type:"TenantUsageEvent",aggregate_id:usage.id,payload:usage,summary:"Tenant usage recorded."}); return usage; });
-  const c=await getPool().connect(); try{ await c.query("insert into tenant_usage_events (id, tenant_id, firm_id, actor_id, usage_type, quantity, unit, source_ref, recorded_at, metadata) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb)",[usage.id,usage.tenant_id,uuidOrNull(usage.firm_id),uuidOrNull(usage.actor_id),usage.usage_type,usage.quantity,usage.unit,usage.source_ref,usage.recorded_at,JSON.stringify(usage.metadata)]); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"tenant_usage.recorded",actor,tenant_id:usage.tenant_id,firm_id:usage.firm_id,aggregate_type:"TenantUsageEvent",aggregate_id:usage.id,payload:usage,summary:"Tenant usage recorded."}); return usage;}); return usage;} finally{c.release();}
+  const c=await getPool().connect(); try{ await c.query("begin"); await setTenantContext(c, usage.tenant_id); await createTenantUsageEvent({ ...usage, firm_id: uuidOrNull(usage.firm_id), actor_id: uuidOrNull(usage.actor_id) }, c); await c.query("commit"); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"tenant_usage.recorded",actor,tenant_id:usage.tenant_id,firm_id:usage.firm_id,aggregate_type:"TenantUsageEvent",aggregate_id:usage.id,payload:usage,summary:"Tenant usage recorded."}); return usage;}); return usage;} catch (error) { await c.query("rollback"); throw error; } finally{c.release();}
 }
 
 export async function createBillingReadinessReviewRecord(body, actor = systemActor(body.tenant_id, body.firm_id)) {
   const review = buildBillingReadinessReview(body, actor);
   if (storeBackend !== "postgres") return withStore((store)=>{ store.billing_readiness_reviews.push(review); appendEventAndAudit(store,{event_type:"billing_readiness.reviewed",actor,tenant_id:review.tenant_id,firm_id:review.firm_id,aggregate_type:"BillingReadinessReview",aggregate_id:review.id,payload:review,summary:"Billing readiness reviewed."}); return review; });
-  const c=await getPool().connect(); try{ await c.query("insert into billing_readiness_reviews (id, tenant_id, firm_id, reviewed_by_actor_id, readiness_status, pricing_model, checks, decision_summary, created_at, metadata) values ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10::jsonb)",[review.id,review.tenant_id,uuidOrNull(review.firm_id),uuidOrNull(review.reviewed_by_actor_id),review.readiness_status,review.pricing_model,JSON.stringify(review.checks),review.decision_summary,review.created_at,JSON.stringify(review.metadata)]); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"billing_readiness.reviewed",actor,tenant_id:review.tenant_id,firm_id:review.firm_id,aggregate_type:"BillingReadinessReview",aggregate_id:review.id,payload:review,summary:"Billing readiness reviewed."}); return review;}); return review;} finally{c.release();}
+  const c=await getPool().connect(); try{ await c.query("begin"); await setTenantContext(c, review.tenant_id); await createBillingReadinessReview({ ...review, firm_id: uuidOrNull(review.firm_id), reviewed_by_actor_id: uuidOrNull(review.reviewed_by_actor_id) }, c); await c.query("commit"); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"billing_readiness.reviewed",actor,tenant_id:review.tenant_id,firm_id:review.firm_id,aggregate_type:"BillingReadinessReview",aggregate_id:review.id,payload:review,summary:"Billing readiness reviewed."}); return review;}); return review;} catch (error) { await c.query("rollback"); throw error; } finally{c.release();}
 }
 function buildPilotExpansionCohort(body, actor = {}) {
   const relational = storeBackend === "postgres";
@@ -2400,13 +3236,13 @@ function buildReleaseCandidateGate(body, actor = {}) {
 export async function createPilotExpansionCohortRecord(body, actor = systemActor(body.tenant_id, body.firm_id)) {
   const cohort = buildPilotExpansionCohort(body, actor);
   if (storeBackend !== "postgres") return withStore((store)=>{ store.pilot_expansion_cohorts.push(cohort); appendEventAndAudit(store,{event_type:"pilot_expansion.cohort_created",actor,tenant_id:cohort.tenant_id,firm_id:cohort.firm_id,aggregate_type:"PilotExpansionCohort",aggregate_id:cohort.id,payload:cohort,summary:"Controlled pilot expansion cohort created."}); return cohort; });
-  const c=await getPool().connect(); try{ await c.query("insert into pilot_expansion_cohorts (id, tenant_id, firm_id, stakeholder_decision_id, created_by_actor_id, cohort_name, expansion_status, max_tenants, max_pilot_users, entry_criteria, risk_controls, created_at, updated_at, metadata) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13,$14::jsonb)",[cohort.id,cohort.tenant_id,uuidOrNull(cohort.firm_id),uuidOrNull(cohort.stakeholder_decision_id),uuidOrNull(cohort.created_by_actor_id),cohort.cohort_name,cohort.expansion_status,cohort.max_tenants,cohort.max_pilot_users,JSON.stringify(cohort.entry_criteria),JSON.stringify(cohort.risk_controls),cohort.created_at,cohort.updated_at,JSON.stringify(cohort.metadata)]); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"pilot_expansion.cohort_created",actor,tenant_id:cohort.tenant_id,firm_id:cohort.firm_id,aggregate_type:"PilotExpansionCohort",aggregate_id:cohort.id,payload:cohort,summary:"Controlled pilot expansion cohort created."}); return cohort;}); return cohort;} finally{c.release();}
+  const c=await getPool().connect(); try{ await c.query("begin"); await setTenantContext(c, cohort.tenant_id); await createPilotExpansionCohort({ ...cohort, firm_id: uuidOrNull(cohort.firm_id), stakeholder_decision_id: uuidOrNull(cohort.stakeholder_decision_id), created_by_actor_id: uuidOrNull(cohort.created_by_actor_id) }, c); await c.query("commit"); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"pilot_expansion.cohort_created",actor,tenant_id:cohort.tenant_id,firm_id:cohort.firm_id,aggregate_type:"PilotExpansionCohort",aggregate_id:cohort.id,payload:cohort,summary:"Controlled pilot expansion cohort created."}); return cohort;}); return cohort;} catch (error) { await c.query("rollback"); throw error; } finally{c.release();}
 }
 
 export async function updatePilotExpansionCohortRecord(body, actor = systemActor(body.tenant_id, body.firm_id)) {
   const timestamp=now();
   if (storeBackend !== "postgres") return withStore((store)=>{ const cohort=store.pilot_expansion_cohorts.find((item)=>item.id===body.expansion_cohort_id&&item.tenant_id===body.tenant_id); if(!cohort) throwNotFound("pilot_expansion_cohorts", body.expansion_cohort_id); cohort.expansion_status=body.expansion_status??cohort.expansion_status; cohort.updated_at=timestamp; appendEventAndAudit(store,{event_type:"pilot_expansion.cohort_updated",actor,tenant_id:cohort.tenant_id,firm_id:cohort.firm_id,aggregate_type:"PilotExpansionCohort",aggregate_id:cohort.id,payload:cohort,summary:"Controlled pilot expansion cohort updated."}); return cohort; });
-  const c=await getPool().connect(); try{ const result=await c.query("update pilot_expansion_cohorts set expansion_status=coalesce($1,expansion_status), updated_at=$2 where id=$3 and tenant_id=$4 returning id::text, tenant_id::text, firm_id::text, stakeholder_decision_id::text, created_by_actor_id::text, cohort_name, expansion_status, max_tenants, max_pilot_users, entry_criteria, risk_controls, created_at, updated_at, metadata",[body.expansion_status??null,timestamp,body.expansion_cohort_id,body.tenant_id]); if(result.rowCount===0) throwNotFound("pilot_expansion_cohorts", body.expansion_cohort_id); const cohort=mapDbDates(result.rows[0]); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"pilot_expansion.cohort_updated",actor,tenant_id:cohort.tenant_id,firm_id:cohort.firm_id,aggregate_type:"PilotExpansionCohort",aggregate_id:cohort.id,payload:cohort,summary:"Controlled pilot expansion cohort updated."}); return cohort;}); return cohort;} finally{c.release();}
+  const c=await getPool().connect(); try{ await c.query("begin"); await setTenantContext(c, body.tenant_id); const result=await c.query("update pilot_expansion_cohorts set expansion_status=coalesce($1,expansion_status), updated_at=$2 where id=$3 and tenant_id=$4 returning id::text, tenant_id::text, firm_id::text, stakeholder_decision_id::text, created_by_actor_id::text, cohort_name, expansion_status, max_tenants, max_pilot_users, entry_criteria, risk_controls, created_at, updated_at, metadata",[body.expansion_status??null,timestamp,body.expansion_cohort_id,body.tenant_id]); if(result.rowCount===0) throwNotFound("pilot_expansion_cohorts", body.expansion_cohort_id); const cohort=mapDbDates(result.rows[0]); await c.query("commit"); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"pilot_expansion.cohort_updated",actor,tenant_id:cohort.tenant_id,firm_id:cohort.firm_id,aggregate_type:"PilotExpansionCohort",aggregate_id:cohort.id,payload:cohort,summary:"Controlled pilot expansion cohort updated."}); return cohort;}); return cohort;} catch (error) { await c.query("rollback"); throw error; } finally{c.release();}
 }
 
 export async function activatePrivatePilotCohortRecord(body, actor = systemActor(body.tenant_id, body.firm_id)) {
@@ -2422,25 +3258,25 @@ export async function activatePrivatePilotCohortRecord(body, actor = systemActor
     }
   };
   if (storeBackend !== "postgres") return withStore((store)=>{ const cohort=store.pilot_expansion_cohorts.find((item)=>item.id===body.expansion_cohort_id&&item.tenant_id===body.tenant_id); if(!cohort) throwNotFound("pilot_expansion_cohorts", body.expansion_cohort_id); cohort.expansion_status="PRIVATE_PILOT_ACTIVE"; cohort.updated_at=timestamp; cohort.metadata={...(cohort.metadata??{}), ...metadataPatch}; appendEventAndAudit(store,{event_type:"pilot_private_cohort.activated",actor,tenant_id:cohort.tenant_id,firm_id:cohort.firm_id,aggregate_type:"PilotExpansionCohort",aggregate_id:cohort.id,payload:{cohort_id:cohort.id, status:cohort.expansion_status, activation_gate:body.activation_gate},summary:"Private pilot cohort activated after R4-S1 through R4-S4 evidence gates passed."}); return cohort; });
-  const c=await getPool().connect(); try{ const result=await c.query("update pilot_expansion_cohorts set expansion_status='PRIVATE_PILOT_ACTIVE', updated_at=$1, metadata = metadata || $2::jsonb where id=$3 and tenant_id=$4 returning id::text, tenant_id::text, firm_id::text, stakeholder_decision_id::text, created_by_actor_id::text, cohort_name, expansion_status, max_tenants, max_pilot_users, entry_criteria, risk_controls, created_at, updated_at, metadata",[timestamp,JSON.stringify(metadataPatch),body.expansion_cohort_id,body.tenant_id]); if(result.rowCount===0) throwNotFound("pilot_expansion_cohorts", body.expansion_cohort_id); const cohort=mapDbDates(result.rows[0]); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"pilot_private_cohort.activated",actor,tenant_id:cohort.tenant_id,firm_id:cohort.firm_id,aggregate_type:"PilotExpansionCohort",aggregate_id:cohort.id,payload:{cohort_id:cohort.id, status:cohort.expansion_status, activation_gate:body.activation_gate},summary:"Private pilot cohort activated after R4-S1 through R4-S4 evidence gates passed."}); return cohort;}); return cohort;} finally{c.release();}
+  const c=await getPool().connect(); try{ await c.query("begin"); await setTenantContext(c, body.tenant_id); const result=await c.query("update pilot_expansion_cohorts set expansion_status='PRIVATE_PILOT_ACTIVE', updated_at=$1, metadata = metadata || $2::jsonb where id=$3 and tenant_id=$4 returning id::text, tenant_id::text, firm_id::text, stakeholder_decision_id::text, created_by_actor_id::text, cohort_name, expansion_status, max_tenants, max_pilot_users, entry_criteria, risk_controls, created_at, updated_at, metadata",[timestamp,JSON.stringify(metadataPatch),body.expansion_cohort_id,body.tenant_id]); if(result.rowCount===0) throwNotFound("pilot_expansion_cohorts", body.expansion_cohort_id); const cohort=mapDbDates(result.rows[0]); await c.query("commit"); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"pilot_private_cohort.activated",actor,tenant_id:cohort.tenant_id,firm_id:cohort.firm_id,aggregate_type:"PilotExpansionCohort",aggregate_id:cohort.id,payload:{cohort_id:cohort.id, status:cohort.expansion_status, activation_gate:body.activation_gate},summary:"Private pilot cohort activated after R4-S1 through R4-S4 evidence gates passed."}); return cohort;}); return cohort;} catch (error) { await c.query("rollback"); throw error; } finally{c.release();}
 }
 
 export async function createTenantOnboardingPlanRecord(body, actor = systemActor(body.tenant_id, body.firm_id)) {
   const plan = buildTenantOnboardingPlan(body, actor);
   if (storeBackend !== "postgres") return withStore((store)=>{ store.tenant_onboarding_plans.push(plan); appendEventAndAudit(store,{event_type:"tenant_onboarding.plan_created",actor,tenant_id:plan.tenant_id,firm_id:plan.firm_id,aggregate_type:"TenantOnboardingPlan",aggregate_id:plan.id,payload:plan,summary:"Tenant onboarding plan created."}); return plan; });
-  const c=await getPool().connect(); try{ await c.query("insert into tenant_onboarding_plans (id, tenant_id, firm_id, expansion_cohort_id, assigned_operator_actor_id, onboarding_status, onboarding_steps, readiness_checks, target_start_at, created_at, updated_at, completed_at, metadata) values ($1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb,$9,$10,$11,$12,$13::jsonb)",[plan.id,plan.tenant_id,uuidOrNull(plan.firm_id),uuidOrNull(plan.expansion_cohort_id),uuidOrNull(plan.assigned_operator_actor_id),plan.onboarding_status,JSON.stringify(plan.onboarding_steps),JSON.stringify(plan.readiness_checks),plan.target_start_at,plan.created_at,plan.updated_at,plan.completed_at,JSON.stringify(plan.metadata)]); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"tenant_onboarding.plan_created",actor,tenant_id:plan.tenant_id,firm_id:plan.firm_id,aggregate_type:"TenantOnboardingPlan",aggregate_id:plan.id,payload:plan,summary:"Tenant onboarding plan created."}); return plan;}); return plan;} finally{c.release();}
+  const c=await getPool().connect(); try{ await c.query("begin"); await setTenantContext(c, plan.tenant_id); await createTenantOnboardingPlan({ ...plan, firm_id: uuidOrNull(plan.firm_id), expansion_cohort_id: uuidOrNull(plan.expansion_cohort_id), assigned_operator_actor_id: uuidOrNull(plan.assigned_operator_actor_id) }, c); await c.query("commit"); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"tenant_onboarding.plan_created",actor,tenant_id:plan.tenant_id,firm_id:plan.firm_id,aggregate_type:"TenantOnboardingPlan",aggregate_id:plan.id,payload:plan,summary:"Tenant onboarding plan created."}); return plan;}); return plan;} catch (error) { await c.query("rollback"); throw error; } finally{c.release();}
 }
 
 export async function updateTenantOnboardingPlanRecord(body, actor = systemActor(body.tenant_id, body.firm_id)) {
   const timestamp=now();
   if (storeBackend !== "postgres") return withStore((store)=>{ const plan=store.tenant_onboarding_plans.find((item)=>item.id===body.onboarding_plan_id&&item.tenant_id===body.tenant_id); if(!plan) throwNotFound("tenant_onboarding_plans", body.onboarding_plan_id); plan.onboarding_status=body.onboarding_status??plan.onboarding_status; plan.updated_at=timestamp; plan.completed_at=body.onboarding_status==="COMPLETE"?timestamp:plan.completed_at; appendEventAndAudit(store,{event_type:"tenant_onboarding.plan_updated",actor,tenant_id:plan.tenant_id,firm_id:plan.firm_id,aggregate_type:"TenantOnboardingPlan",aggregate_id:plan.id,payload:plan,summary:"Tenant onboarding plan updated."}); return plan; });
-  const c=await getPool().connect(); try{ const result=await c.query("update tenant_onboarding_plans set onboarding_status=coalesce($1,onboarding_status), updated_at=$2, completed_at=case when $1='COMPLETE' then $2 else completed_at end where id=$3 and tenant_id=$4 returning id::text, tenant_id::text, firm_id::text, expansion_cohort_id::text, assigned_operator_actor_id::text, onboarding_status, onboarding_steps, readiness_checks, target_start_at, created_at, updated_at, completed_at, metadata",[body.onboarding_status??null,timestamp,body.onboarding_plan_id,body.tenant_id]); if(result.rowCount===0) throwNotFound("tenant_onboarding_plans", body.onboarding_plan_id); const plan=mapDbDates(result.rows[0]); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"tenant_onboarding.plan_updated",actor,tenant_id:plan.tenant_id,firm_id:plan.firm_id,aggregate_type:"TenantOnboardingPlan",aggregate_id:plan.id,payload:plan,summary:"Tenant onboarding plan updated."}); return plan;}); return plan;} finally{c.release();}
+  const c=await getPool().connect(); try{ await c.query("begin"); await setTenantContext(c, body.tenant_id); const result=await c.query("update tenant_onboarding_plans set onboarding_status=coalesce($1,onboarding_status), updated_at=$2, completed_at=case when $1='COMPLETE' then $2 else completed_at end where id=$3 and tenant_id=$4 returning id::text, tenant_id::text, firm_id::text, expansion_cohort_id::text, assigned_operator_actor_id::text, onboarding_status, onboarding_steps, readiness_checks, target_start_at, created_at, updated_at, completed_at, metadata",[body.onboarding_status??null,timestamp,body.onboarding_plan_id,body.tenant_id]); if(result.rowCount===0) throwNotFound("tenant_onboarding_plans", body.onboarding_plan_id); const plan=mapDbDates(result.rows[0]); await c.query("commit"); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"tenant_onboarding.plan_updated",actor,tenant_id:plan.tenant_id,firm_id:plan.firm_id,aggregate_type:"TenantOnboardingPlan",aggregate_id:plan.id,payload:plan,summary:"Tenant onboarding plan updated."}); return plan;}); return plan;} catch (error) { await c.query("rollback"); throw error; } finally{c.release();}
 }
 
 export async function createReleaseCandidateGateRecord(body, actor = systemActor(body.tenant_id, body.firm_id)) {
   const gate = buildReleaseCandidateGate(body, actor);
   if (storeBackend !== "postgres") return withStore((store)=>{ store.release_candidate_gates.push(gate); appendEventAndAudit(store,{event_type:"release_candidate.gate_recorded",actor,tenant_id:gate.tenant_id,firm_id:gate.firm_id,aggregate_type:"ReleaseCandidateGate",aggregate_id:gate.id,payload:gate,summary:"Release candidate governance gate recorded."}); return gate; });
-  const c=await getPool().connect(); try{ await c.query("insert into release_candidate_gates (id, tenant_id, firm_id, expansion_cohort_id, reviewed_by_actor_id, release_candidate, gate_status, required_checks, evidence_refs, decision_summary, created_at, decided_at, metadata) values ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb,$10,$11,$12,$13::jsonb)",[gate.id,gate.tenant_id,uuidOrNull(gate.firm_id),uuidOrNull(gate.expansion_cohort_id),uuidOrNull(gate.reviewed_by_actor_id),gate.release_candidate,gate.gate_status,JSON.stringify(gate.required_checks),JSON.stringify(gate.evidence_refs),gate.decision_summary,gate.created_at,gate.decided_at,JSON.stringify(gate.metadata)]); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"release_candidate.gate_recorded",actor,tenant_id:gate.tenant_id,firm_id:gate.firm_id,aggregate_type:"ReleaseCandidateGate",aggregate_id:gate.id,payload:gate,summary:"Release candidate governance gate recorded."}); return gate;}); return gate;} finally{c.release();}
+  const c=await getPool().connect(); try{ await c.query("begin"); await setTenantContext(c, gate.tenant_id); await createReleaseCandidateGate({ ...gate, firm_id: uuidOrNull(gate.firm_id), expansion_cohort_id: uuidOrNull(gate.expansion_cohort_id), reviewed_by_actor_id: uuidOrNull(gate.reviewed_by_actor_id) }, c); await c.query("commit"); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"release_candidate.gate_recorded",actor,tenant_id:gate.tenant_id,firm_id:gate.firm_id,aggregate_type:"ReleaseCandidateGate",aggregate_id:gate.id,payload:gate,summary:"Release candidate governance gate recorded."}); return gate;}); return gate;} catch (error) { await c.query("rollback"); throw error; } finally{c.release();}
 }
 function pilotReportSummary(store, tenant_id, firm_id = null) {
   const scope = (records) => (records ?? []).filter((item)=> (!tenant_id || item.tenant_id === tenant_id) && (!firm_id || item.firm_id === firm_id));
@@ -2491,21 +3327,21 @@ export async function createPilotReportPackRecord(body, actor = systemActor(body
   const pack = buildPilotReportPack(body, actor, store);
   if (storeBackend !== "postgres") return withStore((store)=>{ store.pilot_report_packs.push(pack); appendEventAndAudit(store,{event_type:"pilot_report_pack.generated",actor,tenant_id:pack.tenant_id,firm_id:pack.firm_id,aggregate_type:"PilotReportPack",aggregate_id:pack.id,payload:pack,summary:"Pilot report pack generated."}); return pack; });
   const clientConn = await getPool().connect();
-  try { await clientConn.query("insert into pilot_report_packs (id, tenant_id, firm_id, generated_by_actor_id, report_scope, report_status, summary, export_manifest, created_at, metadata) values ($1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb,$9,$10::jsonb)",[pack.id,pack.tenant_id,uuidOrNull(pack.firm_id),uuidOrNull(pack.generated_by_actor_id),pack.report_scope,pack.report_status,JSON.stringify(pack.summary),JSON.stringify(pack.export_manifest),pack.created_at,JSON.stringify(pack.metadata)]); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"pilot_report_pack.generated",actor,tenant_id:pack.tenant_id,firm_id:pack.firm_id,aggregate_type:"PilotReportPack",aggregate_id:pack.id,payload:pack,summary:"Pilot report pack generated."}); return pack;}); return pack; } finally { clientConn.release(); }
+  try { await clientConn.query("begin"); await setTenantContext(clientConn, pack.tenant_id); await createPilotReportPack({ ...pack, firm_id: uuidOrNull(pack.firm_id), generated_by_actor_id: uuidOrNull(pack.generated_by_actor_id) }, clientConn); await clientConn.query("commit"); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"pilot_report_pack.generated",actor,tenant_id:pack.tenant_id,firm_id:pack.firm_id,aggregate_type:"PilotReportPack",aggregate_id:pack.id,payload:pack,summary:"Pilot report pack generated."}); return pack;}); return pack; } catch (error) { await clientConn.query("rollback"); throw error; } finally { clientConn.release(); }
 }
 
 export async function createStakeholderReviewBoardRecord(body, actor = systemActor(body.tenant_id, body.firm_id)) {
   const board = buildStakeholderReviewBoard(body, actor);
   if (storeBackend !== "postgres") return withStore((store)=>{ store.stakeholder_review_boards.push(board); appendEventAndAudit(store,{event_type:"stakeholder_review_board.opened",actor,tenant_id:board.tenant_id,firm_id:board.firm_id,aggregate_type:"StakeholderReviewBoard",aggregate_id:board.id,payload:board,summary:"Stakeholder review board opened."}); return board; });
   const clientConn = await getPool().connect();
-  try { await clientConn.query("insert into stakeholder_review_boards (id, tenant_id, firm_id, report_pack_id, chaired_by_actor_id, board_name, review_status, agenda, attendees, scheduled_at, created_at, updated_at, closed_at, metadata) values ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb,$10,$11,$12,$13,$14::jsonb)",[board.id,board.tenant_id,uuidOrNull(board.firm_id),uuidOrNull(board.report_pack_id),uuidOrNull(board.chaired_by_actor_id),board.board_name,board.review_status,JSON.stringify(board.agenda),JSON.stringify(board.attendees),board.scheduled_at,board.created_at,board.updated_at,board.closed_at,JSON.stringify(board.metadata)]); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"stakeholder_review_board.opened",actor,tenant_id:board.tenant_id,firm_id:board.firm_id,aggregate_type:"StakeholderReviewBoard",aggregate_id:board.id,payload:board,summary:"Stakeholder review board opened."}); return board;}); return board; } finally { clientConn.release(); }
+  try { await clientConn.query("begin"); await setTenantContext(clientConn, board.tenant_id); await createStakeholderReviewBoard({ ...board, firm_id: uuidOrNull(board.firm_id), report_pack_id: uuidOrNull(board.report_pack_id), chaired_by_actor_id: uuidOrNull(board.chaired_by_actor_id) }, clientConn); await clientConn.query("commit"); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"stakeholder_review_board.opened",actor,tenant_id:board.tenant_id,firm_id:board.firm_id,aggregate_type:"StakeholderReviewBoard",aggregate_id:board.id,payload:board,summary:"Stakeholder review board opened."}); return board;}); return board; } catch (error) { await clientConn.query("rollback"); throw error; } finally { clientConn.release(); }
 }
 
 export async function createStakeholderReviewDecisionRecord(body, actor = systemActor(body.tenant_id, body.firm_id)) {
   const decision = buildStakeholderReviewDecision(body, actor);
   if (storeBackend !== "postgres") return withStore((store)=>{ const board=store.stakeholder_review_boards.find((item)=>item.id===decision.board_id && item.tenant_id===decision.tenant_id); if(!board) throwNotFound("stakeholder_review_boards", decision.board_id); store.stakeholder_review_decisions.push(decision); board.review_status="CLOSED"; board.closed_at=decision.decided_at; board.updated_at=decision.decided_at; appendEventAndAudit(store,{event_type:"stakeholder_review.decision_recorded",actor,tenant_id:decision.tenant_id,firm_id:decision.firm_id,aggregate_type:"StakeholderReviewDecision",aggregate_id:decision.id,payload:decision,summary:"Stakeholder review decision recorded."}); return decision; });
   const clientConn = await getPool().connect();
-  try { await clientConn.query("begin"); const board=await clientConn.query("select id from stakeholder_review_boards where id=$1 and tenant_id=$2",[decision.board_id,decision.tenant_id]); if(board.rowCount===0) throwNotFound("stakeholder_review_boards", decision.board_id); await clientConn.query("insert into stakeholder_review_decisions (id, tenant_id, firm_id, board_id, decided_by_actor_id, decision, decision_summary, conditions, next_stage, decided_at, metadata) values ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11::jsonb)",[decision.id,decision.tenant_id,uuidOrNull(decision.firm_id),decision.board_id,uuidOrNull(decision.decided_by_actor_id),decision.decision,decision.decision_summary,JSON.stringify(decision.conditions),decision.next_stage,decision.decided_at,JSON.stringify(decision.metadata)]); await clientConn.query("update stakeholder_review_boards set review_status='CLOSED', closed_at=$1, updated_at=$1 where id=$2",[decision.decided_at,decision.board_id]); await clientConn.query("commit"); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"stakeholder_review.decision_recorded",actor,tenant_id:decision.tenant_id,firm_id:decision.firm_id,aggregate_type:"StakeholderReviewDecision",aggregate_id:decision.id,payload:decision,summary:"Stakeholder review decision recorded."}); return decision;}); return decision; } catch(error){ await clientConn.query("rollback"); throw error; } finally { clientConn.release(); }
+  try { await clientConn.query("begin"); await setTenantContext(clientConn, decision.tenant_id); const board=await clientConn.query("select id from stakeholder_review_boards where id=$1 and tenant_id=$2",[decision.board_id,decision.tenant_id]); if(board.rowCount===0) throwNotFound("stakeholder_review_boards", decision.board_id); await createStakeholderReviewDecision({ ...decision, firm_id: uuidOrNull(decision.firm_id), decided_by_actor_id: uuidOrNull(decision.decided_by_actor_id) }, clientConn); await updateStakeholderReviewBoard(decision.board_id, { review_status: "CLOSED", closed_at: decision.decided_at, updated_at: decision.decided_at }, clientConn); await clientConn.query("commit"); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"stakeholder_review.decision_recorded",actor,tenant_id:decision.tenant_id,firm_id:decision.firm_id,aggregate_type:"StakeholderReviewDecision",aggregate_id:decision.id,payload:decision,summary:"Stakeholder review decision recorded."}); return decision;}); return decision; } catch(error){ await clientConn.query("rollback"); throw error; } finally { clientConn.release(); }
 }
 const supportCaseStateTransitions = {
   OPEN: ["TRIAGED", "ESCALATED", "WAITING_ON_USER", "RESOLVED", "CLOSED"],
@@ -2563,7 +3399,8 @@ export async function createPilotIncidentRecord(body, actor = systemActor(body.t
   const clientConn = await getPool().connect();
   try {
     await clientConn.query("begin");
-    await clientConn.query("insert into pilot_incidents (id, tenant_id, firm_id, support_case_id, project_id, opened_by_actor_id, incident_type, severity, status, title, description, detection_source, impact_summary, mitigation_summary, root_cause_summary, created_at, updated_at, resolved_at, metadata) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19::jsonb)", [incident.id,incident.tenant_id,uuidOrNull(incident.firm_id),uuidOrNull(incident.support_case_id),uuidOrNull(incident.project_id),uuidOrNull(incident.opened_by_actor_id),incident.incident_type,incident.severity,incident.status,incident.title,incident.description,incident.detection_source,incident.impact_summary,incident.mitigation_summary,incident.root_cause_summary,incident.created_at,incident.updated_at,incident.resolved_at,JSON.stringify(incident.metadata)]);
+    await setTenantContext(clientConn, incident.tenant_id);
+    await createPilotIncident({ ...incident, firm_id: uuidOrNull(incident.firm_id), support_case_id: uuidOrNull(incident.support_case_id), project_id: uuidOrNull(incident.project_id), opened_by_actor_id: uuidOrNull(incident.opened_by_actor_id) }, clientConn);
     await clientConn.query("commit");
     await withAppState((store)=>{ appendEventAndAudit(store,{event_type:"pilot_incident.opened",actor,tenant_id:incident.tenant_id,firm_id:incident.firm_id,aggregate_type:"PilotIncident",aggregate_id:incident.id,payload:incident,summary:"Pilot incident opened."}); return incident; });
     return incident;
@@ -2575,15 +3412,18 @@ export async function updatePilotIncidentRecord(body, actor = systemActor(body.t
   if (storeBackend !== "postgres") return withStore((store)=>{ const item=store.pilot_incidents.find((record)=>record.id===body.incident_id && record.tenant_id===body.tenant_id); if(!item) throwNotFound("pilot_incidents", body.incident_id); assertStateTransition(item.status, body.status, pilotIncidentStateTransitions, "Pilot incident"); item.status=body.status ?? item.status; item.severity=body.severity ?? item.severity; item.mitigation_summary=body.mitigation_summary ?? item.mitigation_summary; item.root_cause_summary=body.root_cause_summary ?? item.root_cause_summary; item.updated_at=timestamp; item.resolved_at=["RESOLVED","CLOSED"].includes(body.status) ? timestamp : item.resolved_at; appendEventAndAudit(store,{event_type:"pilot_incident.updated",actor,tenant_id:item.tenant_id,firm_id:item.firm_id,aggregate_type:"PilotIncident",aggregate_id:item.id,payload:item,summary:"Pilot incident updated."}); return item; });
   const clientConn = await getPool().connect();
   try {
+    await clientConn.query("begin");
+    await setTenantContext(clientConn, body.tenant_id);
     const existing = await clientConn.query("select status from pilot_incidents where id=$1 and tenant_id=$2", [body.incident_id, body.tenant_id]);
     if(existing.rowCount===0) throwNotFound("pilot_incidents", body.incident_id);
     assertStateTransition(existing.rows[0].status, body.status, pilotIncidentStateTransitions, "Pilot incident");
     const result = await clientConn.query("update pilot_incidents set status=coalesce($1,status), severity=coalesce($2,severity), mitigation_summary=coalesce($3,mitigation_summary), root_cause_summary=coalesce($4,root_cause_summary), updated_at=$5, resolved_at=case when $1 in ('RESOLVED','CLOSED') then $5 else resolved_at end where id=$6 and tenant_id=$7 returning id::text, tenant_id::text, firm_id::text, support_case_id::text, project_id::text, opened_by_actor_id::text, incident_type, severity, status, title, description, detection_source, impact_summary, mitigation_summary, root_cause_summary, created_at, updated_at, resolved_at, metadata", [body.status ?? null,body.severity ?? null,body.mitigation_summary ?? null,body.root_cause_summary ?? null,timestamp,body.incident_id,body.tenant_id]);
     if(result.rowCount===0) throwNotFound("pilot_incidents", body.incident_id);
     const item = mapDbDates(result.rows[0]);
+    await clientConn.query("commit");
     await withAppState((store)=>{ appendEventAndAudit(store,{event_type:"pilot_incident.updated",actor,tenant_id:item.tenant_id,firm_id:item.firm_id,aggregate_type:"PilotIncident",aggregate_id:item.id,payload:item,summary:"Pilot incident updated."}); return item; });
     return item;
-  } finally { clientConn.release(); }
+  } catch (error) { await clientConn.query("rollback"); throw error; } finally { clientConn.release(); }
 }
 function buildSupportCase(body, actor = {}, options = {}) {
   const relational = storeBackend === "postgres" || options.ids === "uuid";
@@ -2612,12 +3452,15 @@ export async function revokePilotUserRecord(body, actor = systemActor(body.tenan
   if (storeBackend !== "postgres") return withStore((store)=>{ const user=store.pilot_users.find((item)=>item.id===body.pilot_user_id && item.tenant_id===body.tenant_id); if(!user) throwNotFound("pilot_users", body.pilot_user_id); user.invite_status="REVOKED"; user.revoked_at=timestamp; user.metadata={...(user.metadata??{}), revocation_reason: body.revocation_reason ?? "pilot_access_revoked"}; appendEventAndAudit(store,{event_type:"pilot_user.revoked",actor,tenant_id:user.tenant_id,firm_id:user.firm_id,aggregate_type:"PilotUser",aggregate_id:user.id,payload:user,summary:"Pilot user access revoked."}); return user; });
   const clientConn = await getPool().connect();
   try {
+    await clientConn.query("begin");
+    await setTenantContext(clientConn, body.tenant_id);
     const result = await clientConn.query("update pilot_users set invite_status='REVOKED', revoked_at=$1, metadata = metadata || $2::jsonb where id=$3 and tenant_id=$4 returning id::text, tenant_id::text, firm_id::text, person_id::text, actor_id::text, email, display_name, pilot_role, invite_status, auth_provider, external_subject, invited_at, activated_at, revoked_at, metadata", [timestamp, JSON.stringify({ revocation_reason: body.revocation_reason ?? "pilot_access_revoked" }), body.pilot_user_id, body.tenant_id]);
     if(result.rowCount===0) throwNotFound("pilot_users", body.pilot_user_id);
     const user = mapDbDates(result.rows[0]);
+    await clientConn.query("commit");
     await withAppState((store)=>{ appendEventAndAudit(store,{event_type:"pilot_user.revoked",actor,tenant_id:user.tenant_id,firm_id:user.firm_id,aggregate_type:"PilotUser",aggregate_id:user.id,payload:user,summary:"Pilot user access revoked."}); return user; });
     return user;
-  } finally { clientConn.release(); }
+  } catch (error) { await clientConn.query("rollback"); throw error; } finally { clientConn.release(); }
 }
 
 export async function suspendPilotUserRecord(body, actor = systemActor(body.tenant_id, body.firm_id)) {
@@ -2625,12 +3468,15 @@ export async function suspendPilotUserRecord(body, actor = systemActor(body.tena
   if (storeBackend !== "postgres") return withStore((store)=>{ const user=store.pilot_users.find((item)=>item.id===body.pilot_user_id && item.tenant_id===body.tenant_id); if(!user) throwNotFound("pilot_users", body.pilot_user_id); if(user.invite_status==="REVOKED") invalidState("Revoked pilot user cannot be suspended; create a new invitation after explicit approval."); user.invite_status="SUSPENDED"; user.metadata={...(user.metadata??{}), suspension_reason: body.suspension_reason ?? "pilot_access_suspended"}; appendEventAndAudit(store,{event_type:"pilot_user.suspended",actor,tenant_id:user.tenant_id,firm_id:user.firm_id,aggregate_type:"PilotUser",aggregate_id:user.id,payload:user,summary:"Pilot user access suspended."}); return user; });
   const clientConn = await getPool().connect();
   try {
+    await clientConn.query("begin");
+    await setTenantContext(clientConn, body.tenant_id);
     const result = await clientConn.query("update pilot_users set invite_status='SUSPENDED', metadata = metadata || $1::jsonb where id=$2 and tenant_id=$3 and invite_status <> 'REVOKED' returning id::text, tenant_id::text, firm_id::text, person_id::text, actor_id::text, email, display_name, pilot_role, invite_status, auth_provider, external_subject, invited_at, activated_at, revoked_at, metadata", [JSON.stringify({ suspension_reason: body.suspension_reason ?? "pilot_access_suspended" }), body.pilot_user_id, body.tenant_id]);
     if(result.rowCount===0) throwNotFound("pilot_users", body.pilot_user_id);
     const user = mapDbDates(result.rows[0]);
+    await clientConn.query("commit");
     await withAppState((store)=>{ appendEventAndAudit(store,{event_type:"pilot_user.suspended",actor,tenant_id:user.tenant_id,firm_id:user.firm_id,aggregate_type:"PilotUser",aggregate_id:user.id,payload:user,summary:"Pilot user access suspended."}); return user; });
     return user;
-  } finally { clientConn.release(); }
+  } catch (error) { await clientConn.query("rollback"); throw error; } finally { clientConn.release(); }
 }
 
 export async function createSupportCaseRecord(body, actor = systemActor(body.tenant_id, body.firm_id)) {
@@ -2638,10 +3484,13 @@ export async function createSupportCaseRecord(body, actor = systemActor(body.ten
   if (storeBackend !== "postgres") return withStore((store)=>{ if(!supportCaseStateTransitions[supportCase.status]) invalidState(`Support case state is invalid: ${supportCase.status}.`); store.support_cases.push(supportCase); appendEventAndAudit(store,{event_type:"support_case.opened",actor,tenant_id:supportCase.tenant_id,firm_id:supportCase.firm_id,aggregate_type:"SupportCase",aggregate_id:supportCase.id,payload:supportCase,summary:"Support case opened."}); return supportCase; });
   const clientConn = await getPool().connect();
   try {
-    await clientConn.query("insert into support_cases (id, tenant_id, firm_id, opened_by_actor_id, related_pilot_user_id, case_type, severity, status, subject, description, resolution_summary, created_at, updated_at, closed_at, metadata) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15::jsonb)", [supportCase.id,supportCase.tenant_id,uuidOrNull(supportCase.firm_id),uuidOrNull(supportCase.opened_by_actor_id),uuidOrNull(supportCase.related_pilot_user_id),supportCase.case_type,supportCase.severity,supportCase.status,supportCase.subject,supportCase.description,supportCase.resolution_summary,supportCase.created_at,supportCase.updated_at,supportCase.closed_at,JSON.stringify(supportCase.metadata)]);
+    await clientConn.query("begin");
+    await setTenantContext(clientConn, supportCase.tenant_id);
+    await createSupportCase({ ...supportCase, firm_id: uuidOrNull(supportCase.firm_id), opened_by_actor_id: uuidOrNull(supportCase.opened_by_actor_id), related_pilot_user_id: uuidOrNull(supportCase.related_pilot_user_id) }, clientConn);
+    await clientConn.query("commit");
     await withAppState((store)=>{ appendEventAndAudit(store,{event_type:"support_case.opened",actor,tenant_id:supportCase.tenant_id,firm_id:supportCase.firm_id,aggregate_type:"SupportCase",aggregate_id:supportCase.id,payload:supportCase,summary:"Support case opened."}); return supportCase; });
     return supportCase;
-  } finally { clientConn.release(); }
+  } catch (error) { await clientConn.query("rollback"); throw error; } finally { clientConn.release(); }
 }
 
 export async function updateSupportCaseRecord(body, actor = systemActor(body.tenant_id, body.firm_id)) {
@@ -2686,10 +3535,13 @@ export async function invitePilotUserRecord(body, actor = systemActor(body.tenan
   if (storeBackend !== "postgres") return withStore((store)=>{ const existing=store.pilot_users.find((item)=>item.tenant_id===user.tenant_id && item.email===user.email && item.invite_status!=="REVOKED"); if(existing) invalidState("Pilot user already has an active, invited, or suspended identity record for this tenant."); store.pilot_users.push(user); appendEventAndAudit(store,{event_type:"pilot_user.invited",actor,tenant_id:user.tenant_id,firm_id:user.firm_id,aggregate_type:"PilotUser",aggregate_id:user.id,payload:user,summary:"Pilot user invited."}); return user; });
   const clientConn = await getPool().connect();
   try {
-    await clientConn.query("insert into pilot_users (id, tenant_id, firm_id, person_id, actor_id, email, display_name, pilot_role, invite_status, auth_provider, external_subject, invited_at, activated_at, revoked_at, metadata) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15::jsonb)", [user.id,user.tenant_id,uuidOrNull(user.firm_id),uuidOrNull(user.person_id),uuidOrNull(user.actor_id),user.email,user.display_name,user.pilot_role,user.invite_status,user.auth_provider,user.external_subject,user.invited_at,user.activated_at,user.revoked_at,JSON.stringify(user.metadata)]);
+    await clientConn.query("begin");
+    await setTenantContext(clientConn, user.tenant_id);
+    await createPilotUser({ ...user, firm_id: uuidOrNull(user.firm_id), person_id: uuidOrNull(user.person_id), actor_id: uuidOrNull(user.actor_id) }, clientConn);
+    await clientConn.query("commit");
     await withAppState((store)=>{ appendEventAndAudit(store,{event_type:"pilot_user.invited",actor,tenant_id:user.tenant_id,firm_id:user.firm_id,aggregate_type:"PilotUser",aggregate_id:user.id,payload:user,summary:"Pilot user invited."}); return user; });
     return user;
-  } finally { clientConn.release(); }
+  } catch (error) { await clientConn.query("rollback"); throw error; } finally { clientConn.release(); }
 }
 
 export async function activatePilotUserRecord(body, actor = systemActor(body.tenant_id, body.firm_id)) {
@@ -2697,12 +3549,15 @@ export async function activatePilotUserRecord(body, actor = systemActor(body.ten
   if (storeBackend !== "postgres") return withStore((store)=>{ const user=store.pilot_users.find((item)=>item.id===body.pilot_user_id || (item.tenant_id===body.tenant_id && item.email===String(body.email??"").toLowerCase())); if(!user) throwNotFound("pilot_users", body.pilot_user_id ?? body.email); if(["REVOKED","SUSPENDED"].includes(user.invite_status)) invalidState("Suspended or revoked pilot user cannot be activated without a new explicit invitation."); user.invite_status="ACTIVE"; user.external_subject=body.external_subject ?? user.external_subject; user.activated_at=timestamp; appendEventAndAudit(store,{event_type:"pilot_user.activated",actor,tenant_id:user.tenant_id,firm_id:user.firm_id,aggregate_type:"PilotUser",aggregate_id:user.id,payload:user,summary:"Pilot user activated."}); return user; });
   const clientConn = await getPool().connect();
   try {
+    await clientConn.query("begin");
+    await setTenantContext(clientConn, body.tenant_id);
     const result = await clientConn.query("update pilot_users set invite_status='ACTIVE', external_subject=coalesce($1, external_subject), activated_at=$2 where id=coalesce($3,id) and tenant_id=$4 and ($5::text is null or lower(email)=lower($5)) and invite_status not in ('REVOKED','SUSPENDED') returning id::text, tenant_id::text, firm_id::text, person_id::text, actor_id::text, email, display_name, pilot_role, invite_status, auth_provider, external_subject, invited_at, activated_at, revoked_at, metadata", [body.external_subject ?? null,timestamp,uuidOrNull(body.pilot_user_id),body.tenant_id,body.email ?? null]);
     if(result.rowCount===0) throwNotFound("pilot_users", body.pilot_user_id ?? body.email);
     const user = mapDbDates(result.rows[0]);
+    await clientConn.query("commit");
     await withAppState((store)=>{ appendEventAndAudit(store,{event_type:"pilot_user.activated",actor,tenant_id:user.tenant_id,firm_id:user.firm_id,aggregate_type:"PilotUser",aggregate_id:user.id,payload:user,summary:"Pilot user activated."}); return user; });
     return user;
-  } finally { clientConn.release(); }
+  } catch (error) { await clientConn.query("rollback"); throw error; } finally { clientConn.release(); }
 }
 function buildMarketplaceListing(body, options = {}) {
   const relational = storeBackend === "postgres" || options.ids === "uuid";
@@ -2933,7 +3788,7 @@ function buildWorkerInstance(body, template, options = {}) {
 export async function createMarketplaceListingRecord(body, actor) {
   const listing = buildMarketplaceListing(body);
   if (storeBackend !== "postgres") return withStore((store)=>{ store.marketplace_listings.push(listing); appendEventAndAudit(store,{event_type:"marketplace.listing_published",actor,tenant_id:body.tenant_id,firm_id:body.firm_id,aggregate_type:"MarketplaceListing",aggregate_id:listing.id,payload:listing,summary:"Private network marketplace listing published."}); return listing; });
-  const clientConn=await getPool().connect(); try{ await clientConn.query("insert into marketplace_listings (id, tenant_id, firm_id, service_pack_id, listing_scope, title, description, qualification_requirements, commercial_model, visibility, status, created_at, updated_at) values ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb,$10,$11,$12,$13)",[listing.id,listing.tenant_id,listing.firm_id,uuidOrNull(listing.service_pack_id),listing.listing_scope,listing.title,listing.description,JSON.stringify(listing.qualification_requirements),JSON.stringify(listing.commercial_model),listing.visibility,listing.status,listing.created_at,listing.updated_at]); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"marketplace.listing_published",actor,tenant_id:body.tenant_id,firm_id:body.firm_id,aggregate_type:"MarketplaceListing",aggregate_id:listing.id,payload:listing,summary:"Private network marketplace listing published."}); return listing;}); return listing;} finally{clientConn.release();}
+  const clientConn=await getPool().connect(); try{ await repoCreateMarketplaceListing({ ...listing, service_pack_id: uuidOrNull(listing.service_pack_id) }, clientConn); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"marketplace.listing_published",actor,tenant_id:body.tenant_id,firm_id:body.firm_id,aggregate_type:"MarketplaceListing",aggregate_id:listing.id,payload:listing,summary:"Private network marketplace listing published."}); return listing;}); return listing;} finally{clientConn.release();}
 }
 
 
@@ -2992,7 +3847,7 @@ export async function createDirectoryReviewBoardDecisionRecord(body, actor) {
     if (listing.visibility !== "TRUSTED_NETWORK" || listing.listing_scope !== "PRIVATE_NETWORK") invalidState("Directory review board can only govern controlled private directory listings.");
     if (decision === "SUSPEND" || decision === "REVOKE") await clientConn.query("update marketplace_listings set status=$1, updated_at=$2 where id=$3 and tenant_id=$4 and firm_id=$5", [decision === "SUSPEND" ? "SUSPENDED" : "REVOKED", timestamp, listing.id, body.tenant_id, body.provider_firm_id]);
     const record = { id: newUuid(), tenant_id: body.tenant_id, provider_firm_id: body.provider_firm_id, listing_id: listing.id, qualification_gate_id: listing.commercial_model?.qualification_gate_id ?? body.qualification_gate_id ?? null, board_ref: body.board_ref ?? "ME-S3-DIRECTORY-REVIEW-BOARD", decision, decision_summary: body.decision_summary, evidence_refs: body.evidence_refs, decided_by_actor_id: actorId(actor), decided_at: timestamp, created_at: timestamp, metadata: boundaryMetadata };
-    await clientConn.query("insert into directory_review_board_decisions (id, tenant_id, provider_firm_id, listing_id, qualification_gate_id, board_ref, decision, decision_summary, evidence_refs, decided_by_actor_id, decided_at, created_at, metadata) values ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,$13::jsonb)", [record.id, record.tenant_id, record.provider_firm_id, record.listing_id, uuidOrNull(record.qualification_gate_id), record.board_ref, record.decision, record.decision_summary, JSON.stringify(record.evidence_refs), uuidOrNull(record.decided_by_actor_id), record.decided_at, record.created_at, JSON.stringify(record.metadata)]);
+    await createDirectoryReviewBoardDecision({ ...record, qualification_gate_id: uuidOrNull(record.qualification_gate_id), decided_by_actor_id: uuidOrNull(record.decided_by_actor_id) }, clientConn);
     await clientConn.query("commit");
     await withAppState((store) => { appendEventAndAudit(store, { event_type: "marketplace.directory_review_board_decision_recorded", actor, tenant_id: body.tenant_id, firm_id: body.provider_firm_id, aggregate_type: "DirectoryReviewBoardDecision", aggregate_id: record.id, payload: record, summary: "Private directory review board decision recorded." }); return record; });
     return record;
@@ -3019,7 +3874,7 @@ export async function createPrivateDirectoryEnquiryRecord(body, actor) {
     if (listingResult.rowCount === 0) throwNotFound("marketplace_listings", body.listing_id);
     if (body.requesting_firm_id === body.provider_firm_id) invalidState("Private directory enquiry requires a separate requesting firm.");
     const enquiry = { id: newUuid(), tenant_id: body.tenant_id, requesting_firm_id: body.requesting_firm_id, provider_firm_id: body.provider_firm_id, listing_id: body.listing_id, enquiry_summary: body.enquiry_summary, status: "ENQUIRY_RECORDED", matching_mode: "MANUAL_REVIEW_ONLY", no_live_matching: true, no_ranking: true, no_award: true, created_by_actor_id: actorId(actor), created_at: timestamp, updated_at: timestamp, metadata: body.metadata ?? {} };
-    await clientConn.query("insert into directory_private_enquiries (id, tenant_id, requesting_firm_id, provider_firm_id, listing_id, enquiry_summary, status, matching_mode, no_live_matching, no_ranking, no_award, created_by_actor_id, created_at, updated_at, metadata) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15::jsonb)", [enquiry.id, enquiry.tenant_id, enquiry.requesting_firm_id, enquiry.provider_firm_id, enquiry.listing_id, enquiry.enquiry_summary, enquiry.status, enquiry.matching_mode, enquiry.no_live_matching, enquiry.no_ranking, enquiry.no_award, uuidOrNull(enquiry.created_by_actor_id), enquiry.created_at, enquiry.updated_at, JSON.stringify(enquiry.metadata)]);
+    await createDirectoryPrivateEnquiry({ ...enquiry, created_by_actor_id: uuidOrNull(enquiry.created_by_actor_id) }, clientConn);
     await withAppState((store) => { appendEventAndAudit(store, { event_type: "marketplace.private_directory_enquiry_recorded", actor, tenant_id: body.tenant_id, firm_id: body.requesting_firm_id, aggregate_type: "PrivateDirectoryEnquiry", aggregate_id: enquiry.id, payload: enquiry, summary: "Private directory enquiry recorded for manual governance review only." }); return enquiry; });
     return enquiry;
   } finally { clientConn.release(); }
@@ -3090,7 +3945,7 @@ export async function createQualificationRenewalReviewRecord(body, actor) {
       listing.commercial_model = { ...(listing.commercial_model ?? {}), renewal_status: reviewStatus, renewal_suspended_at: timestamp };
       await clientConn.query("update marketplace_listings set status='SUSPENDED', updated_at=$1, commercial_model = commercial_model || $2::jsonb where id=$3 and tenant_id=$4 and firm_id=$5", [timestamp, JSON.stringify({ renewal_status: reviewStatus, renewal_suspended_at: timestamp }), listing.id, body.tenant_id, body.provider_firm_id]);
     }
-    await clientConn.query("insert into qualification_renewal_reviews (id, tenant_id, provider_firm_id, qualification_gate_id, listing_id, credential_id, jurisdiction_ref, review_status, expires_at, next_review_due_at, evidence_refs, reviewed_by_actor_id, reviewed_at, created_at, metadata) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12,$13,$14,$15::jsonb)", [record.id, record.tenant_id, record.provider_firm_id, record.qualification_gate_id, record.listing_id, uuidOrNull(record.credential_id), record.jurisdiction_ref, record.review_status, record.expires_at, record.next_review_due_at, JSON.stringify(record.evidence_refs), uuidOrNull(record.reviewed_by_actor_id), record.reviewed_at, record.created_at, JSON.stringify(record.metadata)]);
+    await createQualificationRenewalReview({ ...record, credential_id: uuidOrNull(record.credential_id), reviewed_by_actor_id: uuidOrNull(record.reviewed_by_actor_id) }, clientConn);
     await clientConn.query("commit");
     await withAppState((store) => { appendEventAndAudit(store, { event_type: "marketplace.qualification_renewal_review_recorded", actor, tenant_id: body.tenant_id, firm_id: body.provider_firm_id, aggregate_type: "QualificationRenewalReview", aggregate_id: record.id, payload: record, summary: "Qualification renewal or expiry review recorded for private directory listing." }); return record; });
     return { renewal_review: record, listing };
@@ -3099,7 +3954,7 @@ export async function createQualificationRenewalReviewRecord(body, actor) {
 export async function createCapacityOfferRecord(body, actor) {
   const offer = buildCapacityOffer(body);
   if (storeBackend !== "postgres") return withStore((store)=>{ store.capacity_offers.push(offer); appendEventAndAudit(store,{event_type:"capacity_offer.created",actor,tenant_id:body.tenant_id,firm_id:body.firm_id,aggregate_type:"CapacityOffer",aggregate_id:offer.id,payload:offer,summary:"Capacity offer created for trusted network."}); return offer; });
-  const clientConn=await getPool().connect(); try{ await clientConn.query("insert into capacity_offers (id, tenant_id, firm_id, service_pack_id, capacity_type, pce_units, available_from, available_until, jurisdiction_refs, constraints, status, created_at, updated_at) values ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10::jsonb,$11,$12,$13)",[offer.id,offer.tenant_id,offer.firm_id,uuidOrNull(offer.service_pack_id),offer.capacity_type,offer.pce_units,offer.available_from,offer.available_until,JSON.stringify(offer.jurisdiction_refs),JSON.stringify(offer.constraints),offer.status,offer.created_at,offer.updated_at]); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"capacity_offer.created",actor,tenant_id:body.tenant_id,firm_id:body.firm_id,aggregate_type:"CapacityOffer",aggregate_id:offer.id,payload:offer,summary:"Capacity offer created for trusted network."}); return offer;}); return offer;} finally{clientConn.release();}
+  const clientConn=await getPool().connect(); try{ await createCapacityOffer({ ...offer, service_pack_id: uuidOrNull(offer.service_pack_id) }, clientConn); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"capacity_offer.created",actor,tenant_id:body.tenant_id,firm_id:body.firm_id,aggregate_type:"CapacityOffer",aggregate_id:offer.id,payload:offer,summary:"Capacity offer created for trusted network."}); return offer;}); return offer;} finally{clientConn.release();}
 }
 
 export async function createCollaborationRequestRecord(body, actor) {
@@ -3115,7 +3970,7 @@ export async function createNetworkProfessionalProfileRecord(body, actor) {
   const profile = buildNetworkProfessionalProfile(body, actor);
   if (body.authority_grant === true || profile.authority_grant === true) invalidState("Network professional profiles do not grant professional authority.");
   if (storeBackend !== "postgres") return withStore((store)=>{ store.network_professional_profiles.push(profile); appendEventAndAudit(store,{event_type:"network.professional_profile_created",actor,tenant_id:profile.tenant_id,firm_id:profile.firm_id,aggregate_type:"NetworkProfessionalProfile",aggregate_id:profile.id,payload:profile,summary:"Trusted network professional profile created without authority grant."}); return profile; });
-  const clientConn=await getPool().connect(); try{ await clientConn.query("insert into network_professional_profiles (id, tenant_id, firm_id, person_id, professional_profile_id, display_name, profile_scope, network_status, authority_grant, jurisdiction_refs, credential_refs, capability_refs, created_by_actor_id, created_at, updated_at, metadata) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12::jsonb,$13,$14,$15,$16::jsonb)",[profile.id,profile.tenant_id,profile.firm_id,uuidOrNull(profile.person_id),uuidOrNull(profile.professional_profile_id),profile.display_name,profile.profile_scope,profile.network_status,profile.authority_grant,JSON.stringify(profile.jurisdiction_refs),JSON.stringify(profile.credential_refs),JSON.stringify(profile.capability_refs),uuidOrNull(profile.created_by_actor_id),profile.created_at,profile.updated_at,JSON.stringify(profile.metadata)]); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"network.professional_profile_created",actor,tenant_id:profile.tenant_id,firm_id:profile.firm_id,aggregate_type:"NetworkProfessionalProfile",aggregate_id:profile.id,payload:profile,summary:"Trusted network professional profile created without authority grant."}); return profile;}); return profile;} finally{clientConn.release();}
+  const clientConn=await getPool().connect(); try{ await createNetworkProfessionalProfile({ ...profile, person_id: uuidOrNull(profile.person_id), professional_profile_id: uuidOrNull(profile.professional_profile_id), created_by_actor_id: uuidOrNull(profile.created_by_actor_id) }, clientConn); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"network.professional_profile_created",actor,tenant_id:profile.tenant_id,firm_id:profile.firm_id,aggregate_type:"NetworkProfessionalProfile",aggregate_id:profile.id,payload:profile,summary:"Trusted network professional profile created without authority grant."}); return profile;}); return profile;} finally{clientConn.release();}
 }
 
 export async function createNetworkFirmProfileRecord(body, actor) {
@@ -3123,7 +3978,7 @@ export async function createNetworkFirmProfileRecord(body, actor) {
   assertTrustedNetworkOnly(body);
   const profile = buildNetworkFirmProfile(body, actor);
   if (storeBackend !== "postgres") return withStore((store)=>{ store.network_firm_profiles.push(profile); appendEventAndAudit(store,{event_type:"network.firm_profile_created",actor,tenant_id:profile.tenant_id,firm_id:profile.firm_id,aggregate_type:"NetworkFirmProfile",aggregate_id:profile.id,payload:profile,summary:"Trusted network firm profile created."}); return profile; });
-  const clientConn=await getPool().connect(); try{ await clientConn.query("insert into network_firm_profiles (id, tenant_id, firm_id, display_name, profile_scope, network_status, jurisdiction_refs, capability_refs, created_by_actor_id, created_at, updated_at, metadata) values ($1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb,$9,$10,$11,$12::jsonb)",[profile.id,profile.tenant_id,profile.firm_id,profile.display_name,profile.profile_scope,profile.network_status,JSON.stringify(profile.jurisdiction_refs),JSON.stringify(profile.capability_refs),uuidOrNull(profile.created_by_actor_id),profile.created_at,profile.updated_at,JSON.stringify(profile.metadata)]); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"network.firm_profile_created",actor,tenant_id:profile.tenant_id,firm_id:profile.firm_id,aggregate_type:"NetworkFirmProfile",aggregate_id:profile.id,payload:profile,summary:"Trusted network firm profile created."}); return profile;}); return profile;} finally{clientConn.release();}
+  const clientConn=await getPool().connect(); try{ await createNetworkFirmProfile({ ...profile, created_by_actor_id: uuidOrNull(profile.created_by_actor_id) }, clientConn); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"network.firm_profile_created",actor,tenant_id:profile.tenant_id,firm_id:profile.firm_id,aggregate_type:"NetworkFirmProfile",aggregate_id:profile.id,payload:profile,summary:"Trusted network firm profile created."}); return profile;}); return profile;} finally{clientConn.release();}
 }
 
 export async function createNetworkCapabilityRecord(body, actor) {
@@ -3132,7 +3987,7 @@ export async function createNetworkCapabilityRecord(body, actor) {
   const capability = buildNetworkCapability(body, actor);
   if (!capability.qualification_required) invalidState("Trusted network capabilities require qualification before invitation or assignment.");
   if (storeBackend !== "postgres") return withStore((store)=>{ store.network_capabilities.push(capability); appendEventAndAudit(store,{event_type:"network.capability_created",actor,tenant_id:capability.tenant_id,firm_id:capability.firm_id,aggregate_type:"NetworkCapability",aggregate_id:capability.id,payload:capability,summary:"Trusted network capability created with qualification required."}); return capability; });
-  const clientConn=await getPool().connect(); try{ await clientConn.query("insert into network_capabilities (id, tenant_id, firm_id, professional_network_profile_id, firm_network_profile_id, capability_code, service_pack_ref, jurisdiction_refs, visibility, qualification_required, status, created_by_actor_id, created_at, updated_at, metadata) values ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11,$12,$13,$14,$15::jsonb)",[capability.id,capability.tenant_id,capability.firm_id,uuidOrNull(capability.professional_network_profile_id),uuidOrNull(capability.firm_network_profile_id),capability.capability_code,capability.service_pack_ref,JSON.stringify(capability.jurisdiction_refs),capability.visibility,capability.qualification_required,capability.status,uuidOrNull(capability.created_by_actor_id),capability.created_at,capability.updated_at,JSON.stringify(capability.metadata)]); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"network.capability_created",actor,tenant_id:capability.tenant_id,firm_id:capability.firm_id,aggregate_type:"NetworkCapability",aggregate_id:capability.id,payload:capability,summary:"Trusted network capability created with qualification required."}); return capability;}); return capability;} finally{clientConn.release();}
+  const clientConn=await getPool().connect(); try{ await createNetworkCapability({ ...capability, professional_network_profile_id: uuidOrNull(capability.professional_network_profile_id), firm_network_profile_id: uuidOrNull(capability.firm_network_profile_id), created_by_actor_id: uuidOrNull(capability.created_by_actor_id) }, clientConn); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"network.capability_created",actor,tenant_id:capability.tenant_id,firm_id:capability.firm_id,aggregate_type:"NetworkCapability",aggregate_id:capability.id,payload:capability,summary:"Trusted network capability created with qualification required."}); return capability;}); return capability;} finally{clientConn.release();}
 }
 
 export async function createNetworkCredentialRecord(body, actor) {
@@ -3144,7 +3999,7 @@ export async function createNetworkCredentialRecord(body, actor) {
     credential.verified_at = credential.verified_at ?? now();
   }
   if (storeBackend !== "postgres") return withStore((store)=>{ store.network_credentials.push(credential); appendEventAndAudit(store,{event_type:"network.credential_recorded",actor,tenant_id:credential.tenant_id,firm_id:credential.firm_id,aggregate_type:"NetworkCredential",aggregate_id:credential.id,payload:credential,summary:"Trusted network credential recorded without authority grant."}); return credential; });
-  const clientConn=await getPool().connect(); try{ await clientConn.query("insert into network_credentials (id, tenant_id, firm_id, professional_network_profile_id, credential_type, credential_name, issuer, jurisdiction_refs, verification_status, verified_by_actor_id, verified_at, valid_from, valid_until, evidence_refs, authority_grant, created_by_actor_id, created_at, updated_at, metadata) values ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11,$12,$13,$14::jsonb,$15,$16,$17,$18,$19::jsonb)",[credential.id,credential.tenant_id,credential.firm_id,uuidOrNull(credential.professional_network_profile_id),credential.credential_type,credential.credential_name,credential.issuer,JSON.stringify(credential.jurisdiction_refs),credential.verification_status,uuidOrNull(credential.verified_by_actor_id),credential.verified_at,credential.valid_from,credential.valid_until,JSON.stringify(credential.evidence_refs),credential.authority_grant,uuidOrNull(credential.created_by_actor_id),credential.created_at,credential.updated_at,JSON.stringify(credential.metadata)]); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"network.credential_recorded",actor,tenant_id:credential.tenant_id,firm_id:credential.firm_id,aggregate_type:"NetworkCredential",aggregate_id:credential.id,payload:credential,summary:"Trusted network credential recorded without authority grant."}); return credential;}); return credential;} finally{clientConn.release();}
+  const clientConn=await getPool().connect(); try{ await createNetworkCredential({ ...credential, professional_network_profile_id: uuidOrNull(credential.professional_network_profile_id), verified_by_actor_id: uuidOrNull(credential.verified_by_actor_id), created_by_actor_id: uuidOrNull(credential.created_by_actor_id) }, clientConn); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"network.credential_recorded",actor,tenant_id:credential.tenant_id,firm_id:credential.firm_id,aggregate_type:"NetworkCredential",aggregate_id:credential.id,payload:credential,summary:"Trusted network credential recorded without authority grant."}); return credential;}); return credential;} finally{clientConn.release();}
 }
 
 export async function createNetworkTrustSignalRecord(body, actor) {
@@ -3157,21 +4012,21 @@ export async function createNetworkTrustSignalRecord(body, actor) {
   }
   const signal = buildNetworkTrustSignal(body, actor);
   if (storeBackend !== "postgres") return withStore((store)=>{ store.network_trust_signals.push(signal); appendEventAndAudit(store,{event_type:"network.trust_signal_recorded",actor,tenant_id:signal.tenant_id,firm_id:signal.firm_id,aggregate_type:"NetworkTrustSignal",aggregate_id:signal.id,payload:signal,summary:"Trusted network trust signal recorded as non-credential evidence."}); return signal; });
-  const clientConn=await getPool().connect(); try{ await clientConn.query("insert into network_trust_signals (id, tenant_id, firm_id, subject_type, subject_id, signal_type, signal_summary, evidence_refs, trust_weight, substitutes_for_credential, status, created_by_actor_id, created_at, updated_at, metadata) values ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11,$12,$13,$14,$15::jsonb)",[signal.id,signal.tenant_id,signal.firm_id,signal.subject_type,uuidOrNull(signal.subject_id),signal.signal_type,signal.signal_summary,JSON.stringify(signal.evidence_refs),signal.trust_weight,signal.substitutes_for_credential,signal.status,uuidOrNull(signal.created_by_actor_id),signal.created_at,signal.updated_at,JSON.stringify(signal.metadata)]); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"network.trust_signal_recorded",actor,tenant_id:signal.tenant_id,firm_id:signal.firm_id,aggregate_type:"NetworkTrustSignal",aggregate_id:signal.id,payload:signal,summary:"Trusted network trust signal recorded as non-credential evidence."}); return signal;}); return signal;} finally{clientConn.release();}
+  const clientConn=await getPool().connect(); try{ await createNetworkTrustSignal({ ...signal, subject_id: uuidOrNull(signal.subject_id), created_by_actor_id: uuidOrNull(signal.created_by_actor_id) }, clientConn); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"network.trust_signal_recorded",actor,tenant_id:signal.tenant_id,firm_id:signal.firm_id,aggregate_type:"NetworkTrustSignal",aggregate_id:signal.id,payload:signal,summary:"Trusted network trust signal recorded as non-credential evidence."}); return signal;}); return signal;} finally{clientConn.release();}
 }
 
 export async function createNetworkConflictCheckRecord(body, actor) {
   requireHumanNetworkActor(actor, "Trusted network conflict check recording");
   const check = buildNetworkConflictCheck(body, actor);
   if (storeBackend !== "postgres") return withStore((store)=>{ store.network_conflict_checks.push(check); appendEventAndAudit(store,{event_type:"network.conflict_check_recorded",actor,tenant_id:check.tenant_id,firm_id:check.requesting_firm_id,aggregate_type:"NetworkConflictCheck",aggregate_id:check.id,payload:check,summary:"Trusted network conflict check recorded before invitation."}); return check; });
-  const clientConn=await getPool().connect(); try{ await clientConn.query("insert into network_conflict_checks (id, tenant_id, requesting_firm_id, provider_firm_id, subject_profile_id, check_status, conflict_summary, evidence_refs, checked_by_actor_id, created_at, metadata) values ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11::jsonb)",[check.id,check.tenant_id,check.requesting_firm_id,check.provider_firm_id,uuidOrNull(check.subject_profile_id),check.check_status,check.conflict_summary,JSON.stringify(check.evidence_refs),uuidOrNull(check.checked_by_actor_id),check.created_at,JSON.stringify(check.metadata)]); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"network.conflict_check_recorded",actor,tenant_id:check.tenant_id,firm_id:check.requesting_firm_id,aggregate_type:"NetworkConflictCheck",aggregate_id:check.id,payload:check,summary:"Trusted network conflict check recorded before invitation."}); return check;}); return check;} finally{clientConn.release();}
+  const clientConn=await getPool().connect(); try{ await createNetworkConflictCheck({ ...check, subject_profile_id: uuidOrNull(check.subject_profile_id), checked_by_actor_id: uuidOrNull(check.checked_by_actor_id) }, clientConn); await withAppState((store)=>{appendEventAndAudit(store,{event_type:"network.conflict_check_recorded",actor,tenant_id:check.tenant_id,firm_id:check.requesting_firm_id,aggregate_type:"NetworkConflictCheck",aggregate_id:check.id,payload:check,summary:"Trusted network conflict check recorded before invitation."}); return check;}); return check;} finally{clientConn.release();}
 }
 
 export async function createNetworkQualificationGateRecord(body, actor) {
   requireHumanNetworkActor(actor, "Trusted network qualification gate evaluation");
   const gate = buildNetworkQualificationGate(body, actor);
   if (storeBackend !== "postgres") return withStore((store)=>{ store.network_qualification_gates.push(gate); appendEventAndAudit(store,{event_type:gate.gate_status === "PASS" ? "network.qualification_gate_passed" : "network.qualification_gate_denied",actor,tenant_id:gate.tenant_id,firm_id:gate.requesting_firm_id,aggregate_type:"NetworkQualificationGate",aggregate_id:gate.id,payload:gate,summary:gate.gate_status === "PASS" ? "Trusted network qualification gate passed." : "Trusted network qualification gate denied before invitation."}); return gate; });
-  const clientConn=await getPool().connect(); try{ await clientConn.query("insert into network_qualification_gates (id, tenant_id, requesting_firm_id, provider_firm_id, professional_network_profile_id, firm_network_profile_id, capability_id, credential_id, conflict_check_id, jurisdiction_ref, credential_status, jurisdiction_status, insurance_status, conflict_status, capacity_status, policy_status, gate_status, denial_reasons, created_by_actor_id, created_at, updated_at, metadata) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18::jsonb,$19,$20,$21,$22::jsonb)",[gate.id,gate.tenant_id,gate.requesting_firm_id,gate.provider_firm_id,uuidOrNull(gate.professional_network_profile_id),uuidOrNull(gate.firm_network_profile_id),uuidOrNull(gate.capability_id),uuidOrNull(gate.credential_id),uuidOrNull(gate.conflict_check_id),gate.jurisdiction_ref,gate.credential_status,gate.jurisdiction_status,gate.insurance_status,gate.conflict_status,gate.capacity_status,gate.policy_status,gate.gate_status,JSON.stringify(gate.denial_reasons),uuidOrNull(gate.created_by_actor_id),gate.created_at,gate.updated_at,JSON.stringify(gate.metadata)]); await withAppState((store)=>{appendEventAndAudit(store,{event_type:gate.gate_status === "PASS" ? "network.qualification_gate_passed" : "network.qualification_gate_denied",actor,tenant_id:gate.tenant_id,firm_id:gate.requesting_firm_id,aggregate_type:"NetworkQualificationGate",aggregate_id:gate.id,payload:gate,summary:gate.gate_status === "PASS" ? "Trusted network qualification gate passed." : "Trusted network qualification gate denied before invitation."}); return gate;}); return gate;} finally{clientConn.release();}
+  const clientConn=await getPool().connect(); try{ await createNetworkQualificationGate({ ...gate, professional_network_profile_id: uuidOrNull(gate.professional_network_profile_id), firm_network_profile_id: uuidOrNull(gate.firm_network_profile_id), capability_id: uuidOrNull(gate.capability_id), credential_id: uuidOrNull(gate.credential_id), conflict_check_id: uuidOrNull(gate.conflict_check_id), created_by_actor_id: uuidOrNull(gate.created_by_actor_id) }, clientConn); await withAppState((store)=>{appendEventAndAudit(store,{event_type:gate.gate_status === "PASS" ? "network.qualification_gate_passed" : "network.qualification_gate_denied",actor,tenant_id:gate.tenant_id,firm_id:gate.requesting_firm_id,aggregate_type:"NetworkQualificationGate",aggregate_id:gate.id,payload:gate,summary:gate.gate_status === "PASS" ? "Trusted network qualification gate passed." : "Trusted network qualification gate denied before invitation."}); return gate;}); return gate;} finally{clientConn.release();}
 }
 
 export async function createSpecialistInvitationRecord(body, actor) {
@@ -3189,7 +4044,7 @@ export async function createSpecialistInvitationRecord(body, actor) {
     throw error;
   }
   if (storeBackend !== "postgres") return withStore((next)=>{ next.specialist_invitations.push(invitation); appendEventAndAudit(next,{event_type:"network.specialist_invitation_ready",actor,tenant_id:invitation.tenant_id,firm_id:invitation.requesting_firm_id,aggregate_type:"SpecialistInvitation",aggregate_id:invitation.id,payload:invitation,summary:"Specialist invitation prepared after passing qualification gate."}); return invitation; });
-  const clientConn=await getPool().connect(); try{ await clientConn.query("insert into specialist_invitations (id, tenant_id, requesting_firm_id, provider_firm_id, qualification_gate_id, capability_id, invitation_status, denial_reasons, invited_by_actor_id, created_at, updated_at, metadata) values ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11,$12::jsonb)",[invitation.id,invitation.tenant_id,invitation.requesting_firm_id,invitation.provider_firm_id,uuidOrNull(invitation.qualification_gate_id),uuidOrNull(invitation.capability_id),invitation.invitation_status,JSON.stringify(invitation.denial_reasons),uuidOrNull(invitation.invited_by_actor_id),invitation.created_at,invitation.updated_at,JSON.stringify(invitation.metadata)]); await withAppState((next)=>{appendEventAndAudit(next,{event_type:"network.specialist_invitation_ready",actor,tenant_id:invitation.tenant_id,firm_id:invitation.requesting_firm_id,aggregate_type:"SpecialistInvitation",aggregate_id:invitation.id,payload:invitation,summary:"Specialist invitation prepared after passing qualification gate."}); return invitation;}); return invitation;} finally{clientConn.release();}
+  const clientConn=await getPool().connect(); try{ await createSpecialistInvitation({ ...invitation, qualification_gate_id: uuidOrNull(invitation.qualification_gate_id), capability_id: uuidOrNull(invitation.capability_id), invited_by_actor_id: uuidOrNull(invitation.invited_by_actor_id) }, clientConn); await withAppState((next)=>{appendEventAndAudit(next,{event_type:"network.specialist_invitation_ready",actor,tenant_id:invitation.tenant_id,firm_id:invitation.requesting_firm_id,aggregate_type:"SpecialistInvitation",aggregate_id:invitation.id,payload:invitation,summary:"Specialist invitation prepared after passing qualification gate."}); return invitation;}); return invitation;} finally{clientConn.release();}
 }
 
 export async function createCollaborationWorkspaceRecord(body, actor) {
@@ -3201,7 +4056,7 @@ export async function createCollaborationWorkspaceRecord(body, actor) {
   const workspace = buildCollaborationWorkspace(body, actor, invitation);
   assertWorkspacePolicy(workspace.data_room_policy);
   if (storeBackend !== "postgres") return withStore((next)=>{ next.collaboration_workspaces.push(workspace); appendEventAndAudit(next,{event_type:"network.collaboration_workspace_opened",actor,tenant_id:workspace.tenant_id,firm_id:workspace.requesting_firm_id,aggregate_type:"CollaborationWorkspace",aggregate_id:workspace.id,payload:workspace,summary:"Scoped trusted collaboration workspace opened from qualified specialist invitation."}); return workspace; });
-  const clientConn=await getPool().connect(); try{ await clientConn.query("insert into collaboration_workspaces (id, tenant_id, requesting_firm_id, provider_firm_id, specialist_invitation_id, qualification_gate_id, workspace_status, data_room_policy, permitted_evidence_refs, created_by_actor_id, created_at, updated_at, metadata) values ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb,$10,$11,$12,$13::jsonb)",[workspace.id,workspace.tenant_id,workspace.requesting_firm_id,workspace.provider_firm_id,uuidOrNull(workspace.specialist_invitation_id),uuidOrNull(workspace.qualification_gate_id),workspace.workspace_status,JSON.stringify(workspace.data_room_policy),JSON.stringify(workspace.permitted_evidence_refs),uuidOrNull(workspace.created_by_actor_id),workspace.created_at,workspace.updated_at,JSON.stringify(workspace.metadata)]); await withAppState((next)=>{appendEventAndAudit(next,{event_type:"network.collaboration_workspace_opened",actor,tenant_id:workspace.tenant_id,firm_id:workspace.requesting_firm_id,aggregate_type:"CollaborationWorkspace",aggregate_id:workspace.id,payload:workspace,summary:"Scoped trusted collaboration workspace opened from qualified specialist invitation."}); return workspace;}); return workspace;} finally{clientConn.release();}
+  const clientConn=await getPool().connect(); try{ await createCollaborationWorkspace({ ...workspace, specialist_invitation_id: uuidOrNull(workspace.specialist_invitation_id), qualification_gate_id: uuidOrNull(workspace.qualification_gate_id), created_by_actor_id: uuidOrNull(workspace.created_by_actor_id) }, clientConn); await withAppState((next)=>{appendEventAndAudit(next,{event_type:"network.collaboration_workspace_opened",actor,tenant_id:workspace.tenant_id,firm_id:workspace.requesting_firm_id,aggregate_type:"CollaborationWorkspace",aggregate_id:workspace.id,payload:workspace,summary:"Scoped trusted collaboration workspace opened from qualified specialist invitation."}); return workspace;}); return workspace;} finally{clientConn.release();}
 }
 
 export async function grantCollaborationWorkspaceParticipantRecord(body, actor) {
@@ -3212,7 +4067,7 @@ export async function grantCollaborationWorkspaceParticipantRecord(body, actor) 
   if (![workspace.requesting_firm_id, workspace.provider_firm_id].includes(body.firm_id)) invalidState("Participant firm must belong to the scoped collaboration workspace.");
   const participant = buildWorkspaceParticipant(body, actor);
   if (storeBackend !== "postgres") return withStore((next)=>{ next.collaboration_workspace_participants.push(participant); appendEventAndAudit(next,{event_type:"network.collaboration_participant_granted",actor,tenant_id:participant.tenant_id,firm_id:workspace.requesting_firm_id,aggregate_type:"CollaborationWorkspaceParticipant",aggregate_id:participant.id,payload:participant,summary:"Scoped collaboration workspace access granted."}); return participant; });
-  const clientConn=await getPool().connect(); try{ await clientConn.query("insert into collaboration_workspace_participants (id, tenant_id, workspace_id, firm_id, actor_id, participant_role, access_status, permissions, granted_by_actor_id, granted_at, revoked_by_actor_id, revoked_at, metadata) values ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11,$12,$13::jsonb)",[participant.id,participant.tenant_id,uuidOrNull(participant.workspace_id),participant.firm_id,uuidOrNull(participant.actor_id),participant.participant_role,participant.access_status,JSON.stringify(participant.permissions),uuidOrNull(participant.granted_by_actor_id),participant.granted_at,uuidOrNull(participant.revoked_by_actor_id),participant.revoked_at,JSON.stringify(participant.metadata)]); await withAppState((next)=>{appendEventAndAudit(next,{event_type:"network.collaboration_participant_granted",actor,tenant_id:participant.tenant_id,firm_id:workspace.requesting_firm_id,aggregate_type:"CollaborationWorkspaceParticipant",aggregate_id:participant.id,payload:participant,summary:"Scoped collaboration workspace access granted."}); return participant;}); return participant;} finally{clientConn.release();}
+  const clientConn=await getPool().connect(); try{ await createCollaborationWorkspaceParticipant({ ...participant, workspace_id: uuidOrNull(participant.workspace_id), actor_id: uuidOrNull(participant.actor_id), granted_by_actor_id: uuidOrNull(participant.granted_by_actor_id), revoked_by_actor_id: uuidOrNull(participant.revoked_by_actor_id) }, clientConn); await withAppState((next)=>{appendEventAndAudit(next,{event_type:"network.collaboration_participant_granted",actor,tenant_id:participant.tenant_id,firm_id:workspace.requesting_firm_id,aggregate_type:"CollaborationWorkspaceParticipant",aggregate_id:participant.id,payload:participant,summary:"Scoped collaboration workspace access granted."}); return participant;}); return participant;} finally{clientConn.release();}
 }
 
 export async function revokeCollaborationWorkspaceParticipantRecord(body, actor) {
@@ -3231,7 +4086,7 @@ export async function createResponsibilityMatrixRecord(body, actor) {
   const matrix = buildResponsibilityMatrix(body, actor, workspace);
   assertResponsibilityMatrix(matrix, workspace, participants);
   if (storeBackend !== "postgres") return withStore((next)=>{ next.responsibility_matrices.push(matrix); appendEventAndAudit(next,{event_type:"network.responsibility_matrix_recorded",actor,tenant_id:matrix.tenant_id,firm_id:workspace.requesting_firm_id,aggregate_type:"ResponsibilityMatrix",aggregate_id:matrix.id,payload:matrix,summary:"Trusted collaboration responsibility and approval matrix recorded."}); return matrix; });
-  const clientConn=await getPool().connect(); try{ await clientConn.query("insert into responsibility_matrices (id, tenant_id, workspace_id, requesting_firm_id, provider_firm_id, accountable_firm_id, responsible_professional_actor_id, reviewer_actor_id, approver_actor_id, permitted_worker_actions, regulated_scope, approval_required, matrix_status, created_by_actor_id, created_at, updated_at, metadata) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12,$13,$14,$15,$16,$17::jsonb)",[matrix.id,matrix.tenant_id,uuidOrNull(matrix.workspace_id),matrix.requesting_firm_id,matrix.provider_firm_id,matrix.accountable_firm_id,uuidOrNull(matrix.responsible_professional_actor_id),uuidOrNull(matrix.reviewer_actor_id),uuidOrNull(matrix.approver_actor_id),JSON.stringify(matrix.permitted_worker_actions),matrix.regulated_scope,matrix.approval_required,matrix.matrix_status,uuidOrNull(matrix.created_by_actor_id),matrix.created_at,matrix.updated_at,JSON.stringify(matrix.metadata)]); await withAppState((next)=>{appendEventAndAudit(next,{event_type:"network.responsibility_matrix_recorded",actor,tenant_id:matrix.tenant_id,firm_id:workspace.requesting_firm_id,aggregate_type:"ResponsibilityMatrix",aggregate_id:matrix.id,payload:matrix,summary:"Trusted collaboration responsibility and approval matrix recorded."}); return matrix;}); return matrix;} finally{clientConn.release();}
+  const clientConn=await getPool().connect(); try{ await createResponsibilityMatrix({ ...matrix, workspace_id: uuidOrNull(matrix.workspace_id), responsible_professional_actor_id: uuidOrNull(matrix.responsible_professional_actor_id), reviewer_actor_id: uuidOrNull(matrix.reviewer_actor_id), approver_actor_id: uuidOrNull(matrix.approver_actor_id), created_by_actor_id: uuidOrNull(matrix.created_by_actor_id) }, clientConn); await withAppState((next)=>{appendEventAndAudit(next,{event_type:"network.responsibility_matrix_recorded",actor,tenant_id:matrix.tenant_id,firm_id:workspace.requesting_firm_id,aggregate_type:"ResponsibilityMatrix",aggregate_id:matrix.id,payload:matrix,summary:"Trusted collaboration responsibility and approval matrix recorded."}); return matrix;}); return matrix;} finally{clientConn.release();}
 }
 
 
@@ -3368,7 +4223,7 @@ export async function addCollaborationWorkspaceEvidenceRecord(body, actor) {
   const evidence = buildWorkspaceEvidence(body, actor);
   if (evidence.access_scope !== "WORKSPACE_ONLY") invalidState("R5-S3 evidence refs must remain workspace-scoped.");
   if (storeBackend !== "postgres") return withStore((next)=>{ next.collaboration_workspace_evidence.push(evidence); appendEventAndAudit(next,{event_type:"network.collaboration_evidence_added",actor,tenant_id:evidence.tenant_id,firm_id:workspace.requesting_firm_id,aggregate_type:"CollaborationWorkspaceEvidence",aggregate_id:evidence.id,payload:evidence,summary:"Workspace-scoped collaboration evidence reference added."}); return evidence; });
-  const clientConn=await getPool().connect(); try{ await clientConn.query("insert into collaboration_workspace_evidence (id, tenant_id, workspace_id, participant_id, evidence_ref, evidence_type, access_scope, added_by_actor_id, added_at, metadata) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb)",[evidence.id,evidence.tenant_id,uuidOrNull(evidence.workspace_id),uuidOrNull(evidence.participant_id),evidence.evidence_ref,evidence.evidence_type,evidence.access_scope,uuidOrNull(evidence.added_by_actor_id),evidence.added_at,JSON.stringify(evidence.metadata)]); await withAppState((next)=>{appendEventAndAudit(next,{event_type:"network.collaboration_evidence_added",actor,tenant_id:evidence.tenant_id,firm_id:workspace.requesting_firm_id,aggregate_type:"CollaborationWorkspaceEvidence",aggregate_id:evidence.id,payload:evidence,summary:"Workspace-scoped collaboration evidence reference added."}); return evidence;}); return evidence;} finally{clientConn.release();}
+  const clientConn=await getPool().connect(); try{ await createCollaborationWorkspaceEvidence({ ...evidence, workspace_id: uuidOrNull(evidence.workspace_id), participant_id: uuidOrNull(evidence.participant_id), added_by_actor_id: uuidOrNull(evidence.added_by_actor_id) }, clientConn); await withAppState((next)=>{appendEventAndAudit(next,{event_type:"network.collaboration_evidence_added",actor,tenant_id:evidence.tenant_id,firm_id:workspace.requesting_firm_id,aggregate_type:"CollaborationWorkspaceEvidence",aggregate_id:evidence.id,payload:evidence,summary:"Workspace-scoped collaboration evidence reference added."}); return evidence;}); return evidence;} finally{clientConn.release();}
 }
 export async function createObservatorySnapshotRecord(body, actor) {
   const store = await readStore();
@@ -3384,7 +4239,7 @@ export async function createObservatorySnapshotRecord(body, actor) {
   };
   const snapshot = buildObservatorySnapshot({ ...body, metrics });
   if (storeBackend !== "postgres") return withStore((next)=>{ next.observatory_snapshots.push(snapshot); appendEventAndAudit(next,{event_type:"observatory.snapshot_created",actor,tenant_id:body.tenant_id,firm_id:body.firm_id,aggregate_type:"ObservatorySnapshot",aggregate_id:snapshot.id,payload:snapshot,summary:"Privacy-safe observatory snapshot created."}); return snapshot; });
-  const clientConn=await getPool().connect(); try{ await clientConn.query("insert into observatory_snapshots (id, tenant_id, firm_id, snapshot_scope, metrics, privacy_class, generated_at) values ($1,$2,$3,$4,$5::jsonb,$6,$7)",[snapshot.id,uuidOrNull(snapshot.tenant_id),uuidOrNull(snapshot.firm_id),snapshot.snapshot_scope,JSON.stringify(snapshot.metrics),snapshot.privacy_class,snapshot.generated_at]); await withAppState((next)=>{appendEventAndAudit(next,{event_type:"observatory.snapshot_created",actor,tenant_id:body.tenant_id,firm_id:body.firm_id,aggregate_type:"ObservatorySnapshot",aggregate_id:snapshot.id,payload:snapshot,summary:"Privacy-safe observatory snapshot created."}); return snapshot;}); return snapshot;} finally{clientConn.release();}
+  const clientConn=await getPool().connect(); try{ await clientConn.query("begin"); await setTenantContext(clientConn, snapshot.tenant_id ?? null); await repoCreateObservatorySnapshot({ ...snapshot, tenant_id: uuidOrNull(snapshot.tenant_id), firm_id: uuidOrNull(snapshot.firm_id) }, clientConn); await clientConn.query("commit"); await withAppState((next)=>{appendEventAndAudit(next,{event_type:"observatory.snapshot_created",actor,tenant_id:body.tenant_id,firm_id:body.firm_id,aggregate_type:"ObservatorySnapshot",aggregate_id:snapshot.id,payload:snapshot,summary:"Privacy-safe observatory snapshot created."}); return snapshot;}); return snapshot;} catch (error) { await clientConn.query("rollback"); throw error; } finally{clientConn.release();}
 }
 export async function provisionWorkerInstanceRecord(body, actor) {
   if (storeBackend !== "postgres") {
@@ -3402,13 +4257,14 @@ export async function provisionWorkerInstanceRecord(body, actor) {
   const clientConn = await getPool().connect();
   try {
     await clientConn.query("begin");
+    await setTenantContext(clientConn, body.tenant_id);
     await seedWorkerTemplates(clientConn);
     const templateResult = await clientConn.query("select id::text, code, name, version, default_tools, default_budget, risk_envelope from worker_templates where id::text = $1 or code = $2 order by created_at limit 1", [body.worker_template_id ?? "", body.worker_template_code ?? "formwork-intake-agent"]);
     const template = templateResult.rows[0];
     if (!template) throwNotFound("worker_templates", body.worker_template_id ?? body.worker_template_code);
     const records = buildWorkerInstance(body, template, { ids: "uuid" });
     await clientConn.query("insert into actors (id, actor_type, person_id, worker_instance_id, system_id, external_service_id, tenant_id, firm_id, display_name, status, created_at, metadata) values ($1,'AI_AGENT',null,$2,null,null,$3,$4,$5,'ACTIVE',$6,$7::jsonb)", [records.actor.id, records.worker_instance.id, body.tenant_id, body.firm_id, records.actor.display_name, records.actor.created_at, JSON.stringify(records.actor.metadata)]);
-    await clientConn.query("insert into worker_instances (id, tenant_id, firm_id, worker_template_id, actor_id, name, assigned_services, tool_allowlist, budget_envelope, risk_limits, runtime_status, created_at, updated_at) values ($1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb,$9::jsonb,$10::jsonb,$11,$12,$13)", [records.worker_instance.id, body.tenant_id, body.firm_id, template.id, records.actor.id, records.worker_instance.name, JSON.stringify(records.worker_instance.assigned_services), JSON.stringify(records.worker_instance.tool_allowlist), JSON.stringify(records.worker_instance.budget_envelope), JSON.stringify(records.worker_instance.risk_limits), records.worker_instance.runtime_status, records.worker_instance.created_at, records.worker_instance.updated_at]);
+    await createWorkerInstance({ id: records.worker_instance.id, tenant_id: body.tenant_id, firm_id: body.firm_id, worker_template_id: uuidOrNull(template.id), actor_id: uuidOrNull(records.actor.id), name: records.worker_instance.name, assigned_services: records.worker_instance.assigned_services, tool_allowlist: records.worker_instance.tool_allowlist, budget_envelope: records.worker_instance.budget_envelope, risk_limits: records.worker_instance.risk_limits, runtime_status: records.worker_instance.runtime_status, created_at: records.worker_instance.created_at, updated_at: records.worker_instance.updated_at }, clientConn);
     await clientConn.query("commit");
     await withAppState((store) => { appendEventAndAudit(store, { event_type: "worker_instance.provisioned", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "WorkerInstance", aggregate_id: records.worker_instance.id, payload: { worker_instance_id: records.worker_instance.id, worker_template_id: template.id }, summary: "AI worker instance provisioned." }); return records; });
     return records;
@@ -3423,19 +4279,19 @@ export async function activateWorkerInstanceRecord(body, actor) {
 
 export async function assignTaskToWorkerRecord(body, actor) {
   if (storeBackend !== "postgres") return withStore((store)=>{ const worker=store.worker_instances.find((record)=>record.id===body.worker_instance_id&&record.runtime_status==="ACTIVE"); if(!worker) throwNotFound("worker_instances",body.worker_instance_id); const task=store.tasks.find((record)=>record.id===body.task_id&&record.tenant_id===body.tenant_id&&record.firm_id===body.firm_id); if(!task) throwNotFound("tasks",body.task_id); task.assigned_actor_or_worker_ref=worker.id; task.state="READY"; task.updated_at=now(); appendEventAndAudit(store,{event_type:"task.assigned_to_worker",actor,tenant_id:body.tenant_id,firm_id:body.firm_id,aggregate_type:"Task",aggregate_id:task.id,payload:{task_id:task.id,worker_instance_id:worker.id},summary:"Task assigned to AI worker."}); return {task,worker_instance:worker}; });
-  const clientConn=await getPool().connect(); try{ const workerResult=await clientConn.query("select id::text from worker_instances where id=$1 and tenant_id=$2 and firm_id=$3 and runtime_status='ACTIVE'",[body.worker_instance_id,body.tenant_id,body.firm_id]); if(workerResult.rowCount===0) throwNotFound("worker_instances",body.worker_instance_id); const result=await clientConn.query("update tasks set assigned_actor_or_worker_ref=$1, state='READY', updated_at=$2 where id=$3 and tenant_id=$4 and firm_id=$5 returning id::text, tenant_id::text, firm_id::text, project_id::text, work_package_id::text, task_type, input_ref, output_ref, assigned_actor_or_worker_ref::text, state, risk_class, due_at, created_at, updated_at",[body.worker_instance_id,now(),body.task_id,body.tenant_id,body.firm_id]); if(result.rowCount===0) throwNotFound("tasks",body.task_id); const task=mapDbDates(result.rows[0]); await withAppState((store)=>{ appendEventAndAudit(store,{event_type:"task.assigned_to_worker",actor,tenant_id:body.tenant_id,firm_id:body.firm_id,aggregate_type:"Task",aggregate_id:task.id,payload:{task_id:task.id,worker_instance_id:body.worker_instance_id},summary:"Task assigned to AI worker."}); return task;}); return {task,worker_instance_id:body.worker_instance_id}; } finally{ clientConn.release(); }
+  const clientConn=await getPool().connect(); try{ await clientConn.query("begin"); await setTenantContext(clientConn, body.tenant_id); const workerResult=await clientConn.query("select id::text from worker_instances where id=$1 and tenant_id=$2 and firm_id=$3 and runtime_status='ACTIVE'",[body.worker_instance_id,body.tenant_id,body.firm_id]); if(workerResult.rowCount===0) throwNotFound("worker_instances",body.worker_instance_id); const result=await clientConn.query("update tasks set assigned_actor_or_worker_ref=$1, state='READY', updated_at=$2 where id=$3 and tenant_id=$4 and firm_id=$5 returning id::text, tenant_id::text, firm_id::text, project_id::text, work_package_id::text, task_type, input_ref, output_ref, assigned_actor_or_worker_ref::text, state, risk_class, due_at, created_at, updated_at",[body.worker_instance_id,now(),body.task_id,body.tenant_id,body.firm_id]); if(result.rowCount===0) throwNotFound("tasks",body.task_id); await clientConn.query("commit"); const task=mapDbDates(result.rows[0]); await withAppState((store)=>{ appendEventAndAudit(store,{event_type:"task.assigned_to_worker",actor,tenant_id:body.tenant_id,firm_id:body.firm_id,aggregate_type:"Task",aggregate_id:task.id,payload:{task_id:task.id,worker_instance_id:body.worker_instance_id},summary:"Task assigned to AI worker."}); return task;}); return {task,worker_instance_id:body.worker_instance_id}; } catch(error){ await clientConn.query("rollback"); throw error; } finally{ clientConn.release(); }
 }
 
 function aiActorForWorker(worker) { return { actor_id: worker.actor_id, actor_type: "AI_AGENT", worker_instance_id: worker.id, tenant_id: worker.tenant_id, firm_id: worker.firm_id, display_name: worker.name }; }
 
 export async function produceTaskOutputRecord(body, policyDecision) {
   if (storeBackend !== "postgres") return withStore((store)=>{ const worker=store.worker_instances.find((record)=>record.id===body.worker_instance_id&&record.runtime_status==="ACTIVE"); if(!worker) throwNotFound("worker_instances",body.worker_instance_id); const task=store.tasks.find((record)=>record.id===body.task_id&&record.assigned_actor_or_worker_ref===worker.id); if(!task) throwNotFound("tasks",body.task_id); const output={id:newId("task_output"),tenant_id:body.tenant_id,firm_id:body.firm_id,project_id:task.project_id,task_id:task.id,worker_instance_id:worker.id,output_ref:body.output_ref??`ai-output:${task.id}`,output_schema_ref:body.output_schema_ref??"formwork.worker_output.v1",evidence_refs:body.evidence_refs??[],quality_flags:body.quality_flags??[],requires_human_review:body.requires_human_review??true,status:"PRODUCED",created_at:now()}; store.task_outputs.push(output); task.output_ref=output.output_ref; task.state="OUTPUT_PRODUCED"; task.updated_at=now(); appendEventAndAudit(store,{event_type:"task.output_produced",actor:aiActorForWorker(worker),tenant_id:body.tenant_id,firm_id:body.firm_id,aggregate_type:"TaskOutput",aggregate_id:output.id,payload:output,summary:"AI worker produced task output.",policy_decision_id:policyDecision?.id??null}); return {task_output:output,task}; });
-  const clientConn=await getPool().connect(); try{ await clientConn.query("begin"); const workerResult=await clientConn.query("select id::text, tenant_id::text, firm_id::text, actor_id::text, name, runtime_status from worker_instances where id=$1 and tenant_id=$2 and firm_id=$3 and runtime_status='ACTIVE'",[body.worker_instance_id,body.tenant_id,body.firm_id]); if(workerResult.rowCount===0) throwNotFound("worker_instances",body.worker_instance_id); const taskResult=await clientConn.query("select id::text, tenant_id::text, firm_id::text, project_id::text from tasks where id=$1 and assigned_actor_or_worker_ref=$2",[body.task_id,body.worker_instance_id]); if(taskResult.rowCount===0) throwNotFound("tasks",body.task_id); const worker=mapDbDates(workerResult.rows[0]); const task=mapDbDates(taskResult.rows[0]); const output={id:newUuid(),tenant_id:body.tenant_id,firm_id:body.firm_id,project_id:task.project_id,task_id:task.id,worker_instance_id:worker.id,output_ref:body.output_ref??`ai-output:${task.id}`,output_schema_ref:body.output_schema_ref??"formwork.worker_output.v1",evidence_refs:body.evidence_refs??[],quality_flags:body.quality_flags??[],requires_human_review:body.requires_human_review??true,status:"PRODUCED",created_at:now()}; await clientConn.query("insert into task_outputs (id, tenant_id, firm_id, project_id, task_id, worker_instance_id, output_ref, output_schema_ref, evidence_refs, quality_flags, requires_human_review, status, created_at) values ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10::jsonb,$11,$12,$13)",[output.id,output.tenant_id,output.firm_id,output.project_id,output.task_id,output.worker_instance_id,output.output_ref,output.output_schema_ref,JSON.stringify(output.evidence_refs),JSON.stringify(output.quality_flags),output.requires_human_review,output.status,output.created_at]); const updatedTaskResult=await clientConn.query("update tasks set output_ref=$1, state='OUTPUT_PRODUCED', updated_at=$2 where id=$3 returning id::text, tenant_id::text, firm_id::text, project_id::text, work_package_id::text, task_type, input_ref, output_ref, assigned_actor_or_worker_ref::text, state, risk_class, due_at, created_at, updated_at",[output.output_ref,now(),task.id]); await clientConn.query("commit"); await withAppState((store)=>{ appendEventAndAudit(store,{event_type:"task.output_produced",actor:aiActorForWorker(worker),tenant_id:body.tenant_id,firm_id:body.firm_id,aggregate_type:"TaskOutput",aggregate_id:output.id,payload:output,summary:"AI worker produced task output.",policy_decision_id:policyDecision?.id??null}); return output;}); return {task_output:output,task:mapDbDates(updatedTaskResult.rows[0])}; } catch(error){ await clientConn.query("rollback"); throw error; } finally{ clientConn.release(); }
+  const clientConn=await getPool().connect(); try{ await clientConn.query("begin"); await setTenantContext(clientConn, body.tenant_id); const workerResult=await clientConn.query("select id::text, tenant_id::text, firm_id::text, actor_id::text, name, runtime_status from worker_instances where id=$1 and tenant_id=$2 and firm_id=$3 and runtime_status='ACTIVE'",[body.worker_instance_id,body.tenant_id,body.firm_id]); if(workerResult.rowCount===0) throwNotFound("worker_instances",body.worker_instance_id); const taskResult=await clientConn.query("select id::text, tenant_id::text, firm_id::text, project_id::text from tasks where id=$1 and assigned_actor_or_worker_ref=$2",[body.task_id,body.worker_instance_id]); if(taskResult.rowCount===0) throwNotFound("tasks",body.task_id); const worker=mapDbDates(workerResult.rows[0]); const task=mapDbDates(taskResult.rows[0]); const output={id:newUuid(),tenant_id:body.tenant_id,firm_id:body.firm_id,project_id:task.project_id,task_id:task.id,worker_instance_id:worker.id,output_ref:body.output_ref??`ai-output:${task.id}`,output_schema_ref:body.output_schema_ref??"formwork.worker_output.v1",evidence_refs:body.evidence_refs??[],quality_flags:body.quality_flags??[],requires_human_review:body.requires_human_review??true,status:"PRODUCED",created_at:now()}; await createTaskOutput({ ...output, tenant_id: uuidOrNull(output.tenant_id), firm_id: uuidOrNull(output.firm_id), project_id: uuidOrNull(output.project_id), task_id: uuidOrNull(output.task_id), worker_instance_id: uuidOrNull(output.worker_instance_id) }, clientConn); const updatedTaskResult=await clientConn.query("update tasks set output_ref=$1, state='OUTPUT_PRODUCED', updated_at=$2 where id=$3 returning id::text, tenant_id::text, firm_id::text, project_id::text, work_package_id::text, task_type, input_ref, output_ref, assigned_actor_or_worker_ref::text, state, risk_class, due_at, created_at, updated_at",[output.output_ref,now(),task.id]); await clientConn.query("commit"); await withAppState((store)=>{ appendEventAndAudit(store,{event_type:"task.output_produced",actor:aiActorForWorker(worker),tenant_id:body.tenant_id,firm_id:body.firm_id,aggregate_type:"TaskOutput",aggregate_id:output.id,payload:output,summary:"AI worker produced task output.",policy_decision_id:policyDecision?.id??null}); return output;}); return {task_output:output,task:mapDbDates(updatedTaskResult.rows[0])}; } catch(error){ await clientConn.query("rollback"); throw error; } finally{ clientConn.release(); }
 }
 
 export async function requestToolInvocationRecord(body, policyDecision) {
   if (storeBackend !== "postgres") return withStore((store)=>{ const worker=store.worker_instances.find((record)=>record.id===body.worker_instance_id&&record.runtime_status==="ACTIVE"); if(!worker) throwNotFound("worker_instances",body.worker_instance_id); if(!(worker.tool_allowlist??[]).includes(body.tool_name)) invalidState("Tool is not allowed for this worker."); const invocation={id:newId("tool_invocation"),tenant_id:body.tenant_id,firm_id:body.firm_id,worker_instance_id:worker.id,task_id:body.task_id??null,tool_name:body.tool_name,invocation_status:"REQUESTED",input_summary:body.input_summary??null,output_ref:null,cost_estimate:Number(body.cost_estimate??0),created_at:now(),completed_at:null}; store.tool_invocations.push(invocation); appendEventAndAudit(store,{event_type:"tool.invocation_requested",actor:aiActorForWorker(worker),tenant_id:body.tenant_id,firm_id:body.firm_id,aggregate_type:"ToolInvocation",aggregate_id:invocation.id,payload:invocation,summary:"AI worker requested tool invocation.",policy_decision_id:policyDecision?.id??null}); return invocation; });
-  const clientConn=await getPool().connect(); try{ const workerResult=await clientConn.query("select id::text, tenant_id::text, firm_id::text, actor_id::text, name, tool_allowlist, runtime_status from worker_instances where id=$1 and tenant_id=$2 and firm_id=$3 and runtime_status='ACTIVE'",[body.worker_instance_id,body.tenant_id,body.firm_id]); if(workerResult.rowCount===0) throwNotFound("worker_instances",body.worker_instance_id); const worker=mapDbDates(workerResult.rows[0]); if(!(worker.tool_allowlist??[]).includes(body.tool_name)) invalidState("Tool is not allowed for this worker."); const invocation={id:newUuid(),tenant_id:body.tenant_id,firm_id:body.firm_id,worker_instance_id:worker.id,task_id:uuidOrNull(body.task_id),tool_name:body.tool_name,invocation_status:"REQUESTED",input_summary:body.input_summary??null,output_ref:null,cost_estimate:Number(body.cost_estimate??0),created_at:now(),completed_at:null}; await clientConn.query("insert into tool_invocations (id, tenant_id, firm_id, worker_instance_id, task_id, tool_name, invocation_status, input_summary, output_ref, cost_estimate, created_at, completed_at) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)",[invocation.id,invocation.tenant_id,invocation.firm_id,invocation.worker_instance_id,invocation.task_id,invocation.tool_name,invocation.invocation_status,invocation.input_summary,invocation.output_ref,invocation.cost_estimate,invocation.created_at,invocation.completed_at]); await withAppState((store)=>{ appendEventAndAudit(store,{event_type:"tool.invocation_requested",actor:aiActorForWorker(worker),tenant_id:body.tenant_id,firm_id:body.firm_id,aggregate_type:"ToolInvocation",aggregate_id:invocation.id,payload:invocation,summary:"AI worker requested tool invocation.",policy_decision_id:policyDecision?.id??null}); return invocation;}); return invocation; } finally{ clientConn.release(); }
+  const clientConn=await getPool().connect(); try{ const workerResult=await clientConn.query("select id::text, tenant_id::text, firm_id::text, actor_id::text, name, tool_allowlist, runtime_status from worker_instances where id=$1 and tenant_id=$2 and firm_id=$3 and runtime_status='ACTIVE'",[body.worker_instance_id,body.tenant_id,body.firm_id]); if(workerResult.rowCount===0) throwNotFound("worker_instances",body.worker_instance_id); const worker=mapDbDates(workerResult.rows[0]); if(!(worker.tool_allowlist??[]).includes(body.tool_name)) invalidState("Tool is not allowed for this worker."); const invocation={id:newUuid(),tenant_id:body.tenant_id,firm_id:body.firm_id,worker_instance_id:worker.id,task_id:uuidOrNull(body.task_id),tool_name:body.tool_name,invocation_status:"REQUESTED",input_summary:body.input_summary??null,output_ref:null,cost_estimate:Number(body.cost_estimate??0),created_at:now(),completed_at:null}; await createToolInvocation({ ...invocation, tenant_id: uuidOrNull(invocation.tenant_id), firm_id: uuidOrNull(invocation.firm_id), worker_instance_id: uuidOrNull(invocation.worker_instance_id) }, clientConn); await withAppState((store)=>{ appendEventAndAudit(store,{event_type:"tool.invocation_requested",actor:aiActorForWorker(worker),tenant_id:body.tenant_id,firm_id:body.firm_id,aggregate_type:"ToolInvocation",aggregate_id:invocation.id,payload:invocation,summary:"AI worker requested tool invocation.",policy_decision_id:policyDecision?.id??null}); return invocation;}); return invocation; } finally{ clientConn.release(); }
 }
 export async function issueInvoiceRecord(body, actor) {
   if (storeBackend !== "postgres") {
@@ -3452,13 +4308,19 @@ export async function issueInvoiceRecord(body, actor) {
   }
   const clientConn = await getPool().connect();
   try {
+    await clientConn.query("begin");
+    await setTenantContext(clientConn, body.tenant_id);
     const invoiceResult = await clientConn.query("select i.id::text, i.tenant_id::text, i.firm_id::text, i.relationship_id::text, i.engagement_id::text, i.project_id::text, i.invoice_number, i.currency, i.line_items, i.tax_summary, i.status, i.due_at, i.created_at, i.updated_at, p.project_state from invoices i left join projects p on p.id = i.project_id where i.id = $1 and i.tenant_id = $2 and i.firm_id = $3", [body.invoice_id, body.tenant_id, body.firm_id]);
     if (invoiceResult.rowCount === 0) throwNotFound("invoices", body.invoice_id);
     if (invoiceResult.rows[0].project_state !== "DELIVERABLE_ISSUED") invalidState("Invoice can only be issued after project deliverable is issued.");
     const result = await clientConn.query("update invoices set status = 'ISSUED', updated_at = $1 where id = $2 returning id::text, tenant_id::text, firm_id::text, relationship_id::text, engagement_id::text, project_id::text, invoice_number, currency, line_items, tax_summary, status, due_at, created_at, updated_at", [now(), body.invoice_id]);
     const invoice = mapDbDates(result.rows[0]);
+    await clientConn.query("commit");
     await withAppState((store) => { appendEventAndAudit(store, { event_type: "invoice.issued", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "Invoice", aggregate_id: invoice.id, payload: { invoice_id: invoice.id }, summary: "Invoice issued after delivery gate." }); return invoice; });
     return invoice;
+  } catch (error) {
+    await clientConn.query("rollback");
+    throw error;
   } finally { clientConn.release(); }
 }
 
@@ -3501,16 +4363,17 @@ export async function recordPaymentStatusRecord(body, actor) {
   const clientConn = await getPool().connect();
   try {
     await clientConn.query("begin");
+    await setTenantContext(clientConn, body.tenant_id);
     const invoiceResult = await clientConn.query("select id::text, tenant_id::text, firm_id::text, relationship_id::text, engagement_id::text, project_id::text, invoice_number, currency, line_items, tax_summary, status, due_at, created_at, updated_at from invoices where id = $1 and tenant_id = $2 and firm_id = $3", [body.invoice_id, body.tenant_id, body.firm_id]);
     if (invoiceResult.rowCount === 0) throwNotFound("invoices", body.invoice_id);
     const invoice = mapDbDates(invoiceResult.rows[0]);
     if (invoice.status !== "ISSUED") invalidState("Payment can only be recorded against an issued invoice.");
     const payment = buildPaymentStatus(body, invoice, { ids: "uuid" });
-    await clientConn.query("insert into payment_statuses (id, tenant_id, firm_id, invoice_id, amount, currency, provider_ref, payment_status, received_at, created_at, updated_at) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)", [payment.id, payment.tenant_id, payment.firm_id, payment.invoice_id, payment.amount, payment.currency, payment.provider_ref, payment.payment_status, payment.received_at, payment.created_at, payment.updated_at]);
+    await createPaymentStatus({ ...payment, firm_id: uuidOrNull(payment.firm_id), invoice_id: uuidOrNull(payment.invoice_id) }, clientConn);
     const status = payment.payment_status === "PAID" ? "PAID" : "PAYMENT_PENDING";
-    const updatedInvoiceResult = await clientConn.query("update invoices set status = $1, updated_at = $2 where id = $3 returning id::text, tenant_id::text, firm_id::text, relationship_id::text, engagement_id::text, project_id::text, invoice_number, currency, line_items, tax_summary, status, due_at, created_at, updated_at", [status, now(), invoice.id]);
+    const updatedInvoiceRow = await updateInvoice(invoice.id, { status, updated_at: now() }, clientConn);
     await clientConn.query("commit");
-    const updatedInvoice = mapDbDates(updatedInvoiceResult.rows[0]);
+    const updatedInvoice = mapDbDates(updatedInvoiceRow);
     await withAppState((store) => { appendEventAndAudit(store, { event_type: "payment.recorded", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "PaymentStatus", aggregate_id: payment.id, payload: { invoice_id: invoice.id, payment_status: payment.payment_status }, summary: "Payment status recorded." }); return payment; });
     return { payment_status: payment, invoice: updatedInvoice };
   } catch (error) { await clientConn.query("rollback"); throw error; } finally { clientConn.release(); }
@@ -3808,6 +4671,18 @@ function upsertById(collection, record) {
   else collection.push(record);
 }
 
+// Hiring-bug fix (2026-10-01, ADR-091): several AWIA provisioning records carry natural-key ids
+// that are NOT firm-scoped -- seat-<code>, role-assignment-<code>, package-binding-<code>,
+// staff-lifecycle-<code>-<state>, and the constant evidence-pack id -- so two firms hiring the same
+// staff code (e.g. CFO-001) produce identical ids. The whole multi-tenant store is loaded into one
+// in-memory object, so a plain upsertById() merged firm B's record INTO firm A's (cross-tenant
+// overwrite). This variant only ever matches a record in the same firm.
+function upsertScopedById(collection, record) {
+  const index = collection.findIndex((item) => item.id === record?.id && item.firm_id === record?.firm_id);
+  if (index >= 0) collection[index] = { ...collection[index], ...record };
+  else collection.push(record);
+}
+
 function awiaRecord(record, idField) {
   return { id: record[idField], ...record };
 }
@@ -3862,26 +4737,52 @@ export async function provisionAwiaVirtualStaffPilotRecord(body, actor) {
       salary_plan_id: body.salary_plan_id ?? "virtual-staff-controlled-pilot-plan",
       registry: awiaVirtualStaffPackageRegistry
     });
-    upsertById(store.awia_virtual_staff_provisioning_runs, awiaProvisioningSnapshot(run));
-    for (const seat of run.seats) upsertById(store.awia_virtual_staff_seats, awiaRecord(seat, "staff_seat_id"));
-    for (const member of run.members) upsertById(store.awia_virtual_staff_members, awiaRecord(member, "agent_id"));
-    for (const assignment of run.role_assignments) upsertById(store.awia_staff_role_assignments, awiaRecord(assignment, "role_assignment_id"));
-    for (const binding of run.package_bindings) upsertById(store.awia_staff_package_bindings, awiaRecord(binding, "package_binding_id"));
-    for (const event of run.lifecycle_events) upsertById(store.awia_staff_lifecycle_events, awiaRecord(event, "lifecycle_event_id"));
+    upsertScopedById(store.awia_virtual_staff_provisioning_runs, awiaProvisioningSnapshot(run));
+    for (const seat of run.seats) upsertScopedById(store.awia_virtual_staff_seats, awiaRecord(seat, "staff_seat_id"));
+    for (const member of run.members) upsertScopedById(store.awia_virtual_staff_members, awiaRecord(member, "agent_id"));
+    for (const assignment of run.role_assignments) upsertScopedById(store.awia_staff_role_assignments, awiaRecord(assignment, "role_assignment_id"));
+    for (const binding of run.package_bindings) upsertScopedById(store.awia_staff_package_bindings, awiaRecord(binding, "package_binding_id"));
+    for (const event of run.lifecycle_events) upsertScopedById(store.awia_staff_lifecycle_events, awiaRecord(event, "lifecycle_event_id"));
     const evidencePack = buildAwiaVirtualStaffEvidencePack({ registry: awiaVirtualStaffPackageRegistry, provisioningRun: run });
-    upsertById(store.awia_staff_evidence_packs, { id: evidencePack.evidence_pack_id, ...evidencePack, tenant_id: body.tenant_id, firm_id: body.firm_id, created_at: now() });
+    upsertScopedById(store.awia_staff_evidence_packs, { id: evidencePack.evidence_pack_id, ...evidencePack, tenant_id: body.tenant_id, firm_id: body.firm_id, created_at: now() });
     appendEventAndAudit(store, { event_type: "awia.virtual_staff.provisioned", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaVirtualStaffProvisioningRun", aggregate_id: storeBackend === "postgres" ? deterministicUuid(run.provisioning_run_id) : run.provisioning_run_id, payload: { staff_count: run.members.length, boundary: run.boundary, runtime_execution_enabled: run.runtime_execution_enabled }, summary: "AWIA virtual staff pilot roster provisioned as controlled records." });
     return { provisioning_run: run, evidence_pack: evidencePack };
   });
 }
 
+// Phase 5, slice 5c (2026-09-30): the real AWIA staff lifecycle state machine. D.1's finding
+// confirmed directly by reading the code: staffLifecycleStates (awia-virtual-staff-
+// provisioning.mjs) already names all 7 states and canAcceptExecutableTask() already gates
+// task-readiness on lifecycle_status === "ACTIVE" (the authority gate's
+// STAFF_LIFECYCLE_NOT_EXECUTABLE finding, confirmed live via the HM-S2 pilot flow) -- but
+// updateAwiaVirtualStaffLifecycleRecord itself only checked that to_state belonged to an
+// incomplete 5-state set (missing PROVISIONING and ARCHIVED entirely) with NO transition-
+// table validation: a member could jump from any state directly to any other, including
+// DRAFT->RETIRED or RETIRED->ACTIVE. That is the concrete gap "enforce lifecycle transitions
+// after hire, not just at hire" describes. Fixed by validating every transition against a
+// real from->to table below. canAcceptExecutableTask()'s existing gate then automatically
+// blocks task assignment/readiness the instant a member leaves ACTIVE -- no separate
+// enforcement code is needed at the task-assignment call sites for this to take effect.
+const AWIA_STAFF_LIFECYCLE_TRANSITIONS = {
+  DRAFT: ["PROVISIONING", "ACTIVE"],
+  PROVISIONING: ["ACTIVE"],
+  ACTIVE: ["PAUSED", "SUSPENDED", "RETIRED"],
+  PAUSED: ["ACTIVE", "SUSPENDED", "RETIRED"],
+  SUSPENDED: ["ACTIVE", "RETIRED"],
+  RETIRED: ["ARCHIVED"],
+  ARCHIVED: []
+};
+
 export async function updateAwiaVirtualStaffLifecycleRecord(body, actor) {
-  const allowedStates = new Set(["DRAFT", "ACTIVE", "PAUSED", "SUSPENDED", "RETIRED"]);
-  if (!allowedStates.has(body.to_state)) invalidState(`Unsupported AWIA staff lifecycle state: ${body.to_state}`);
+  if (!staffLifecycleStates.includes(body.to_state)) invalidState(`Unsupported AWIA staff lifecycle state: ${body.to_state}`);
   return withStore((store) => {
     const member = store.awia_virtual_staff_members.find((record) => record.organization_id === body.tenant_id && record.firm_id === body.firm_id && record.agent_code === body.staff_code);
     if (!member) throwNotFound("awia_virtual_staff_members", body.staff_code);
     const fromState = member.lifecycle_status;
+    const allowedNextStates = AWIA_STAFF_LIFECYCLE_TRANSITIONS[fromState] ?? [];
+    if (!allowedNextStates.includes(body.to_state)) {
+      invalidState(`AWIA staff lifecycle transition rejected: ${fromState} -> ${body.to_state} is not allowed (from ${fromState}, allowed: ${allowedNextStates.join(", ") || "none -- terminal state"}).`);
+    }
     member.lifecycle_status = body.to_state;
     member.updated_at = now();
     const event = {
@@ -3969,6 +4870,9 @@ export async function assignAwiaVirtualStaffTaskRecord(body, actor) {
     }
     const task = store.tasks.find((record) => record.id === body.task_id && record.tenant_id === body.tenant_id && record.firm_id === body.firm_id);
     if (!task) throwNotFound("tasks", body.task_id);
+    // ADR-089 W1 (B1): an evidence ref of the form "file:<id>" must point at a real uploaded file
+    // in this same tenant/firm -- a worker can never be handed another firm's file by id.
+    assertScopedFileRefs(store, body.evidence_refs ?? [], body);
     let readiness = evaluateVirtualStaffRuntimeAction({
       provisioningRun: awiaRunFromStore(store, body.tenant_id, body.firm_id),
       registry: awiaVirtualStaffPackageRegistry,
@@ -4057,6 +4961,10 @@ export async function assignAwiaVirtualStaffTaskRecord(body, actor) {
       assigned_by_actor_id: actor.actor_id,
       assigned_at: now(),
       updated_at: now(),
+      // ADR-090 W2: link back to the owner's work request (null for project tasks assigned directly).
+      work_request_id: body.work_request_id ?? null,
+      instructions: body.instructions ?? null,
+      due_at: body.due_at ?? task.due_at ?? null,
       boundary: "assigned_workdesk_item_requires_human_supervision_and_review"
     };
     store.awia_staff_workdesk_items.push(item);
@@ -4073,9 +4981,22 @@ export async function produceAwiaStaffOutputDraftRecord(body, actor) {
   return withStore((store) => {
     const item = store.awia_staff_workdesk_items.find((record) => record.id === body.workdesk_item_id && record.tenant_id === body.tenant_id && record.firm_id === body.firm_id);
     if (!item) throwNotFound("awia_staff_workdesk_items", body.workdesk_item_id);
-    if (item.workdesk_status !== "ASSIGNED") invalidState("AWIA output drafts can only be produced from ASSIGNED workdesk items.");
+    // ADR-089 W1 (B3): REWORK (owner asked for a revision) may produce a fresh draft; the prior
+    // draft is kept untouched as history and linked via supersedes_output_draft_id.
+    // ADR-093 W4: NEEDS_INFO counts as the status it will return to (ASSIGNED or REWORK).
+    const effectiveStatus = effectiveWorkdeskStatus(item);
+    if (effectiveStatus !== "ASSIGNED" && effectiveStatus !== "REWORK") invalidState("AWIA output drafts can only be produced from ASSIGNED or REWORK workdesk items.");
     const member = store.awia_virtual_staff_members.find((record) => record.id === item.staff_member_id && record.lifecycle_status === "ACTIVE");
     if (!member) throwNotFound("active awia_virtual_staff_members", item.staff_code);
+    const priorDraft = effectiveStatus === "REWORK" && item.output_draft_id ? store.awia_staff_output_drafts.find((record) => record.id === item.output_draft_id) : null;
+    // ADR-089 W1 (B1): owner-attached output file (for skills without an executable module yet --
+    // decision D4). Must be an uploaded file in this tenant/firm.
+    const outputFile = body.output_file_id ? assertScopedFileRefs(store, [`file:${body.output_file_id}`], body)[0] : null;
+    // ADR-092 W3 (D4): work given through a request never gets an empty placeholder draft -- it is
+    // either run by its skill (run-skill) or the owner attaches the finished output file.
+    if (item.work_request_id && !outputFile && (body.output_payload === undefined || body.output_payload === null)) {
+      invalidState(isRunnableSkill(item.skill_id ?? scopedFind(store, "work_requests", item.work_request_id, body)?.skill_id) ? "Run the worker on the inputs (or attach the finished output file) to produce this draft." : "This kind of work cannot be run automatically yet -- attach the finished output file.");
+    }
     const output = {
       id: body.output_draft_id ?? (storeBackend === "postgres" ? newUuid() : newId("awia_output_draft")),
       tenant_id: body.tenant_id,
@@ -4087,8 +5008,15 @@ export async function produceAwiaStaffOutputDraftRecord(body, actor) {
       staff_member_id: item.staff_member_id,
       output_title: body.output_title ?? `${item.staff_code} draft output`,
       output_summary: body.output_summary ?? item.assignment_summary,
-      output_ref: body.output_ref ?? `awia://draft-output/${item.id}`,
+      output_ref: outputFile ? `file:${outputFile.id}` : (body.output_ref ?? `awia://draft-output/${item.id}`),
+      output_file_id: outputFile?.id ?? null,
       output_payload: body.output_payload ?? null,
+      // ADR-092 W3: how the draft was made -- the skill run (module, input files + SHA-256) or null
+      // when the owner attached the output themselves.
+      generation: body.generation ?? null,
+      supersedes_output_draft_id: priorDraft?.id ?? null,
+      revision_number: (priorDraft?.revision_number ?? (priorDraft ? 1 : 0)) + 1,
+      revision_request_notes: priorDraft ? (item.revision_request_notes ?? null) : null,
       evidence_refs: body.evidence_refs ?? item.evidence_refs ?? [],
       status: "DRAFT_REVIEW_REQUIRED",
       requires_human_review: true,
@@ -4107,7 +5035,15 @@ export async function produceAwiaStaffOutputDraftRecord(body, actor) {
     store.awia_staff_output_drafts.push(output);
     item.workdesk_status = "OUTPUT_DRAFTED";
     item.output_draft_id = output.id;
+    item.last_run_error = null;
+    item.needs_info_return_status = null;
     item.updated_at = now();
+    // ADR-093 W4 (B6): timeline entry for request work (legacy items keep their old behaviour).
+    if (item.work_request_id) {
+      postItemThreadMessage(store, item, actor, output.generation
+        ? { role: "VIRTUAL_STAFF", kind: "DRAFT_READY", content: `Draft ${output.revision_number > 1 ? `revision ${output.revision_number} ` : ""}ready for your review: ${output.output_summary ?? output.output_title}` }
+        : { role: "HUMAN_SUPERVISOR", kind: "OUTPUT_ATTACHED", content: `Attached the finished output: ${outputFile?.filename ?? output.output_title}.`, file_ids: outputFile ? [outputFile.id] : [] });
+    }
     const task = store.tasks.find((record) => record.id === item.task_id);
     if (task) {
       task.output_ref = output.output_ref;
@@ -4155,8 +5091,18 @@ export async function reviewAwiaStaffOutputDraftRecord(body, actor) {
     output.updated_at = now();
     const item = store.awia_staff_workdesk_items.find((record) => record.id === output.workdesk_item_id);
     if (item) {
-      item.workdesk_status = body.review_decision === "APPROVED_FOR_CLIENT_DRAFT" ? "REVIEWED_FOR_CLIENT_DRAFT" : "REVIEW_ACTION_REQUIRED";
+      // ADR-089 W1 (B3): REVISION_REQUIRED now sends the item back to the worker (REWORK) instead
+      // of the old REVIEW_ACTION_REQUIRED dead end; REJECTED still lands in REVIEW_ACTION_REQUIRED
+      // (archivable), unchanged.
+      item.workdesk_status = body.review_decision === "APPROVED_FOR_CLIENT_DRAFT"
+        ? "REVIEWED_FOR_CLIENT_DRAFT"
+        : body.review_decision === "REVISION_REQUIRED" ? "REWORK" : "REVIEW_ACTION_REQUIRED";
+      if (body.review_decision === "REVISION_REQUIRED") item.revision_request_notes = body.review_notes ?? null;
       item.updated_at = now();
+      if (item.work_request_id) {
+        const said = { APPROVED_FOR_CLIENT_DRAFT: "Approved", REVISION_REQUIRED: "Revision requested", REJECTED: "Rejected" }[body.review_decision];
+        postItemThreadMessage(store, item, actor, { role: "HUMAN_SUPERVISOR", kind: "REVIEW", content: `${said}${body.review_notes ? `: ${body.review_notes}` : "."}` });
+      }
     }
     appendEventAndAudit(store, { event_type: "awia.virtual_staff.output_reviewed", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaStaffOutputReview", aggregate_id: review.id, payload: { output_draft_id: output.id, review_decision: body.review_decision }, summary: "Human reviewed AWIA virtual staff draft output." });
     return { output_draft: output, output_review: review, workdesk_item: item ?? null };
@@ -4205,6 +5151,10 @@ export async function prepareAwiaClientDeliveryDraftRecord(body, actor) {
     if (!output) throwNotFound("awia_staff_output_drafts", body.output_draft_id);
     const review = [...store.awia_staff_output_reviews].reverse().find((record) => record.output_draft_id === output.id && record.review_decision === "APPROVED_FOR_CLIENT_DRAFT");
     if (!review) invalidState("Client delivery draft requires human review decision APPROVED_FOR_CLIENT_DRAFT.");
+    // ADR-090 W2 (D2): INTERNAL firm work never goes to a client -- it is filed via
+    // completeAwiaInternalWorkdeskItemRecord instead.
+    const sourceItem = store.awia_staff_workdesk_items.find((record) => record.id === output.workdesk_item_id);
+    if (sourceItem?.risk_class === "INTERNAL") invalidState("INTERNAL firm work cannot be prepared for a client; mark it complete instead.");
     const draft = {
       id: body.client_delivery_draft_id ?? (storeBackend === "postgres" ? newUuid() : newId("awia_client_delivery_draft")),
       tenant_id: body.tenant_id,
@@ -4218,7 +5168,10 @@ export async function prepareAwiaClientDeliveryDraftRecord(body, actor) {
       client_id: body.client_id,
       delivery_title: body.delivery_title ?? output.output_title,
       delivery_summary: body.delivery_summary ?? output.output_summary,
-      delivery_ref: body.delivery_ref ?? `client-draft://${output.id}`,
+      // ADR-089 W1 (B1): an approved output that carries a real file hands that file straight to
+      // the client delivery draft, so the owner can download exactly what was approved.
+      delivery_ref: body.delivery_ref ?? (output.output_file_id ? `file:${output.output_file_id}` : `client-draft://${output.id}`),
+      delivery_file_id: output.output_file_id ?? null,
       evidence_refs: body.evidence_refs ?? output.evidence_refs,
       status: "CLIENT_DELIVERY_DRAFT_PREPARED",
       final_issue_allowed: false,
@@ -4248,14 +5201,19 @@ export async function markAwiaClientDeliveryDraftSentRecord(body, actor) {
     draft.marked_sent_by_actor_id = actor.actor_id;
     draft.marked_sent_at = now();
     const item = store.awia_staff_workdesk_items.find((record) => record.id === draft.workdesk_item_id);
+    let filed = null;
     if (item) {
       item.workdesk_status = "ARCHIVED_SENT";
       item.archived_at = now();
       item.archived_by_actor_id = actor.actor_id;
       item.updated_at = now();
+      // ADR-093 W4 (B7): file the approved output in the document register.
+      const outputDraft = store.awia_staff_output_drafts.find((record) => record.id === draft.output_draft_id);
+      filed = fileWorkdeskOutputToRegister(store, item, outputDraft, actor);
+      if (item.work_request_id) postItemThreadMessage(store, item, actor, { role: "HUMAN_SUPERVISOR", kind: "CLOSED", content: `Marked sent to the client.${filed ? ` Filed in Documents as ${filed.document_number}.` : ""}` });
     }
     appendEventAndAudit(store, { event_type: "awia.virtual_staff.client_delivery_draft_marked_sent", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaClientDeliveryDraft", aggregate_id: draft.id, payload: { output_draft_id: draft.output_draft_id, marked_sent_by_actor_id: actor.actor_id }, summary: "Owner recorded that a prepared client delivery draft was delivered outside vFirm; this is a recordkeeping action only, not a system client transmission or final issue action." });
-    return { client_delivery_draft: draft, workdesk_item: item ?? null };
+    return { client_delivery_draft: draft, workdesk_item: item ?? null, filed_document: filed };
   });
 }
 
@@ -4265,9 +5223,9 @@ export async function archiveAwiaStaffWorkdeskItemRecord(body, actor) {
     if (!item) throwNotFound("awia_staff_workdesk_items", body.workdesk_item_id);
     const output = item.output_draft_id ? store.awia_staff_output_drafts.find((record) => record.id === item.output_draft_id) : null;
     const isRejectedOutput = output?.status === "REJECTED";
-    const archivableStatuses = new Set(["REVIEW_ACTION_REQUIRED"]);
+    const archivableStatuses = new Set(["REVIEW_ACTION_REQUIRED", "REWORK", "NEEDS_INFO"]);
     if (!archivableStatuses.has(item.workdesk_status) && !isRejectedOutput) {
-      invalidState("Only a workdesk item stuck at REVIEW_ACTION_REQUIRED, or whose output draft was REJECTED, can be archived.");
+      invalidState("Only a workdesk item at REVIEW_ACTION_REQUIRED or REWORK, or whose output draft was REJECTED, can be archived.");
     }
     item.workdesk_status = "ARCHIVED_DISMISSED";
     item.archived_at = now();
@@ -4513,7 +5471,10 @@ export async function hireAwiaFirmWorkerRecord(body, actor) {
     // member record itself (see createVirtualStaffMember in
     // awia-virtual-staff-provisioning.mjs), so a position-less occupant is
     // identified via its role assignment record instead.
-    const activeMembersForFirm = (store.awia_virtual_staff_members ?? []).filter((item) => item.tenant_id === body.tenant_id && item.firm_id === body.firm_id && item.lifecycle_status !== "RETIRED");
+    // Hiring-bug fix (2026-10-01, ADR-091): member records carry the tenant as `organization_id`
+    // (createVirtualStaffMember), never `tenant_id`, so filtering on item.tenant_id matched nothing
+    // and this guardrail silently never fired (a second Bookkeeper was accepted as FAO-002).
+    const activeMembersForFirm = (store.awia_virtual_staff_members ?? []).filter((item) => (item.tenant_id ?? item.organization_id) === body.tenant_id && item.firm_id === body.firm_id && item.lifecycle_status !== "RETIRED");
     const duplicateOccupant = body.position_id
       ? activeMembersForFirm.find((item) => item.position_id === body.position_id)
       : activeMembersForFirm.find((item) => !item.position_id && existingRoleAssignments.some((assignment) => assignment.staff_code === item.agent_code && assignment.role_code === roleCode));
@@ -4536,16 +5497,16 @@ export async function hireAwiaFirmWorkerRecord(body, actor) {
     });
     if (!run.ok) invalidState(`AWIA staff hire rejected: ${run.findings.map((finding) => finding.code).join(", ")}`);
 
-    for (const seat of run.seats) upsertById(store.awia_virtual_staff_seats, awiaRecord(seat, "staff_seat_id"));
-    for (const member of run.members) upsertById(store.awia_virtual_staff_members, { ...awiaRecord(member, "agent_id"), display_name: body.display_name ?? member.display_name, position_id: resolvedPositionId });
-    for (const assignment of run.role_assignments) upsertById(store.awia_staff_role_assignments, awiaRecord(assignment, "role_assignment_id"));
-    for (const binding of run.package_bindings) upsertById(store.awia_staff_package_bindings, awiaRecord(binding, "package_binding_id"));
-    for (const event of run.lifecycle_events) upsertById(store.awia_staff_lifecycle_events, awiaRecord(event, "lifecycle_event_id"));
+    for (const seat of run.seats) upsertScopedById(store.awia_virtual_staff_seats, awiaRecord(seat, "staff_seat_id"));
+    for (const member of run.members) upsertScopedById(store.awia_virtual_staff_members, { ...awiaRecord(member, "agent_id"), display_name: body.display_name ?? member.display_name, position_id: resolvedPositionId });
+    for (const assignment of run.role_assignments) upsertScopedById(store.awia_staff_role_assignments, awiaRecord(assignment, "role_assignment_id"));
+    for (const binding of run.package_bindings) upsertScopedById(store.awia_staff_package_bindings, awiaRecord(binding, "package_binding_id"));
+    for (const event of run.lifecycle_events) upsertScopedById(store.awia_staff_lifecycle_events, awiaRecord(event, "lifecycle_event_id"));
 
     const fullRun = validateVirtualStaffProvisioningRun(awiaRunFromStore(store, body.tenant_id, body.firm_id), awiaVirtualStaffPackageRegistry);
-    upsertById(store.awia_virtual_staff_provisioning_runs, { ...awiaProvisioningSnapshot(fullRun), package_code: packageAssignment.package_code });
+    upsertScopedById(store.awia_virtual_staff_provisioning_runs, { ...awiaProvisioningSnapshot(fullRun), package_code: packageAssignment.package_code });
     const evidencePack = buildAwiaVirtualStaffEvidencePack({ registry: awiaVirtualStaffPackageRegistry, provisioningRun: fullRun });
-    upsertById(store.awia_staff_evidence_packs, { id: evidencePack.evidence_pack_id, ...evidencePack, tenant_id: body.tenant_id, firm_id: body.firm_id, created_at: now() });
+    upsertScopedById(store.awia_staff_evidence_packs, { id: evidencePack.evidence_pack_id, ...evidencePack, tenant_id: body.tenant_id, firm_id: body.firm_id, created_at: now() });
 
     const hiredMember = store.awia_virtual_staff_members.find((item) => item.agent_code === staffCode && item.firm_id === body.firm_id);
     appendEventAndAudit(store, {
@@ -4589,14 +5550,14 @@ export async function provisionAwiaVirtualStaffFromTemplateRecord(body, actor) {
       registry: awiaVirtualStaffPackageRegistry,
       pilotStaff
     });
-    upsertById(store.awia_virtual_staff_provisioning_runs, { ...awiaProvisioningSnapshot(run), template_id: resolved.template.template_id, template_name: resolved.template.name, template_version: resolved.template.version, package_code: packageAssignment.package_code });
-    for (const seat of run.seats) upsertById(store.awia_virtual_staff_seats, { ...awiaRecord(seat, "staff_seat_id"), template_id: resolved.template.template_id });
-    for (const member of run.members) upsertById(store.awia_virtual_staff_members, awiaRecord(member, "agent_id"));
-    for (const assignment of run.role_assignments) upsertById(store.awia_staff_role_assignments, awiaRecord(assignment, "role_assignment_id"));
-    for (const binding of run.package_bindings) upsertById(store.awia_staff_package_bindings, awiaRecord(binding, "package_binding_id"));
-    for (const event of run.lifecycle_events) upsertById(store.awia_staff_lifecycle_events, awiaRecord(event, "lifecycle_event_id"));
+    upsertScopedById(store.awia_virtual_staff_provisioning_runs, { ...awiaProvisioningSnapshot(run), template_id: resolved.template.template_id, template_name: resolved.template.name, template_version: resolved.template.version, package_code: packageAssignment.package_code });
+    for (const seat of run.seats) upsertScopedById(store.awia_virtual_staff_seats, { ...awiaRecord(seat, "staff_seat_id"), template_id: resolved.template.template_id });
+    for (const member of run.members) upsertScopedById(store.awia_virtual_staff_members, awiaRecord(member, "agent_id"));
+    for (const assignment of run.role_assignments) upsertScopedById(store.awia_staff_role_assignments, awiaRecord(assignment, "role_assignment_id"));
+    for (const binding of run.package_bindings) upsertScopedById(store.awia_staff_package_bindings, awiaRecord(binding, "package_binding_id"));
+    for (const event of run.lifecycle_events) upsertScopedById(store.awia_staff_lifecycle_events, awiaRecord(event, "lifecycle_event_id"));
     const evidencePack = buildAwiaVirtualStaffEvidencePack({ registry: awiaVirtualStaffPackageRegistry, provisioningRun: run });
-    upsertById(store.awia_staff_evidence_packs, { id: evidencePack.evidence_pack_id, ...evidencePack, tenant_id: body.tenant_id, firm_id: body.firm_id, template_id: resolved.template.template_id, created_at: now() });
+    upsertScopedById(store.awia_staff_evidence_packs, { id: evidencePack.evidence_pack_id, ...evidencePack, tenant_id: body.tenant_id, firm_id: body.firm_id, template_id: resolved.template.template_id, created_at: now() });
     appendEventAndAudit(store, { event_type: "awia.virtual_staff.provisioned_from_template", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "AwiaVirtualStaffProvisioningRun", aggregate_id: storeBackend === "postgres" ? deterministicUuid(run.provisioning_run_id) : run.provisioning_run_id, payload: { staff_count: run.members.length, template_id: resolved.template.template_id, boundary: run.boundary, runtime_execution_enabled: run.runtime_execution_enabled }, summary: "AWIA virtual staff roster provisioned for this firm from a named reusable template." });
     return { provisioning_run: { ...run, template_id: resolved.template.template_id, template_name: resolved.template.name }, evidence_pack: evidencePack };
   });
@@ -4606,22 +5567,206 @@ export async function readAwiaStaffTemplateCatalogueRecord() {
   return { boundary: "named_roster_templates_only_no_cross_firm_data_sharing_no_autonomous_authority", templates: listAwiaStaffTemplates() };
 }
 
+// HM-S7 Phase 4f, slice 1 (2026-09-29): persistLedgerFromStore() used to re-upsert every
+// policy_decisions/audit_events/event_log row ever created, on every single withStore()/
+// withAppState() call, because it looped over the FULL array loadPostgresStore() had just
+// read back from the database (all tenants, all history) with no way to tell old rows from
+// new ones. Since these 3 tables are strictly append-only in the postgres path (confirmed by
+// reading every call site: the only place they're ever pushed to is appendEventAndAudit()'s
+// two push()es and the JSON-backend-only branch of createPolicyDecisionRecord() -- nothing
+// mutates or reorders an existing entry), capturing each array's length right after load and
+// only persisting the slice added after that point is exactly equivalent to before (every
+// row still gets upserted exactly once, in the same order) but turns an O(total historical
+// ledger size) cost on every request into O(rows actually added this request) -- the ledger
+// only ever grows, so this was the single biggest, worst-compounding instance of the "load
+// everything, resync everything" pattern flagged for Phase 4f.
+function captureLedgerBaseline(store) {
+  return {
+    policy_decisions: (store.policy_decisions ?? []).length,
+    audit_events: (store.audit_events ?? []).length,
+    event_log: (store.event_log ?? []).length
+  };
+}
+
+// HM-S7 Phase 4f, slice 3 (2026-09-29): the ledger's baseline-array-length trick (above) only
+// works because those 3 arrays are strictly append-only. Most of the other 7 persist*FromStore
+// domains are NOT append-only -- e.g. front_desk_enquiries records get mutated in place
+// (handOffQualifiedEnquiry's Object.assign(current, {status: "HANDED_OFF", ...})) rather than
+// re-pushed, so a naive "only persist rows added after this array's starting length" check would
+// silently stop persisting that status change forever (the array's length doesn't grow when an
+// existing row is edited). This is exactly the risk the architecture review flagged before any of
+// these 7 domains could be touched.
+//
+// Content-diff dirty-checking is the safe, generic alternative that works for both create-only
+// and mutate-in-place domains without needing to find and instrument every call site that
+// creates or edits a record: snapshot each opted-in collection's rows by id -> JSON string right
+// after load, then at save time only upsert rows whose current JSON differs from that snapshot
+// (new rows, whose id has no snapshot entry, always count as changed). A row that's genuinely
+// unchanged since load always serializes identically, so this can only ever skip a row that
+// truly has nothing new to persist -- it cannot silently miss a real change, because a real
+// content change necessarily produces a different JSON string. Worst case on any edge (e.g. two
+// different mutations that happen to produce byte-identical JSON, which isn't possible for
+// different field values) is an unnecessary upsert -- the same behavior as today, never data
+// loss. Domains are opted in one at a time, per slice, after confirming (as above) how their
+// records get created/mutated -- not applied blanket across all persist*FromStore functions at
+// once.
+const RECORD_DEDUP_COLLECTIONS = [
+  "file_objects", // ADR-089 W1: created via registerFileObjectRecord only; download audit never mutates the row
+  "work_requests", // ADR-090 W2: created via createWorkRequestRecord, mutated in place on assign/cancel/add-files
+  "front_desk_enquiries", // slice 3: created via createFrontDeskEnquiryRecord, mutated in place
+  "client_communication_drafts", // slice 3: created via draftClientCommunicationRecord only, never mutated in place
+  // slice 4 (2026-09-29): all 17 AWIA virtual staff collections, audited call-by-call --
+  // created via upsertById() (matches by id, merges or pushes), plain .push(), or mutated in
+  // place via direct field assignment after a .find() (e.g. updateAwiaVirtualStaffLifecycleRecord's
+  // `member.lifecycle_status = body.to_state`, updateAwiaStaffSeatBillingStatusRecord's
+  // `seat.billing_status = ...`, produceAwiaStaffOutputDraftRecord's
+  // `item.workdesk_status = "OUTPUT_DRAFTED"`, reviewAwiaStaffOutputDraftRecord's
+  // `output.status = body.review_decision`, markAwiaClientDeliveryDraftSentRecord's
+  // `draft.status = "OWNER_MARKED_SENT"`, archiveAwiaStaffWorkdeskItemRecord's
+  // `item.workdesk_status = "ARCHIVED_DISMISSED"`). All three patterns are handled correctly by
+  // changedRecords()'s content-diff, which doesn't care how a record changed, only whether its
+  // current JSON differs from its baseline JSON. Confirmed no collection is ever removed from
+  // (only .filter()'d into a separate derived array for reads, never reassigned) -- the test-firm
+  // purge utility deletes these tables with direct SQL (`delete from awia_virtual_staff_seats
+  // where firm_id = $1`, etc.), never touching these in-memory arrays.
+  "awia_virtual_staff_provisioning_runs",
+  "awia_virtual_staff_seats",
+  "awia_virtual_staff_members",
+  "awia_staff_role_assignments",
+  "awia_staff_package_bindings",
+  "awia_staff_lifecycle_events",
+  "awia_staff_authority_decisions",
+  "awia_staff_evidence_packs",
+  "awia_staff_task_readiness_records",
+  "awia_staff_workdesk_items",
+  "awia_staff_output_drafts",
+  "awia_staff_output_reviews",
+  "awia_client_delivery_drafts",
+  "awia_staff_memory_entries",
+  "awia_staff_conversation_threads",
+  "awia_staff_conversation_messages",
+  "awia_staff_seat_billing_events",
+  // slice 5 (2026-09-29): all 7 Firm Factory / Provisioning collections, audited call-by-call --
+  // factory_firm_blueprints, factory_provisioning_runs and provisioned_firm_instances are mutated
+  // in place after a .find() (e.g. validateFactoryFirmBlueprintRecord's
+  // `blueprint.validation_status = ...`, createFactoryProvisioningRunRecord's
+  // `current.blueprint_state = "PROVISIONED"`, certifyFactoryPackBindingRecord's
+  // `run.pack_certification_state = ...` / `instance.pack_certification_state = ...`,
+  // runFactoryReadinessTestRecord's `run.provisioning_state = ...` / `instance.instance_status = ...`,
+  // acceptFactoryHandoffRecord's `run.provisioning_state = "ACCEPTED_FOR_LOCAL_PILOT"` /
+  // `instance.instance_status = ...`); factory_worker_bindings, pack_compatibility_checks,
+  // pack_binding_certifications and service_activation_records are only ever .push()'d, never
+  // mutated afterward (confirmed via grep across the whole file). changedRecords()'s content-diff
+  // handles both patterns correctly, same as slice 4.
+  "factory_firm_blueprints",
+  "factory_provisioning_runs",
+  "provisioned_firm_instances",
+  "factory_worker_bindings",
+  "pack_compatibility_checks",
+  "pack_binding_certifications",
+  "service_activation_records",
+  // slice 6 (2026-09-29): all 6 Quotation/AWIA-package collections, audited call-by-call --
+  // quotation_cases, boq_extraction_aids and quotation_draft_packs are mutated in place after a
+  // .find() (e.g. approveQuotationCaseRecord's `item.status = "APPROVAL_RECORDED"`,
+  // reviewBoqExtractionAidRecord's `item.extraction_status = ...`,
+  // reviewQuotationDraftPackRecord's `item.draft_status = ...`; issueQuotationDraftPackRecord
+  // additionally cross-mutates a quotation_draft_packs row and a quotation_cases row together
+  // in one call, which changedRecords() handles fine since each collection is diffed
+  // independently); quotation_issue_records and quotation_receivable_preparations are only ever
+  // .push()'d, never mutated afterward; awia_firm_package_assignments goes through upsertById()
+  // (matches by id, merges or pushes), the same pattern already proven safe in slice 4.
+  "quotation_cases",
+  "boq_extraction_aids",
+  "quotation_draft_packs",
+  "quotation_issue_records",
+  "quotation_receivable_preparations",
+  "awia_firm_package_assignments",
+  // slice 7 (2026-09-29): all 6 Administration collections, audited call-by-call --
+  // administration_skill_bindings, administrative_deadlines and transmittal_drafts are
+  // create-only (.push(), never mutated afterward); correspondence_records is mutated in place
+  // elsewhere (issueQuotationDraftPackRecord's `correspondence.status = "ISSUED_BY_HUMAN"`);
+  // document_register_entries and document_revision_records are both mutated in place by
+  // addDocumentRevisionRecord (`entry.current_revision_id = revision.id`,
+  // `previous.status = "SUPERSEDED"`). persistAdministrationFromStore's hand-rolled per-column
+  // insert loops (not a generic record-jsonb array like the domains above) are updated to filter
+  // through changedRecords() the same way.
+  "administration_skill_bindings",
+  "correspondence_records",
+  "document_register_entries",
+  "document_revision_records",
+  "administrative_deadlines",
+  "transmittal_drafts",
+  // slice 8 (2026-09-29): all 5 Commercial Operations collections, audited call-by-call --
+  // commercial_skill_bindings, proposal_dispatch_records (create-only by construction, its
+  // insert is "on conflict do nothing") and receivable_follow_ups are create-only; sales_pipeline_records
+  // and expense_records are mutated in place elsewhere (dispatchProposalRecord's
+  // `opportunity.stage = "PROPOSAL_SENT"`, approveExpenseRecord's `item.status = "APPROVED"`).
+  "commercial_skill_bindings",
+  "sales_pipeline_records",
+  "proposal_dispatch_records",
+  "expense_records",
+  "receivable_follow_ups",
+  // slice 9 (2026-09-29): all 5 Technical Delivery collections, audited call-by-call --
+  // technical_skill_bindings, drawing_review_records, calculation_input_sets and
+  // delivery_package_records are create-only; technical_qa_findings is mutated in place by
+  // resolveTechnicalQaFindingRecord's `item.status = "RESOLVED"`.
+  "technical_skill_bindings",
+  "drawing_review_records",
+  "calculation_input_sets",
+  "technical_qa_findings",
+  "delivery_package_records"
+];
+
+function captureRecordBaseline(store) {
+  const baseline = {};
+  for (const name of RECORD_DEDUP_COLLECTIONS) {
+    const map = new Map();
+    for (const record of store[name] ?? []) {
+      if (record?.id) map.set(record.id, JSON.stringify(record));
+    }
+    baseline[name] = map;
+  }
+  return baseline;
+}
+
+// Used inside a persist*FromStore function to get only the rows worth upserting this request. A
+// record with no `id`, or a collection not opted into RECORD_DEDUP_COLLECTIONS (baseline is
+// undefined for it), is returned unfiltered -- same as today's always-upsert-everything behavior.
+function changedRecords(store, name, recordBaseline) {
+  const map = recordBaseline?.[name];
+  const records = store[name] ?? [];
+  if (!map) return records;
+  return records.filter((record) => {
+    if (!record?.id) return true;
+    const prior = map.get(record.id);
+    return prior === undefined || prior !== JSON.stringify(record);
+  });
+}
+
 export async function withStore(mutator) {
   const store = await loadStore();
+  const ledgerBaseline = captureLedgerBaseline(store);
+  const recordBaseline = captureRecordBaseline(store);
   const result = await mutator(store);
-  await saveStore(store);
+  await saveStore(store, ledgerBaseline, recordBaseline);
   return result;
 }
 
 async function withAppState(mutator) {
   const store = await loadStore();
+  const ledgerBaseline = captureLedgerBaseline(store);
+  const recordBaseline = captureRecordBaseline(store);
   const result = await mutator(store);
-  await savePostgresStore(store);
+  await savePostgresStore(store, ledgerBaseline, recordBaseline);
   return result;
 }
 
-export async function readStore() {
-  return loadStore();
+// Read-side tenant scoping, first usable entry point (2026-09-30): pass tenantId when a caller
+// genuinely only needs one tenant's data and isn't also about to mutate/save the store in the same
+// call (that's withStore/withAppState, deliberately left unscoped for now -- see loadPostgresStore's
+// comment). Every existing call site (readStore() with no argument) is completely unaffected.
+export async function readStore(tenantId = null) {
+  return loadStore(tenantId);
 }
 
 export function requireFields(body, fields) {
@@ -4808,7 +5953,28 @@ export async function resetStore() {
 
 function getPool() {
   if (!pool) {
-    pool = new Pool({ connectionString: databaseUrl });
+    // HM-S7 Phase 4f, slice 2 (2026-09-29): loadPostgresStore() now fires its ~120 read queries
+    // concurrently instead of one at a time (see its comment), so this pool needs enough
+    // connections for that fan-out to actually run in parallel rather than queueing behind the
+    // previous default of 10. DATABASE_POOL_MAX lets this be tuned per-environment.
+    //
+    // HM-S7 Phase 4f, hotfix (2026-09-29): the default here was 20, which broke login in
+    // production with "(EMAXCONNSESSION) max clients reached in session mode - max clients are
+    // limited to pool_size: 15" -- Supabase's Session Mode connection pooler (typically the
+    // port-5432 connection string) caps how many real Postgres connections it will hand out at
+    // once, and this app's own pool was asking for more of them than that cap allows, on top of
+    // whatever other connections share that same pooler. Lowered the default to 10 (below the
+    // reported cap of 15) so this doesn't reproduce out of the box. If DATABASE_POOL_MAX is set
+    // in the environment, that value still wins -- it must stay below your Supabase project's
+    // pooler pool_size (Project Settings -> Database -> Connection pooling), with headroom for
+    // any other services sharing that same pooler. For real throughput at this fan-out size, the
+    // more correct fix is switching DATABASE_URL to Supabase's Transaction Mode pooler
+    // (typically port 6543 instead of 5432) -- it's built for many short-lived concurrent
+    // connections like this read fan-out, unlike Session Mode.
+    pool = new Pool({
+      connectionString: databaseUrl,
+      max: Number(process.env.DATABASE_POOL_MAX) || 10
+    });
   }
   return pool;
 }
@@ -5225,6 +6391,10 @@ function stripRelationalCollections(store) {
   quotation_issue_records: [],
   quotation_receivable_preparations: [],
   awia_firm_package_assignments: [],
+  // ADR-089 W1: file_objects has its own relational table (migration 0048), so it is stripped
+  // from the app_state blob like every other relational collection.
+  file_objects: [],
+  work_requests: [],
   service_packs: [],
   service_skus: [],
   worker_templates: [],

@@ -31,12 +31,12 @@ export async function getEngagement(id) {
   return rows[0] ?? null;
 }
 
-export async function createEngagement(record) {
-  return insertRow("engagements", ENGAGEMENTS_COLUMNS, record);
+export async function createEngagement(record, client = null) {
+  return insertRow("engagements", ENGAGEMENTS_COLUMNS, record, client);
 }
 
-export async function updateEngagement(id, patch) {
-  return updateRowById("engagements", ENGAGEMENTS_COLUMNS, id, patch);
+export async function updateEngagement(id, patch, client = null) {
+  return updateRowById("engagements", ENGAGEMENTS_COLUMNS, id, patch, client);
 }
 
 // --- projects ---
@@ -55,12 +55,12 @@ export async function getProject(id) {
   return rows[0] ?? null;
 }
 
-export async function createProject(record) {
-  return insertRow("projects", PROJECTS_COLUMNS, record);
+export async function createProject(record, client = null) {
+  return insertRow("projects", PROJECTS_COLUMNS, record, client);
 }
 
-export async function updateProject(id, patch) {
-  return updateRowById("projects", PROJECTS_COLUMNS, id, patch);
+export async function updateProject(id, patch, client = null) {
+  return updateRowById("projects", PROJECTS_COLUMNS, id, patch, client);
 }
 
 // --- work_packages ---
@@ -79,12 +79,12 @@ export async function getWorkPackage(id) {
   return rows[0] ?? null;
 }
 
-export async function createWorkPackage(record) {
-  return insertRow("work_packages", WORK_PACKAGES_COLUMNS, record);
+export async function createWorkPackage(record, client = null) {
+  return insertRow("work_packages", WORK_PACKAGES_COLUMNS, record, client);
 }
 
-export async function updateWorkPackage(id, patch) {
-  return updateRowById("work_packages", WORK_PACKAGES_COLUMNS, id, patch);
+export async function updateWorkPackage(id, patch, client = null) {
+  return updateRowById("work_packages", WORK_PACKAGES_COLUMNS, id, patch, client);
 }
 
 // --- tasks ---
@@ -103,12 +103,12 @@ export async function getTask(id) {
   return rows[0] ?? null;
 }
 
-export async function createTask(record) {
-  return insertRow("tasks", TASKS_COLUMNS, record);
+export async function createTask(record, client = null) {
+  return insertRow("tasks", TASKS_COLUMNS, record, client);
 }
 
-export async function updateTask(id, patch) {
-  return updateRowById("tasks", TASKS_COLUMNS, id, patch);
+export async function updateTask(id, patch, client = null) {
+  return updateRowById("tasks", TASKS_COLUMNS, id, patch, client);
 }
 
 // --- technical_skill_bindings ---

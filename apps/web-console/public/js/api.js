@@ -17,6 +17,10 @@
 // once at boot, then attach it to every request.
 
 import { getAccessToken } from "./auth.js";
+import {
+  resolveIdentityFromStore as resolveIdentityFromStoreShared,
+  scopeStoreToFirm,
+} from "/shared/identity-resolution.mjs";
 
 const API_PREFIX = "/api";
 
@@ -68,8 +72,36 @@ function scopedBody(body) {
   return { tenant_id: identity.tenant_id, firm_id: identity.firm_id, ...(body ?? {}) };
 }
 
+// Phase 6 slice 6d: thin in-memory GET cache, shared across every page mount
+// (this module is a singleton -- every page imports the same `api` object).
+// Without it, switching Dashboard -> Team -> Dashboard re-fetches the whole
+// store from scratch every time, even though nothing changed in between.
+//
+// Keyed by the exact request path (already includes ?tenant_id=&firm_id=
+// from withScope(), so different firms/scopes never collide). Invalidation
+// is deliberately blunt: any successful POST clears the entire cache, rather
+// than trying to model which GET endpoints each POST route actually affects
+// -- request() is the only fetch path in this app (every api.* method goes
+// through it), so a full clear on write is guaranteed correct, just
+// occasionally fetches a couple of endpoints that a given write didn't
+// actually touch. A short TTL is kept as a safety net for anything that
+// might mutate state outside this module's own POST calls (there isn't
+// anything today, but it costs nothing to have).
+const GET_CACHE_TTL_MS = 15000;
+const getCache = new Map(); // path -> { data, expiresAt }
+
+// Exposed for tests and for any future explicit "refresh" affordance --
+// not called anywhere in the app today since POST already invalidates.
+export function clearCache() {
+  getCache.clear();
+}
+
 async function request(path, options = {}) {
   const method = options.method ?? "GET";
+  if (method === "GET" && !options.skipCache) {
+    const cached = getCache.get(path);
+    if (cached && cached.expiresAt > Date.now()) return cached.data;
+  }
   const body = method === "POST" ? scopedBody(options.body) : options.body;
   const res = await fetch(API_PREFIX + path, {
     method,
@@ -85,7 +117,53 @@ async function request(path, options = {}) {
     err.code = payload?.error?.code;
     throw err;
   }
-  return payload?.data ?? payload;
+  const data = payload?.data ?? payload;
+  if (method === "GET") {
+    getCache.set(path, { data, expiresAt: Date.now() + GET_CACHE_TTL_MS });
+  } else if (method === "POST") {
+    getCache.clear();
+  }
+  return data;
+}
+
+// ADR-089 W1 (B1): firm file upload/download. The API takes the raw file bytes as the request
+// body (POST /files/upload?tenant_id=&firm_id=&filename=...) -- no multipart -- so these bypass
+// request()'s JSON serialization. Downloads need the auth headers too (anonymous downloads are
+// refused server-side), so a plain <a href> cannot be used: fetch -> Blob -> temporary link.
+async function uploadFile(file, { classification = "CLIENT_CONFIDENTIAL", purpose = "WORK_INPUT" } = {}) {
+  const query = `filename=${encodeURIComponent(file.name)}&classification=${encodeURIComponent(classification)}&purpose=${encodeURIComponent(purpose)}`;
+  const res = await fetch(API_PREFIX + withScope(`/files/upload?${query}`), {
+    method: "POST",
+    headers: { "content-type": file.type || "application/octet-stream", ...(await authHeaders()) },
+    body: file,
+  });
+  let payload = null;
+  try { payload = await res.json(); } catch { /* non-JSON error body */ }
+  if (!res.ok || payload?.ok === false) {
+    const err = new Error(payload?.error?.message ?? `Upload failed (${res.status})`);
+    err.status = res.status;
+    err.code = payload?.error?.code;
+    throw err;
+  }
+  getCache.clear();
+  return payload.data;
+}
+
+async function downloadFile(fileId, filename = "download") {
+  const res = await fetch(API_PREFIX + withScope(`/files/${encodeURIComponent(fileId)}/download`), { headers: { ...(await authHeaders()) } });
+  if (!res.ok) {
+    let message = `Download failed (${res.status})`;
+    try { message = (await res.json())?.error?.message ?? message; } catch { /* binary or empty */ }
+    throw new Error(message);
+  }
+  const url = URL.createObjectURL(await res.blob());
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
 export const api = {
@@ -119,6 +197,23 @@ export const api = {
   prepareClientDeliveryDraft: (body) => request("/awia/virtual-staff/client-delivery-draft", { method: "POST", body }),
   markClientDeliverySent: (body) => request("/awia/virtual-staff/client-delivery-draft/mark-sent", { method: "POST", body }),
   archiveWorkdeskItem: (body) => request("/awia/virtual-staff/workdesk-item/archive", { method: "POST", body }),
+  decideClassAApproval: (body) => request("/awia/virtual-staff/output-class-a-approval", { method: "POST", body }),
+  uploadFile,
+  downloadFile,
+  // ADR-090 W2: owner work requests (the firm's front door) + internal work completion.
+  getRequestTypes: () => request("/work-requests/request-types"),
+  createWorkRequest: (body) => request("/work-requests", { method: "POST", body }),
+  assignWorkRequest: (body) => request("/work-requests/assign", { method: "POST", body }),
+  cancelWorkRequest: (body) => request("/work-requests/cancel", { method: "POST", body }),
+  addWorkRequestFiles: (body) => request("/work-requests/add-files", { method: "POST", body }),
+  completeInternalWork: (body) => request("/awia/virtual-staff/workdesk-item/complete-internal", { method: "POST", body }),
+  // ADR-092 W3: the worker runs its skill over the request's inputs; the owner corrects inputs.
+  runSkill: (body) => request("/awia/virtual-staff/workdesk-item/run-skill", { method: "POST", body }),
+  updateWorkRequestInputs: (body) => request("/work-requests/update-inputs", { method: "POST", body }),
+  // ADR-093 W4: item conversation (owner notes/answers) and the document register.
+  postItemMessage: (body) => request("/awia/virtual-staff/workdesk-item/message", { method: "POST", body }),
+  registerDocument: (body) => request("/documents", { method: "POST", body }),
+  reviseDocument: (body) => request("/documents/revise", { method: "POST", body }),
   provisionPilotStaff: (body) => request("/awia/virtual-staff/provision-pilot", { method: "POST", body }),
   evaluateTaskReadiness: (body) => request("/awia/virtual-staff/task-readiness", { method: "POST", body }),
   createClient: (body) => request("/clients", { method: "POST", body }),
@@ -142,41 +237,14 @@ export function fallbackActor(tenantId, firmId) {
   return { id: identity?.actor_id ?? "console-operator", display_name: "Console Operator", tenant_id: tenantId, firm_id: firmId };
 }
 
-// Replicates apps/web/public/app.js's activeFirmInStore() / activeTenantInStore()
-// / latestPrincipalActor() (read directly from that file): pick the active
-// firm (prefer one with an ACTIVE subscription package, skip archived
-// PD-H2 pilot firms, else the most recently created firm), its tenant, and
-// the most recently created HUMAN actor scoped to that firm. Call once
-// after GET /mvp/store at boot and pass the result to setIdentity().
+// Phase 6 slice 6b: this used to be a hand-copy of apps/web/public/app.js's
+// activeFirmInStore()/activeTenantInStore()/latestPrincipalActor() (see
+// claude/vfirm-architecture-review.md, Slice 6a). Both frontends now import
+// the one canonical implementation from packages/core-domain, served at
+// /shared/identity-resolution.mjs. Call once after GET /mvp/store at boot
+// and pass the result to setIdentity().
 export function resolveIdentityFromStore(store) {
-  const firms = store?.firms ?? [];
-  const tenants = store?.tenants ?? [];
-  const packages = store?.subscription_packages ?? [];
-  const actors = store?.actors ?? [];
-
-  const isArchivedPilotFirm = (firm) => {
-    const tenant = tenants.find((t) => t.id === firm?.tenant_id);
-    return /\bPD[- ]?H2\b/i.test(`${firm?.name ?? ""} ${tenant?.name ?? ""}`);
-  };
-
-  const selectable = firms.filter((firm) => !isArchivedPilotFirm(firm));
-  const pool = selectable.length ? selectable : firms;
-  const subscribedFirm = [...pool].reverse().find((firm) =>
-    packages.some((pkg) => pkg.firm_id === firm.id && pkg.package_status === "ACTIVE")
-  );
-  const firm = subscribedFirm ?? pool[pool.length - 1] ?? firms[firms.length - 1] ?? null;
-  const tenant = firm ? tenants.find((t) => t.id === firm.tenant_id) ?? null : tenants[tenants.length - 1] ?? null;
-  const actor = firm ? [...actors].reverse().find((a) => a.firm_id === firm.id && a.actor_type === "HUMAN") ?? null : null;
-
-  return {
-    tenant_id: actor?.tenant_id ?? firm?.tenant_id ?? tenant?.id ?? null,
-    firm_id: actor?.firm_id ?? firm?.id ?? null,
-    actor_id: actor?.actor_id ?? actor?.id ?? null,
-    role: actor?.role ?? "principal",
-    firm,
-    tenant,
-    actor,
-  };
+  return resolveIdentityFromStoreShared(store);
 }
 
 // SECURITY FIX (post-HM-S4, 2026-09-21): GET /mvp/store is deliberately a
@@ -194,21 +262,17 @@ export function resolveIdentityFromStore(store) {
 // put multiple real firms in one shared live database). Every content page
 // must filter through this before rendering.
 //
-// A record is "firm-scoped" if it carries a firm_id field at all; only those
-// records are filtered down to the current firm. Arrays whose records don't
-// carry firm_id (firms, tenants themselves) are left untouched -- they are
-// reference/identity data, not a specific firm's own data, and filtering
-// them would break nothing that reads them today but is deliberately not
-// the mission of this function.
+// UPDATE (Phase 6 slice 6b, 2026-09-30): this used to only check a literal
+// firm_id field, which missed specialist_assignments, collaboration_workspaces,
+// collaboration_requests, and responsibility_matrices -- those key firm
+// ownership by requesting_firm_id/provider_firm_id/accountable_firm_id
+// instead, so every other firm's rows were still leaking through here (see
+// claude/vfirm-architecture-review.md, Slice 6a finding #4). Now delegates
+// to the shared scopeStoreToFirm(), which checks all four firm-id fields
+// plus a relationship/client/project fallback chain, same as apps/web.
 export function scopeStoreToCurrentFirm(store) {
-  if (!identity?.firm_id || !store || typeof store !== "object") return store;
-  const scoped = {};
-  for (const [key, value] of Object.entries(store)) {
-    if (!Array.isArray(value)) { scoped[key] = value; continue; }
-    const isFirmScoped = value.some((item) => item && typeof item === "object" && "firm_id" in item);
-    scoped[key] = isFirmScoped ? value.filter((item) => item?.firm_id === identity.firm_id) : value;
-  }
-  return scoped;
+  if (!identity?.firm || !identity?.tenant || !store || typeof store !== "object") return store;
+  return scopeStoreToFirm(store, identity.firm, identity.tenant);
 }
 
 // Reference data for the "Hire a worker" panel (My Team).

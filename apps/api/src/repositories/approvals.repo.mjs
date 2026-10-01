@@ -31,10 +31,16 @@ export async function getApproval(id) {
   return rows[0] ?? null;
 }
 
-export async function createApproval(record) {
-  return insertRow("approvals", APPROVALS_COLUMNS, record);
+// HM-S7 Phase 4b (2026-09-28): optional trailing `client` lets a caller that already has a
+// transaction open on its own pg client (e.g. store.mjs's approveProposalRecord /
+// reviewDeliverableRecord, which insert an approval alongside other table writes in one
+// begin/commit) run this insert on that same connection instead of the shared pool -- so
+// wiring a handler onto this repository layer doesn't weaken a transaction it already had.
+// Omitting it keeps the original standalone-pool behavior for any other caller.
+export async function createApproval(record, client = null) {
+  return insertRow("approvals", APPROVALS_COLUMNS, record, client);
 }
 
-export async function updateApproval(id, patch) {
-  return updateRowById("approvals", APPROVALS_COLUMNS, id, patch);
+export async function updateApproval(id, patch, client = null) {
+  return updateRowById("approvals", APPROVALS_COLUMNS, id, patch, client);
 }

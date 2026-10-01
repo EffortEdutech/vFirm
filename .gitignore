@@ -20,3 +20,5 @@ data/*.json
 # Graphify generated graph output
 graphify-out/
 .graphify-work/
+# ADR-089 W1: locally stored uploaded firm files (client-confidential) -- never commit.
+data/files/

@@ -130,3 +130,75 @@ already sends, see "Identity / tenant scoping" above) when a request body
 has no `actor` field, so this app doesn't need to send one explicitly.
 `fallbackActor()` in `api.js` is kept as an opt-in for any caller that wants
 to pass `actor` in the body anyway.
+
+## Workdesk is actionable, with real files (ADR-089 W1, 2026-09-30)
+
+The Workdesk now drives the whole governed loop from this console (previously read-only here):
+
+- **Inbox** -- open tasks nobody has been given yet. *Assign…* opens an inline form: worker,
+  what they should do (per-role list mirroring the server's authority-gate tool policy), written
+  instructions, **input files** (uploaded to firm storage, attached as `file:<id>` evidence refs),
+  file sensitivity, optional free-text reference. At least one file or reference is required
+  (the authority gate refuses work with no evidence).
+- **Pending** -- *Get their draft*, or *Attach output file…* for work the worker cannot produce
+  automatically yet (decision D4: owner-completable). Items the owner sent back show as `REWORK`
+  with the revision note.
+- **Approval** -- inputs and output side by side; *Approve* / *Request revision* (note required) /
+  *Reject*; *Grant Class A approval* first where the skill requires it; rejected items can be
+  dismissed to the archive.
+- **Outbox** -- *Prepare for client* (the approved output file carries into the delivery draft)
+  and *Mark sent* (owner record-keeping only; vFirm never transmits to the client).
+- **Archived** -- delivered or dismissed.
+
+Every file chip downloads through `GET /api/files/<id>/download` with the signed-in identity
+(fetch -> Blob, since anonymous downloads are refused). Uploads go to `POST /api/files/upload`
+as the raw file body. Server side: `apps/api/src/file-storage.mjs`, `file_objects` collection
+(migration `0048_work_intake_file_objects.sql`), smoke test `npm run check:w1:file-storage-and-rework`.
+
+## "+ New request" and work requests (ADR-090 W2, 2026-10-01)
+
+- **+ New request** (topbar, every Owner page) opens a drawer: *what do you need* (15 plain-English
+  request types grouped by position, Class A flagged), *the brief* (title, instructions, input
+  files, sensitivity, reference), *for whom* (the firm's own internal work, or one of a client's
+  projects), priority and due date, and *who does it* (leave it in the Inbox, or assign now to an
+  eligible active worker).
+- **Workdesk Inbox** lists submitted requests by priority with the Clerk's (ARO-01, deterministic)
+  suggestion, *Assign* (eligible workers only), *Add files* and *Cancel*. Project tasks from
+  accepted proposals still appear below.
+- **Internal work** (no client) is approved like any other work and then *Mark complete* in the
+  Outbox -- it can never be prepared for a client.
+- API: `POST /work-requests`, `/work-requests/assign`, `/work-requests/cancel`,
+  `/work-requests/add-files`, `GET /work-requests/request-types`,
+  `POST /awia/virtual-staff/workdesk-item/complete-internal`. Smoke test: `npm run check:w2:work-requests`.
+
+## Workers run their skill on your files (ADR-092 W3, 2026-10-01)
+
+- Five request types are **runnable**: *Sort out an admin request* (ARO-01), *Reconcile bank vs
+  books* (FAO-11), *Qualify and score a lead* (SAO-03), *Plan who does what* (OPO-09) and
+  *Prepare a new-hire onboarding* (ARO-10, Class A). The New Request drawer shows their fields and
+  labelled file slots (e.g. bank statement + book entries, CSV or Excel .xlsx).
+- In **Pending**, press the worker's button (e.g. *Reconcile*). The worker reads the files, runs
+  its deterministic skill and hands you a draft plus a downloadable CSV. If something is missing the
+  row says **Needs input** (what to add); fix it with *Edit inputs* or *Add files* (pick which
+  file it is -- a new file replaces the old one in that slot) and press the button again.
+- **Approval** shows how each draft was made ("Worked out by FAO-11 from ..."). Review, Class A
+  approval and the draft-only rule are unchanged. Other request types: attach the finished file.
+- API: `POST /awia/virtual-staff/workdesk-item/run-skill`, `POST /work-requests/update-inputs`;
+  `form_inputs` / `file_roles` on `POST /work-requests`, `file_role` on `/work-requests/add-files`.
+  Smoke test: `npm run check:w3:skill-runner`.
+
+## Conversations, filing, Documents and shortcuts (ADR-093 W4, 2026-10-01)
+
+- **Questions from your team** (Workdesk Inbox): when a worker can't run because something is
+  missing, the item moves to the Inbox with what they need. Reply on its **Conversation** (attach
+  files there too), *Edit inputs* or *Add files* -- the work goes back to the worker -- then
+  *Try again*. Every request's item keeps a conversation: hand-over, questions, your notes and
+  files, drafts and review decisions, and where it was filed.
+- **Filing**: marking client work sent, or internal work complete, files the approved output in
+  **Documents** as `WR-xxxx-OUT` (linked to the client project when there is one).
+- **Documents** (Firm > Documents): search and filter the register, download any revision, add a
+  new revision, or *Add a document* yourself (numbered DOC-0001...).
+- **Shortcuts**: *Give work* on each active worker in My Team, a *What your team can do* panel,
+  *Request work* on each project, and the Dashboard's **Needs you** tray.
+- API: `POST /awia/virtual-staff/workdesk-item/message`, `POST /documents`, `POST /documents/revise`;
+  workdesk status `NEEDS_INFO`. Smoke test: `npm run check:w4:collaboration-and-filing`.

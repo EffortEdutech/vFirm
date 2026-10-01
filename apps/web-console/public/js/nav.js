@@ -28,7 +28,11 @@ export const OWNER_NAV = [
   },
   {
     category: "Firm",
-    items: [{ id: "firm-settings", label: "Firm Settings", icon: "⚙" }],
+    items: [
+      // ADR-093 W4 (F3): the firm's document register -- uploads and filed work outputs.
+      { id: "documents", label: "Documents", icon: "▧" },
+      { id: "firm-settings", label: "Firm Settings", icon: "⚙" },
+    ],
   },
 ];
 
@@ -69,6 +73,7 @@ export const PAGE_META = {
   sales: { eyebrow: "Clients", title: "Clients & Sales", desc: "Enquiries, opportunities and proposals." },
   projects: { eyebrow: "Clients", title: "Projects", desc: "Active and delivered client engagements." },
   finance: { eyebrow: "Finance", title: "Finance", desc: "Cash position, invoices and expenses." },
+  documents: { eyebrow: "Firm", title: "Documents", desc: "Every file your firm keeps: uploads and approved work, with revisions." },
   "firm-settings": { eyebrow: "Firm", title: "Firm Settings", desc: "Profile, workspace and governance settings." },
 
   "admin-firms": { eyebrow: "Platform", title: "Firms & Tenants", desc: "Every firm running on the platform." },

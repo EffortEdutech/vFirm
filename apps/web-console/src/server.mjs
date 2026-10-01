@@ -11,6 +11,10 @@ const publicDir = join(root, "apps/web-console/public");
 const port = Number(process.env.VFIRM_WEB_CONSOLE_PORT ?? 3092);
 const apiBase = process.env.VFIRM_API_BASE ?? "http://127.0.0.1:3091";
 
+// Phase 6 slice 6b: same shared identity-resolution module apps/web now
+// serves at this same path -- see that server.mjs's matching comment.
+const sharedIdentityResolutionPath = join(root, "packages/core-domain/src/identity-resolution.mjs");
+
 const contentTypes = new Map([
   [".html", "text/html; charset=utf-8"],
   [".css", "text/css; charset=utf-8"],
@@ -52,6 +56,10 @@ const server = createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
     if (url.pathname.startsWith("/api/")) return proxyApi(req, res, url);
     if (url.pathname === "/favicon.ico") return send(res, 204, "");
+    if (url.pathname === "/shared/identity-resolution.mjs") {
+      const file = await readFile(sharedIdentityResolutionPath);
+      return send(res, 200, file, "text/javascript; charset=utf-8");
+    }
     const pathname = url.pathname === "/" ? "/index.html" : url.pathname;
     const target = normalize(join(publicDir, pathname));
     if (!target.startsWith(publicDir)) return send(res, 403, "Forbidden");

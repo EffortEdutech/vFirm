@@ -130,7 +130,9 @@ try {
 
   // Human "Send back" then "Approve" loop, exactly as the Work screen offers both buttons.
   const revised = await post("/awia/virtual-staff/output-review", { tenant_id: firm.tenant_id, firm_id: firm.id, output_draft_id: draft.output_draft.id, review_decision: "REVISION_REQUIRED", review_notes: "Please add last quarter's comparison." }, h);
-  assert.equal(revised.workdesk_item.workdesk_status, "REVIEW_ACTION_REQUIRED");
+  // ADR-089 W1 (B3): "Send back" now returns the item to the worker as REWORK instead of the old
+  // REVIEW_ACTION_REQUIRED dead end.
+  assert.equal(revised.workdesk_item.workdesk_status, "REWORK");
   const approved = await post("/awia/virtual-staff/output-review", { tenant_id: firm.tenant_id, firm_id: firm.id, output_draft_id: draft.output_draft.id, review_decision: "APPROVED_FOR_CLIENT_DRAFT", review_notes: "Looks good now." }, h);
   assert.equal(approved.output_review.review_decision, "APPROVED_FOR_CLIENT_DRAFT");
   assert.equal(approved.workdesk_item.workdesk_status, "REVIEWED_FOR_CLIENT_DRAFT");

@@ -31,6 +31,10 @@ const STATUS_TONE = {
   // distinct wait, not an ordinary review -- gets its own tone rather than
   // falling through to "default" like an unrecognized status would.
   class_a_approval_pending: "amber", class_a_approved: "moss", class_a_denied: "rose",
+  // ADR-089 W1: owner asked for a revision -- back with the worker; plus the Workdesk's real states.
+  rework: "amber", assigned: "amber", output_drafted: "amber", review_action_required: "rose", reviewed_for_client_draft: "moss", client_delivery_draft_prepared: "moss", archived_sent: "moss",
+  // ADR-093 W4: the worker is waiting on the owner.
+  needs_info: "rose", work_output: "moss", current: "moss", superseded: "default",
 };
 
 export function statusPill(status) {

@@ -52,8 +52,8 @@ export async function getWorkerInstance(id) {
   return rows[0] ?? null;
 }
 
-export async function createWorkerInstance(record) {
-  return insertRow("worker_instances", WORKER_INSTANCES_COLUMNS, record);
+export async function createWorkerInstance(record, client = null) {
+  return insertRow("worker_instances", WORKER_INSTANCES_COLUMNS, record, client);
 }
 
 export async function updateWorkerInstance(id, patch) {
@@ -76,8 +76,8 @@ export async function getTaskOutput(id) {
   return rows[0] ?? null;
 }
 
-export async function createTaskOutput(record) {
-  return insertRow("task_outputs", TASK_OUTPUTS_COLUMNS, record);
+export async function createTaskOutput(record, client = null) {
+  return insertRow("task_outputs", TASK_OUTPUTS_COLUMNS, record, client);
 }
 
 export async function updateTaskOutput(id, patch) {
@@ -100,8 +100,8 @@ export async function getToolInvocation(id) {
   return rows[0] ?? null;
 }
 
-export async function createToolInvocation(record) {
-  return insertRow("tool_invocations", TOOL_INVOCATIONS_COLUMNS, record);
+export async function createToolInvocation(record, client = null) {
+  return insertRow("tool_invocations", TOOL_INVOCATIONS_COLUMNS, record, client);
 }
 
 export async function updateToolInvocation(id, patch) {

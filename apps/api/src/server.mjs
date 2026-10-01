@@ -8,7 +8,7 @@ import { apiContracts } from "../../../packages/core-domain/src/api-contracts.mj
 import { formworkServicePack } from "../../../packages/service-packs/src/formwork.mjs";
 import { buildAwiaStaffDepartmentDashboard } from "../../../packages/core-domain/src/awia-virtual-staff-department-dashboard.mjs";
 import { buildAwiaFirmPayrollSummary } from "../../../packages/core-domain/src/awia-virtual-staff-payroll.mjs";
-import { acceptProposalRecord, approveProposalRecord, createClientRecord, completeTaskRecord, createDeliverableDraftRecord, createEvidenceBundleRecord, createFirmRecord, createIntakeSessionRecord, createInvoiceRecord, createMarketplaceListingRecord, updateMarketplaceListingStatusRecord, createDirectoryReviewBoardDecisionRecord, createPrivateDirectoryEnquiryRecord, createDirectoryEnquiryCollaborationRequestRecord, createQualificationRenewalReviewRecord, createCapacityOfferRecord, createCollaborationRequestRecord, createObservatorySnapshotRecord, createPolicyDecisionRecord, createProposalRecord, createTenantRecord, findValidProfessionalAuthority, invitePilotUserRecord, activatePilotUserRecord, revokePilotUserRecord, suspendPilotUserRecord, createSupportCaseRecord, updateSupportCaseRecord, createPilotIncidentRecord, updatePilotIncidentRecord, createPilotFeedbackRecord, createPilotAcceptanceReviewRecord, createPilotImprovementItemRecord, updatePilotImprovementItemRecord, createPilotReportPackRecord, createStakeholderReviewBoardRecord, createStakeholderReviewDecisionRecord, createPilotExpansionCohortRecord, updatePilotExpansionCohortRecord, activatePrivatePilotCohortRecord, createTenantOnboardingPlanRecord, updateTenantOnboardingPlanRecord, createReleaseCandidateGateRecord, createTenantPilotControlRecord, recordTenantUsageEventRecord, createBillingReadinessReviewRecord, createPaymentProviderConfigRecord, createSubscriptionPackageRecord, createCommercialLaunchControlRecord, issueDeliverableRecord, issueInvoiceRecord, produceTaskOutputRecord, provisionWorkerInstanceRecord, recordPaymentStatusRecord, requestToolInvocationRecord, reviewDeliverableRecord, activateWorkerInstanceRecord, assignTaskToWorkerRecord, startTaskRecord, getStoreInfo, newId, now, openProjectDeliveryRecord, provisionAwiaVirtualStaffPilotRecord, updateAwiaVirtualStaffLifecycleRecord, evaluateAwiaVirtualStaffTaskReadinessRecord, assignAwiaVirtualStaffTaskRecord, produceAwiaStaffOutputDraftRecord, reviewAwiaStaffOutputDraftRecord, decideAwiaStaffClassAApprovalRecord, prepareAwiaClientDeliveryDraftRecord, markAwiaClientDeliveryDraftSentRecord, archiveAwiaStaffWorkdeskItemRecord, appendAwiaStaffMemoryEntryRecord, openAwiaStaffConversationThreadRecord, postAwiaStaffConversationMessageRecord, updateAwiaStaffSeatBillingStatusRecord, provisionAwiaVirtualStaffFromTemplateRecord, readAwiaStaffTemplateCatalogueRecord, assignAwiaFirmPackageRecord, readAwiaFirmPackageAssignmentRecord, hireAwiaFirmWorkerRecord, purgeTestFirmRecord, readStore, requireFields, systemActor, withStore } from "./store.mjs";
+import { acceptProposalRecord, approveProposalRecord, createClientRecord, completeTaskRecord, createDeliverableDraftRecord, createEvidenceBundleRecord, createFirmRecord, createIntakeSessionRecord, createInvoiceRecord, createMarketplaceListingRecord, updateMarketplaceListingStatusRecord, createDirectoryReviewBoardDecisionRecord, createPrivateDirectoryEnquiryRecord, createDirectoryEnquiryCollaborationRequestRecord, createQualificationRenewalReviewRecord, createCapacityOfferRecord, createCollaborationRequestRecord, createObservatorySnapshotRecord, createPolicyDecisionRecord, createProposalRecord, createTenantRecord, findValidProfessionalAuthority, invitePilotUserRecord, activatePilotUserRecord, revokePilotUserRecord, suspendPilotUserRecord, createSupportCaseRecord, updateSupportCaseRecord, createPilotIncidentRecord, updatePilotIncidentRecord, createPilotFeedbackRecord, createPilotAcceptanceReviewRecord, createPilotImprovementItemRecord, updatePilotImprovementItemRecord, createPilotReportPackRecord, createStakeholderReviewBoardRecord, createStakeholderReviewDecisionRecord, createPilotExpansionCohortRecord, updatePilotExpansionCohortRecord, activatePrivatePilotCohortRecord, createTenantOnboardingPlanRecord, updateTenantOnboardingPlanRecord, createReleaseCandidateGateRecord, createTenantPilotControlRecord, recordTenantUsageEventRecord, createBillingReadinessReviewRecord, createPaymentProviderConfigRecord, createSubscriptionPackageRecord, createCommercialLaunchControlRecord, issueDeliverableRecord, issueInvoiceRecord, produceTaskOutputRecord, provisionWorkerInstanceRecord, recordPaymentStatusRecord, requestToolInvocationRecord, reviewDeliverableRecord, activateWorkerInstanceRecord, assignTaskToWorkerRecord, startTaskRecord, getStoreInfo, newId, now, openProjectDeliveryRecord, provisionAwiaVirtualStaffPilotRecord, updateAwiaVirtualStaffLifecycleRecord, evaluateAwiaVirtualStaffTaskReadinessRecord, assignAwiaVirtualStaffTaskRecord, produceAwiaStaffOutputDraftRecord, prepareAwiaSkillRunRecord, recordAwiaSkillRunIssueRecord, updateWorkRequestInputsRecord, postWorkdeskItemMessageRecord, registerFileDocumentRecord, reviseFileDocumentRecord, reviewAwiaStaffOutputDraftRecord, decideAwiaStaffClassAApprovalRecord, prepareAwiaClientDeliveryDraftRecord, markAwiaClientDeliveryDraftSentRecord, archiveAwiaStaffWorkdeskItemRecord, appendAwiaStaffMemoryEntryRecord, openAwiaStaffConversationThreadRecord, postAwiaStaffConversationMessageRecord, updateAwiaStaffSeatBillingStatusRecord, provisionAwiaVirtualStaffFromTemplateRecord, readAwiaStaffTemplateCatalogueRecord, assignAwiaFirmPackageRecord, readAwiaFirmPackageAssignmentRecord, hireAwiaFirmWorkerRecord, purgeTestFirmRecord, readStore, requireFields, systemActor, withStore, computeWorkdeskItemStatus, computeWorkdeskItemStatusLabel } from "./store.mjs";
 import { createFrontDeskEnquiryRecord, qualifyFrontDeskEnquiryRecord, createClientCommunicationDraftRecord, handoffFrontDeskEnquiryRecord } from "./store.mjs";
 import { bindAdministrationSkillsRecord, createCorrespondenceRecord, registerDocumentRecord, addDocumentRevisionRecord, createAdministrativeDeadlineRecord, completeAdministrativeDeadlineRecord, createTransmittalDraftRecord } from "./store.mjs";
 import { bindCommercialSkillsRecord, createSalesPipelineRecord, updateSalesPipelineRecord, dispatchProposalRecord, createExpenseRecord, approveExpenseRecord, createReceivableFollowUpRecord, readCashSnapshot } from "./store.mjs";
@@ -17,6 +17,13 @@ import { createNetworkProfessionalProfileRecord, createNetworkFirmProfileRecord,
 import { createNetworkConflictCheckRecord, createNetworkQualificationGateRecord, createSpecialistInvitationRecord } from "./store.mjs";
 import { createCollaborationWorkspaceRecord, grantCollaborationWorkspaceParticipantRecord, revokeCollaborationWorkspaceParticipantRecord, addCollaborationWorkspaceEvidenceRecord, createResponsibilityMatrixRecord, createSpecialistAssignmentRecord, transitionSpecialistAssignmentRecord } from "./store.mjs";
 import { addFirmMemberRecord } from "./store.mjs";
+// ADR-089 W1 (B1): firm file storage.
+import { registerFileObjectRecord, recordFileDownloadRecord, newUuid, isPostgresStore } from "./store.mjs";
+// ADR-090 W2: owner work requests (front door) + internal work completion.
+import { createWorkRequestRecord, prepareWorkRequestAssignment, recordWorkRequestAssignmentRecord, cancelWorkRequestRecord, addWorkRequestFilesRecord, completeAwiaInternalWorkdeskItemRecord } from "./store.mjs";
+import { listWorkRequestTypes } from "../../../packages/core-domain/src/awia-work-request-types.mjs";
+import { runSkill, SkillInputError } from "../../../packages/core-domain/src/awia-skill-runner.mjs";
+import { createFileStorage, fileMaxBytes, sanitizeFilename, resolveAllowedMimeType, sha256Hex, storageKeyFor, FILE_CLASSIFICATIONS } from "./file-storage.mjs";
 
 const root = process.cwd();
 const port = Number(process.env.VFIRM_API_PORT ?? 3091);
@@ -35,6 +42,7 @@ const supabaseJwks = SUPABASE_URL ? createRemoteJWKSet(new URL(`${SUPABASE_URL}/
 const supabaseAdmin = SUPABASE_URL && process.env.VFIRM_SUPABASE_SERVICE_ROLE_KEY
   ? createSupabaseClient(SUPABASE_URL, process.env.VFIRM_SUPABASE_SERVICE_ROLE_KEY, { auth: { autoRefreshToken: false, persistSession: false } })
   : null;
+const fileStorage = createFileStorage({ supabaseAdmin, root });
 const readCollections = new Map([
   ["tenants", "tenants"],
   ["persons", "persons"],
@@ -103,6 +111,8 @@ const readCollections = new Map([
   ["awia-staff-output-drafts", "awia_staff_output_drafts"],
   ["awia-staff-output-reviews", "awia_staff_output_reviews"],
   ["awia-client-delivery-drafts", "awia_client_delivery_drafts"],
+  ["file-objects", "file_objects"],
+  ["work-requests", "work_requests"],
   ["awia-staff-memory-entries", "awia_staff_memory_entries"],
   ["awia-staff-conversation-threads", "awia_staff_conversation_threads"],
   ["awia-staff-conversation-messages", "awia_staff_conversation_messages"],
@@ -345,7 +355,14 @@ function requireHumanOperationalAuthority(actor, label) {
 }
 
 function actorFromBody(body, req = null, tenant_id = null, firm_id = null) {
-  const actor = body.actor ?? devActorFromHeaders(req, tenant_id, firm_id) ?? systemActor(tenant_id, firm_id);
+  // Regression fix (2026-09-30): this used to read `body.actor ?? devActorFromHeaders(...) ?? systemActor(...)`
+  // -- a client-supplied `body.actor` was trusted ahead of any server-verified identity, letting an
+  // unauthenticated caller fully impersonate any real actor by ID (the exact write-side identity-theft
+  // gap this project's Phase 1 review was supposed to have closed on 2026-09-24; re-auditing this function
+  // directly on 2026-09-30 found it was still present in the delivered file). `body.actor` is no longer a
+  // trusted input anywhere: the only sources of identity here are a real verified request (Supabase JWT or
+  // dev-header, via devActorFromHeaders) or the synthetic system actor fallback.
+  const actor = devActorFromHeaders(req, tenant_id, firm_id) ?? systemActor(tenant_id, firm_id);
   assertActorScope(actor, { tenant_id, firm_id }, "command");
   return actor;
 }
@@ -484,6 +501,13 @@ async function readResource(req, url) {
   const collection = readCollections.get(slug);
   if (!collection) return null;
   const actor = devActorFromHeaders(req);
+  // ADR-089 W1: uploaded-file metadata (filenames, hashes) is never listed to an anonymous caller.
+  if (collection === "file_objects" && !actor) {
+    const error = new Error("A signed-in user is required to list files.");
+    error.status = 401;
+    error.code = "AUTH_REQUIRED";
+    throw error;
+  }
   assertActorScope(actor, { tenant_id: url.searchParams.get("tenant_id"), firm_id: url.searchParams.get("firm_id") }, collection);
   const store = await readStore();
   const records = Array.isArray(store[collection]) ? store[collection] : [];
@@ -817,6 +841,7 @@ const tenantExportCollections = [
   "worker_instances", "task_outputs", "tool_invocations", "pilot_handoff_records", "pilot_users", "support_cases", "pilot_incidents", "pilot_feedback", "pilot_acceptance_reviews", "pilot_improvement_items", "pilot_report_packs", "stakeholder_review_boards", "stakeholder_review_decisions",
   "tenant_pilot_controls", "tenant_usage_events", "billing_readiness_reviews", "payment_provider_configs", "subscription_packages", "commercial_launch_controls", "factory_firm_blueprints", "factory_provisioning_runs", "provisioned_firm_instances", "factory_worker_bindings", "pack_compatibility_checks", "pack_binding_certifications", "service_activation_records", "policy_decisions",
   "awia_virtual_staff_provisioning_runs", "awia_virtual_staff_seats", "awia_virtual_staff_members", "awia_staff_role_assignments", "awia_staff_package_bindings", "awia_staff_lifecycle_events", "awia_staff_authority_decisions", "awia_staff_evidence_packs", "awia_staff_task_readiness_records", "awia_staff_workdesk_items", "awia_staff_output_drafts", "awia_staff_output_reviews", "awia_client_delivery_drafts", "awia_staff_memory_entries", "awia_staff_conversation_threads", "awia_staff_conversation_messages", "awia_staff_seat_billing_events", "awia_firm_package_assignments",
+  "file_objects", "work_requests",
   "event_log", "audit_events"
 ];
 
@@ -1910,6 +1935,12 @@ async function purgeTestFirm(body, req = null) {
     error.code = "TEST_FIRM_PURGE_LOCKED";
     throw error;
   }
+  // Auth gap closed (2026-09-30, finding C.6): this had no actor check of any kind when the env flag
+  // was set -- only the flag plus the target firm's name matching a test-firm pattern
+  // (assertPurgeableTestFirmName, inside purgeTestFirmRecord) stood between an unauthenticated caller
+  // and permanently deleting a firm. Now requires a real, server-verified human actor.
+  const actor = actorFromBody(body, req, body.tenant_id, body.firm_id);
+  requireHumanOperationalAuthority(actor, "Test-firm purge (POST /internal/purge-test-firm)");
   return purgeTestFirmRecord(body);
 }
 
@@ -1945,7 +1976,8 @@ async function evaluateAwiaVirtualStaffTaskReadiness(body, req = null) {
 
 
 async function assignAwiaVirtualStaffTask(body, req = null) {
-  requireFields(body, ["tenant_id", "firm_id", "staff_code", "task_id", "tool", "client_id"]);
+  // ADR-090 W2 (D2): INTERNAL firm work has no client; every other risk class still requires one.
+  requireFields(body, body.risk_class === "INTERNAL" ? ["tenant_id", "firm_id", "staff_code", "task_id", "tool"] : ["tenant_id", "firm_id", "staff_code", "task_id", "tool", "client_id"]);
   const actor = actorFromBody(body, req, body.tenant_id, body.firm_id);
   return assignAwiaVirtualStaffTaskRecord(body, actor);
 }
@@ -3108,6 +3140,16 @@ const routes = new Map([
   ["POST /awia/virtual-staff/client-delivery-draft", prepareAwiaClientDeliveryDraft],
   ["POST /awia/virtual-staff/client-delivery-draft/mark-sent", markAwiaClientDeliveryDraftSent],
   ["POST /awia/virtual-staff/workdesk-item/archive", archiveAwiaStaffWorkdeskItem],
+  ["POST /awia/virtual-staff/workdesk-item/complete-internal", completeAwiaInternalWorkdeskItem],
+  ["POST /work-requests", createWorkRequest],
+  ["POST /work-requests/assign", assignWorkRequest],
+  ["POST /work-requests/cancel", cancelWorkRequest],
+  ["POST /work-requests/add-files", addWorkRequestFiles],
+  ["POST /work-requests/update-inputs", updateWorkRequestInputs],
+  ["POST /awia/virtual-staff/workdesk-item/run-skill", runAwiaWorkdeskSkill],
+  ["POST /awia/virtual-staff/workdesk-item/message", postWorkdeskItemMessage],
+  ["POST /documents", registerFileDocument],
+  ["POST /documents/revise", reviseFileDocument],
   ["POST /awia/virtual-staff/memory/append", appendAwiaStaffMemoryEntry],
   ["POST /awia/virtual-staff/conversation/open", openAwiaStaffConversationThread],
   ["POST /awia/virtual-staff/conversation/message", postAwiaStaffConversationMessage],
@@ -3199,6 +3241,262 @@ const routes = new Map([
   ["POST /mvp/demo-loop", createDemoLoop]
 ]);
 
+// ADR-089 W1 (B1, 2026-09-30): firm file upload/download.
+// Upload is a raw-binary POST (the file bytes ARE the body, no multipart parsing needed):
+//   POST /files/upload?tenant_id=&firm_id=&filename=&classification=&purpose=
+//   content-type: <the file's MIME type>
+// Download streams the bytes back only to a verified actor in the owning tenant/firm:
+//   GET /files/<id>/download?tenant_id=&firm_id=
+// Both require a real identity (Supabase JWT or dev headers) -- unlike command routes there is
+// no system-actor fallback, so an anonymous caller can never read or write firm files.
+function requireVerifiedActor(req, tenant_id, firm_id, label) {
+  const actor = devActorFromHeaders(req, tenant_id, firm_id);
+  if (!actor) {
+    const error = new Error(`A signed-in user is required to ${label}.`);
+    error.status = 401;
+    error.code = "AUTH_REQUIRED";
+    throw error;
+  }
+  assertActorScope(actor, { tenant_id, firm_id }, label);
+  if (!actor.tenant_id || !actor.firm_id) forbidden(`Actor must be scoped to a tenant and firm to ${label}.`);
+  return actor;
+}
+
+async function readBinaryBody(req, maxBytes) {
+  const declared = Number(req.headers["content-length"] ?? 0);
+  if (declared > maxBytes) {
+    const error = new Error(`File exceeds the ${Math.round(maxBytes / 1048576)} MB limit.`);
+    error.status = 413;
+    error.code = "FILE_TOO_LARGE";
+    throw error;
+  }
+  const chunks = [];
+  let total = 0;
+  for await (const chunk of req) {
+    total += chunk.length;
+    if (total > maxBytes) {
+      const error = new Error(`File exceeds the ${Math.round(maxBytes / 1048576)} MB limit.`);
+      error.status = 413;
+      error.code = "FILE_TOO_LARGE";
+      throw error;
+    }
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks);
+}
+
+async function uploadFirmFile(req, url) {
+  const tenant_id = url.searchParams.get("tenant_id");
+  const firm_id = url.searchParams.get("firm_id");
+  requireFields({ tenant_id, firm_id, filename: url.searchParams.get("filename") }, ["tenant_id", "firm_id", "filename"]);
+  const actor = requireVerifiedActor(req, tenant_id, firm_id, "upload files");
+  const filename = sanitizeFilename(url.searchParams.get("filename"));
+  const mime_type = resolveAllowedMimeType(filename, req.headers["content-type"]);
+  const classification = url.searchParams.get("classification") ?? "CLIENT_CONFIDENTIAL";
+  if (!FILE_CLASSIFICATIONS.includes(classification)) {
+    const error = new Error(`Unknown file classification: ${classification}`);
+    error.status = 400;
+    error.code = "VALIDATION_ERROR";
+    throw error;
+  }
+  const buffer = await readBinaryBody(req, fileMaxBytes());
+  if (buffer.length === 0) {
+    const error = new Error("Uploaded file is empty.");
+    error.status = 400;
+    error.code = "VALIDATION_ERROR";
+    throw error;
+  }
+  const file_id = isPostgresStore() ? newUuid() : newId("file");
+  const storage_key = storageKeyFor({ tenant_id, firm_id, file_id });
+  // Bytes first, record second: a file_objects row never points at bytes that failed to store.
+  await fileStorage.put(storage_key, buffer, mime_type);
+  return registerFileObjectRecord({
+    tenant_id,
+    firm_id,
+    file_id,
+    filename,
+    mime_type,
+    size_bytes: buffer.length,
+    sha256: sha256Hex(buffer),
+    storage_backend: fileStorage.backend,
+    storage_key,
+    classification,
+    purpose: url.searchParams.get("purpose") ?? "WORK_INPUT"
+  }, actor);
+}
+
+async function downloadFirmFile(req, res, url, fileId) {
+  const tenant_id = url.searchParams.get("tenant_id");
+  const firm_id = url.searchParams.get("firm_id");
+  requireFields({ tenant_id, firm_id }, ["tenant_id", "firm_id"]);
+  const actor = requireVerifiedActor(req, tenant_id, firm_id, "download files");
+  const record = await recordFileDownloadRecord({ tenant_id, firm_id, file_id: fileId }, actor);
+  const buffer = await fileStorage.get(record.storage_key);
+  if (sha256Hex(buffer) !== record.sha256) {
+    const error = new Error("Stored file failed its integrity check (SHA-256 mismatch).");
+    error.status = 500;
+    error.code = "FILE_INTEGRITY_ERROR";
+    throw error;
+  }
+  res.writeHead(200, {
+    "content-type": record.mime_type,
+    "content-length": String(buffer.length),
+    // ASCII fallback + RFC 5987 UTF-8 form, so non-Latin filenames (e.g. Malay/Arabic) never
+    // produce an invalid header.
+    "content-disposition": `attachment; filename="${record.filename.replace(/[^\x20-\x7e]/g, "_").replace(/["\\]/g, "_")}"; filename*=UTF-8''${encodeURIComponent(record.filename)}`,
+    "x-vfirm-file-sha256": record.sha256,
+    "cache-control": "no-store",
+    ...corsHeaders(req)
+  });
+  res.end(buffer);
+}
+
+// ADR-090 W2 (B2, 2026-10-01): owner work requests -- the firm's front door. See
+// createWorkRequestRecord / prepareWorkRequestAssignment in store.mjs. Assignment always runs
+// through assignAwiaVirtualStaffTaskRecord (authority gate, position/skill scope, Class A), and a
+// refusal is recorded on the request, which stays in the Inbox.
+async function runWorkRequestAssignment(body, actor) {
+  const { assignment } = await prepareWorkRequestAssignment(body);
+  try {
+    const result = await assignAwiaVirtualStaffTaskRecord(assignment, actor);
+    const workRequest = await recordWorkRequestAssignmentRecord(body, actor, { workdesk_item_id: result.workdesk_item.id });
+    return { work_request: workRequest, workdesk_item: result.workdesk_item, readiness: result.readiness };
+  } catch (error) {
+    await recordWorkRequestAssignmentRecord(body, actor, { error: error instanceof Error ? error.message : String(error) }).catch(() => {});
+    throw error;
+  }
+}
+
+async function createWorkRequest(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "title", "request_type_id"]);
+  const actor = actorFromBody(body, req, body.tenant_id, body.firm_id);
+  const workRequest = await createWorkRequestRecord(body, actor);
+  // Decision D3: the owner may assign straight away ("assign now"); otherwise it waits in the Inbox.
+  if (!body.assign_to_staff_code) return { work_request: workRequest, workdesk_item: null, assignment_error: null };
+  try {
+    const assigned = await runWorkRequestAssignment({ tenant_id: body.tenant_id, firm_id: body.firm_id, work_request_id: workRequest.id, staff_code: body.assign_to_staff_code }, actor);
+    return { ...assigned, assignment_error: null };
+  } catch (error) {
+    const current = (await readStore()).work_requests.find((record) => record.id === workRequest.id) ?? workRequest;
+    return { work_request: current, workdesk_item: null, assignment_error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+async function assignWorkRequest(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "work_request_id", "staff_code"]);
+  const actor = actorFromBody(body, req, body.tenant_id, body.firm_id);
+  return runWorkRequestAssignment(body, actor);
+}
+
+async function cancelWorkRequest(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "work_request_id"]);
+  return cancelWorkRequestRecord(body, actorFromBody(body, req, body.tenant_id, body.firm_id));
+}
+
+async function addWorkRequestFiles(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "work_request_id", "file_ids"]);
+  return addWorkRequestFilesRecord(body, actorFromBody(body, req, body.tenant_id, body.firm_id));
+}
+
+// ADR-093 W4 (B6, F3): item thread messages and document register filing from uploaded files.
+async function postWorkdeskItemMessage(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "workdesk_item_id"]);
+  return postWorkdeskItemMessageRecord(body, actorFromBody(body, req, body.tenant_id, body.firm_id));
+}
+
+async function registerFileDocument(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "file_id"]);
+  return registerFileDocumentRecord(body, actorFromBody(body, req, body.tenant_id, body.firm_id));
+}
+
+async function reviseFileDocument(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "document_register_entry_id", "file_id"]);
+  return reviseFileDocumentRecord(body, actorFromBody(body, req, body.tenant_id, body.firm_id));
+}
+
+async function updateWorkRequestInputs(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "work_request_id"]);
+  return updateWorkRequestInputsRecord(body, actorFromBody(body, req, body.tenant_id, body.firm_id));
+}
+
+// ADR-092 W3 (B4, 2026-10-01): the worker runs its skill over the owner's inputs.
+//   POST /awia/virtual-staff/workdesk-item/run-skill { tenant_id, firm_id, workdesk_item_id }
+// 1. prepareAwiaSkillRunRecord checks the item (Pending), worker (ACTIVE), request type (has a
+//    deterministic module) and that every input file is this tenant/firm's.
+// 2. The input bytes are read from firm storage and re-verified against their SHA-256.
+// 3. runSkill() (packages/core-domain/src/awia-skill-runner.mjs) produces the payload + a CSV.
+// 4. The CSV is stored as a WORK_OUTPUT file, then the draft goes through the UNCHANGED
+//    produceAwiaStaffOutputDraftRecord: draft only, human review, Class A gate, no final issue.
+// Missing inputs -> 422 SKILL_INPUT_REQUIRED with a plain-English list; the item stays Pending.
+const OUTPUT_CLASSIFICATION_RANK = ["FIRM_INTERNAL", "CLIENT_CONFIDENTIAL", "FINANCE_RESTRICTED", "HR_RESTRICTED"];
+const SKILL_OUTPUT_CLASSIFICATION = { "FAO-11": "FINANCE_RESTRICTED", "ARO-10": "HR_RESTRICTED" };
+
+async function runAwiaWorkdeskSkill(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "workdesk_item_id"]);
+  const actor = actorFromBody(body, req, body.tenant_id, body.firm_id);
+  const prep = await prepareAwiaSkillRunRecord(body);
+  const files = [];
+  for (const record of prep.files) {
+    const buffer = await fileStorage.get(record.storage_key);
+    if (sha256Hex(buffer) !== record.sha256) {
+      const error = new Error(`Input file ${record.filename} failed its integrity check (SHA-256 mismatch).`);
+      error.status = 500;
+      error.code = "FILE_INTEGRITY_ERROR";
+      throw error;
+    }
+    files.push({ id: record.id, filename: record.filename, mime_type: record.mime_type, sha256: record.sha256, buffer });
+  }
+  let result;
+  try {
+    result = runSkill(prep.skill_id, { title: prep.request.title, instructions: prep.request.instructions ?? "", form_inputs: prep.request.form_inputs ?? {}, file_roles: prep.request.file_roles ?? {}, files });
+  } catch (error) {
+    if (error instanceof SkillInputError) {
+      await recordAwiaSkillRunIssueRecord(body, actor, error.message).catch(() => {});
+      const failure = new Error(error.message);
+      failure.status = 422;
+      failure.code = error.code;
+      throw failure;
+    }
+    throw error;
+  }
+  // The output is at least as sensitive as the most sensitive input (and finance/HR skills are
+  // restricted by default).
+  const ranks = [prep.request.risk_class === "INTERNAL" ? "FIRM_INTERNAL" : "CLIENT_CONFIDENTIAL", SKILL_OUTPUT_CLASSIFICATION[prep.skill_id], ...prep.files.map((file) => file.classification)].filter(Boolean);
+  const classification = ranks.reduce((best, value) => (OUTPUT_CLASSIFICATION_RANK.indexOf(value) > OUTPUT_CLASSIFICATION_RANK.indexOf(best) ? value : best), "FIRM_INTERNAL");
+  const file_id = isPostgresStore() ? newUuid() : newId("file");
+  const storage_key = storageKeyFor({ tenant_id: body.tenant_id, firm_id: body.firm_id, file_id });
+  await fileStorage.put(storage_key, result.output_csv, "text/csv");
+  await registerFileObjectRecord({
+    tenant_id: body.tenant_id,
+    firm_id: body.firm_id,
+    file_id,
+    filename: result.output_filename,
+    mime_type: "text/csv",
+    size_bytes: result.output_csv.length,
+    sha256: sha256Hex(result.output_csv),
+    storage_backend: fileStorage.backend,
+    storage_key,
+    classification,
+    purpose: "WORK_OUTPUT",
+    linked_to: { type: "AwiaStaffWorkdeskItem", id: prep.item.id }
+  }, actor);
+  return produceAwiaStaffOutputDraftRecord({
+    tenant_id: body.tenant_id,
+    firm_id: body.firm_id,
+    workdesk_item_id: prep.item.id,
+    output_title: result.output_title,
+    output_summary: result.output_summary,
+    output_payload: result.payload,
+    output_file_id: file_id,
+    generation: { method: "DETERMINISTIC_SKILL_MODULE", skill_id: result.skill_id, input_files: result.input_files, input_notes: result.input_notes, form_inputs_used: Object.keys(prep.request.form_inputs ?? {}), boundary: result.boundary, ran_at: new Date().toISOString() }
+  }, actor);
+}
+
+async function completeAwiaInternalWorkdeskItem(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "workdesk_item_id"]);
+  return completeAwiaInternalWorkdeskItemRecord(body, actorFromBody(body, req, body.tenant_id, body.firm_id));
+}
+
 const server = createServer(async (req, res) => {
   try {
     if (req.method === "OPTIONS") {
@@ -3263,7 +3561,27 @@ const server = createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/service-packs/formwork") return sendJson(req, res, 200, { ok: true, data: { ...formworkServicePack, service_pack_record_id: FORMWORK_SERVICE_PACK_ID, service_sku_record_id: FORMWORK_SERVICE_SKU_ID } });
     if (req.method === "GET" && url.pathname === "/accounts/cash-snapshot") return sendJson(req, res, 200, { ok: true, data: await readAccountsCashSnapshot(req, url) });
     if (req.method === "GET" && url.pathname === "/database/schema") { const schema = await readFile(join(root, "infra/database/schema.sql"), "utf8"); return sendJson(req, res, 200, { ok: true, data: { path: "infra/database/schema.sql", bytes: schema.length } }); }
-    if (req.method === "GET" && url.pathname === "/mvp/store") return sendJson(req, res, 200, { ok: true, data: await readStore() });
+    if (req.method === "GET" && url.pathname === "/work-requests/request-types") return sendJson(req, res, 200, { ok: true, data: listWorkRequestTypes() });
+    if (req.method === "POST" && url.pathname === "/files/upload") return sendJson(req, res, 201, { ok: true, data: await uploadFirmFile(req, url) });
+    { const fileDownload = req.method === "GET" ? url.pathname.match(/^\/files\/([^/]+)\/download$/) : null; if (fileDownload) return await downloadFirmFile(req, res, url, decodeURIComponent(fileDownload[1])); }
+    if (req.method === "GET" && url.pathname === "/mvp/store") {
+      const storeData = await readStore();
+      // Phase 5, slice 5a (2026-09-30): attach server-computed display_status /
+      // display_status_label to each AWIA workdesk item in the response only -- new objects,
+      // never mutating storeData.awia_staff_workdesk_items in place, so this can't leak into
+      // any save/diff path (readStore() is a plain read; nothing downstream of this response
+      // writes storeData back).
+      const workdeskDrafts = storeData.awia_staff_output_drafts ?? [];
+      const workdeskDeliveries = storeData.awia_client_delivery_drafts ?? [];
+      const workdeskItems = Array.isArray(storeData.awia_staff_workdesk_items)
+        ? storeData.awia_staff_workdesk_items.map((item) => ({
+            ...item,
+            display_status: computeWorkdeskItemStatus(item, workdeskDrafts, workdeskDeliveries),
+            display_status_label: computeWorkdeskItemStatusLabel(item, workdeskDrafts),
+          }))
+        : storeData.awia_staff_workdesk_items;
+      return sendJson(req, res, 200, { ok: true, data: { ...storeData, awia_staff_workdesk_items: workdeskItems } });
+    }
     if (req.method === "GET") { const resource = await readResource(req, url); if (resource) return sendJson(req, res, resource.status, resource.body); }
     if (req.method === "POST" && url.pathname === "/mvp/reset") {
       if (process.env.VFIRM_ALLOW_FULL_STORE_RESET !== "true") {
@@ -3272,7 +3590,18 @@ const server = createServer(async (req, res) => {
       const { resetStore } = await import("./store.mjs");
       return sendJson(req, res, 200, { ok: true, data: await resetStore() });
     }
-    if (req.method === "POST" && url.pathname === "/policy/evaluate") { const input = await readJson(req); const decision = evaluatePolicy(input); const policyDecision = await createPolicyDecisionRecord(input, decision); return sendJson(req, res, 200, { ok: true, data: decision, policy_decision_id: policyDecision?.id ?? null, audit_event_id: null, correlation_id: input?.correlation_id ?? null }); }
+    if (req.method === "POST" && url.pathname === "/policy/evaluate") {
+      // Auth gap closed (2026-09-30, finding C.6): this had no actor check at all -- any caller could
+      // evaluate a policy decision and have it recorded under an arbitrary, attacker-chosen actor_id in
+      // `input.actor`. Resolves a real, server-verified actor the same way every other command route
+      // does, and uses it instead of whatever `input.actor` the caller supplied.
+      const input = await readJson(req);
+      const actor = actorFromBody(input, req, input.tenant_id ?? null, input.firm_id ?? null);
+      const scopedInput = { ...input, actor };
+      const decision = evaluatePolicy(scopedInput);
+      const policyDecision = await createPolicyDecisionRecord(scopedInput, decision);
+      return sendJson(req, res, 200, { ok: true, data: decision, policy_decision_id: policyDecision?.id ?? null, audit_event_id: null, correlation_id: input?.correlation_id ?? null });
+    }
     const handler = routes.get(`${req.method} ${url.pathname}`);
     if (handler) return sendJson(req, res, 201, { ok: true, data: await handler(await readJson(req), req) });
     sendJson(req, res, 404, { ok: false, error: { code: "NOT_FOUND", message: "Route not found." } });

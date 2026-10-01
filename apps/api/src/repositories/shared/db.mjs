@@ -48,7 +48,18 @@ async function getPool() {
   return pool;
 }
 
-export async function query(sql, params = []) {
+// HM-S7 Phase 4b (2026-09-28): every function here previously always went through the shared
+// pool, opening its own connection -- fine for a standalone read/write, but incompatible with
+// a caller (a store.mjs handler, or a future service-layer function) that needs this repo's
+// insert/update to participate in a larger multi-table transaction it already has open on its
+// own client. The optional trailing `client` parameter lets a caller pass an existing
+// `pg` client (from `pool.connect()` + `begin`) in explicitly; when omitted, behavior is
+// unchanged -- the call goes through the shared pool exactly as before. This is what makes it
+// possible to swap a hand-written insert inside an existing begin/commit block (e.g.
+// approveProposalRecord's `insert into approvals ...`) for this repository's createApproval()
+// without weakening that operation's atomicity.
+export async function query(sql, params = [], client = null) {
+  if (client) return client.query(sql, params);
   const currentPool = await getPool();
   return currentPool.query(sql, params);
 }
@@ -61,7 +72,15 @@ export async function query(sql, params = []) {
 // instead of a generated INSERT sending an explicit `null` and tripping their `not null` constraints.
 // `columnDefs` is `[{ name, jsonb }, ...]` -- the table's real column list, in schema order, with
 // `jsonb: true` marking columns that need a `::jsonb` cast and JSON.stringify() on the way in.
-export async function insertRow(table, columnDefs, record) {
+// HM-S7 Phase 4c (2026-09-28): optional `options.onConflictDoNothing` appends
+// `on conflict (id) do nothing`, matching the idempotent-upsert semantics several
+// hand-written inserts already relied on (e.g. store.mjs's upsertPolicyDecision/
+// upsertAuditEvent/upsertEventLog, which are safe to call twice with the same id -- a
+// plain insert would throw a duplicate-key error instead of silently no-op'ing). Omitting
+// it keeps the original plain-insert behavior for every other caller. When a conflict is
+// hit, `rows[0]` comes back undefined (no row to return) -- callers that rely on
+// on-conflict-do-nothing already don't use the returned row (see audit-ledger-platform.repo.mjs).
+export async function insertRow(table, columnDefs, record, client = null, options = {}) {
   const columns = [];
   const placeholders = [];
   const values = [];
@@ -79,14 +98,16 @@ export async function insertRow(table, columnDefs, record) {
     i++;
   }
   if (columns.length === 0) throw new Error(`insertRow(${table}): record has no columns matching this table's schema`);
+  const conflictClause = options.onConflictDoNothing ? " on conflict (id) do nothing" : "";
   const { rows } = await query(
-    `insert into ${table} (${columns.join(", ")}) values (${placeholders.join(", ")}) returning *`,
-    values
+    `insert into ${table} (${columns.join(", ")}) values (${placeholders.join(", ")})${conflictClause} returning *`,
+    values,
+    client
   );
   return rows[0];
 }
 
-export async function updateRowById(table, columnDefs, id, patch) {
+export async function updateRowById(table, columnDefs, id, patch, client = null) {
   const setClauses = [];
   const values = [id];
   let i = 2;
@@ -102,14 +123,29 @@ export async function updateRowById(table, columnDefs, id, patch) {
     i++;
   }
   if (setClauses.length === 0) {
-    const { rows } = await query(`select * from ${table} where id = $1`, [id]);
+    const { rows } = await query(`select * from ${table} where id = $1`, [id], client);
     return rows[0] ?? null;
   }
   const { rows } = await query(
     `update ${table} set ${setClauses.join(", ")} where id = $1 returning *`,
-    values
+    values,
+    client
   );
   return rows[0] ?? null;
+}
+
+// HM-S7 Phase 4d (2026-09-29): sets the per-transaction session GUC that the RLS backstop
+// policies (see infra/database/migrations/0034_rls_backstop_directory_sales_intake.sql
+// onward) key off of. Must be called on `client` right after `begin`, before any insert/
+// update on an RLS-protected table -- `set_config(..., true)` is transaction-local (SET
+// LOCAL semantics), so it automatically clears when the transaction ends and can never leak
+// onto the next request that borrows this same pooled connection. Call with the tenant_id
+// already validated against the requesting actor (by assertActorScope/
+// requireHumanOperationalAuthority) before this point -- this does not re-check anything
+// itself, it only makes that already-checked value visible to the database for its own
+// independent enforcement.
+export async function setTenantContext(client, tenantId) {
+  await client.query("select set_config('app.current_tenant_id', $1, true)", [tenantId ?? ""]);
 }
 
 // Exposed for tests/scripts that need transactional isolation (e.g. HM-S6 item 4's contract tests

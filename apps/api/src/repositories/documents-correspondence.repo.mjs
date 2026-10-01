@@ -31,12 +31,12 @@ export async function getDocument(id) {
   return rows[0] ?? null;
 }
 
-export async function createDocument(record) {
-  return insertRow("documents", DOCUMENTS_COLUMNS, record);
+export async function createDocument(record, client = null) {
+  return insertRow("documents", DOCUMENTS_COLUMNS, record, client);
 }
 
-export async function updateDocument(id, patch) {
-  return updateRowById("documents", DOCUMENTS_COLUMNS, id, patch);
+export async function updateDocument(id, patch, client = null) {
+  return updateRowById("documents", DOCUMENTS_COLUMNS, id, patch, client);
 }
 
 // --- document_versions ---
@@ -55,12 +55,12 @@ export async function getDocumentVersion(id) {
   return rows[0] ?? null;
 }
 
-export async function createDocumentVersion(record) {
-  return insertRow("document_versions", DOCUMENT_VERSIONS_COLUMNS, record);
+export async function createDocumentVersion(record, client = null) {
+  return insertRow("document_versions", DOCUMENT_VERSIONS_COLUMNS, record, client);
 }
 
-export async function updateDocumentVersion(id, patch) {
-  return updateRowById("document_versions", DOCUMENT_VERSIONS_COLUMNS, id, patch);
+export async function updateDocumentVersion(id, patch, client = null) {
+  return updateRowById("document_versions", DOCUMENT_VERSIONS_COLUMNS, id, patch, client);
 }
 
 // --- document_register_entries ---
@@ -199,12 +199,12 @@ export async function getEvidenceBundle(id) {
   return rows[0] ?? null;
 }
 
-export async function createEvidenceBundle(record) {
-  return insertRow("evidence_bundles", EVIDENCE_BUNDLES_COLUMNS, record);
+export async function createEvidenceBundle(record, client = null) {
+  return insertRow("evidence_bundles", EVIDENCE_BUNDLES_COLUMNS, record, client);
 }
 
-export async function updateEvidenceBundle(id, patch) {
-  return updateRowById("evidence_bundles", EVIDENCE_BUNDLES_COLUMNS, id, patch);
+export async function updateEvidenceBundle(id, patch, client = null) {
+  return updateRowById("evidence_bundles", EVIDENCE_BUNDLES_COLUMNS, id, patch, client);
 }
 
 // --- administration_skill_bindings ---
