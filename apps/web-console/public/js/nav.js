@@ -37,6 +37,7 @@ export const OWNER_NAV = [
       { id: "bizkick-chains", label: "Chains", icon: "⛓" },
       { id: "bizkick-history", label: "Sync history", icon: "◷" },
       { id: "bizkick-conflicts", label: "Conflicts", icon: "⚑" },
+      { id: "bizkick-rules", label: "Rules", icon: "⚙" },
     ],
   },
   {
@@ -94,6 +95,7 @@ export const PAGE_META = {
   "bizkick-chains": { eyebrow: "BizKick", title: "Chains", desc: "How transactions follow one another, from quotation to receipt, with the links that are missing." },
   "bizkick-history": { eyebrow: "BizKick", title: "Sync history", desc: "Every import, what it did to each row, and the file it came from." },
   "bizkick-conflicts": { eyebrow: "BizKick", title: "Conflicts", desc: "Rows where BizKick and vFirm disagree. You decide which stands." },
+  "bizkick-rules": { eyebrow: "BizKick", title: "Rules", desc: "Let the register raise work for your team. Every rule starts off, and you preview it before turning it on." },
   "firm-settings": { eyebrow: "Firm", title: "Firm Settings", desc: "Profile, workspace and governance settings." },
 
   "admin-firms": { eyebrow: "Platform", title: "Firms & Tenants", desc: "Every firm running on the platform." },

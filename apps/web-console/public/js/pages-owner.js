@@ -64,6 +64,24 @@ export function needsYouTiles(store) {
   ];
 }
 
+// CE-S3: BizKick signals appended to the tray (kept separate so needsYouTiles stays store-only).
+const BIZKICK_SIGNAL_TILES = [
+  ["expiring_quotations", "Quotations expiring soon", "bizkick-transactions", true],
+  ["overdue_invoices", "Overdue invoices", "bizkick-transactions", true],
+  ["conflicts", "BizKick conflicts to decide", "bizkick-conflicts", true],
+  ["missing_links", "Transactions with a missing link", "bizkick-chains", false],
+  ["duplicates", "Duplicate transactions", "bizkick-transactions", false],
+];
+export function bizkickSignalTiles(signals) {
+  return BIZKICK_SIGNAL_TILES.map(([key, label, page, urgent]) => ({ key: `bk_${key}`, label, count: signals?.signals?.[key]?.count ?? 0, page, urgent }));
+}
+function bizkickTrayPanel(signals) {
+  if (!signals?.connected) return "";
+  const tiles = bizkickSignalTiles(signals);
+  if (!tiles.some((t) => t.count)) return "";
+  return panel("Needs you — BizKick", `<div class="ny-grid">${tiles.map((t) => `<button class="ny-tile${t.count ? (t.urgent ? " ny-urgent" : " ny-active") : ""}" type="button" data-nav-page="${escapeHtml(t.page)}" ${t.count ? "" : "disabled"}><span class="ny-count">${t.count}</span><span class="ny-label">${escapeHtml(t.label)}</span></button>`).join("")}</div>`);
+}
+
 function needsYouPanel(tiles) {
   const total = tiles.reduce((sum, t) => sum + t.count, 0);
   const body = total
@@ -80,8 +98,8 @@ export async function mountDashboard(root) {
     if (tile) window.dispatchEvent(new CustomEvent("vfirm:navigate", { detail: { page: tile.dataset.navPage, tab: tile.dataset.navTab } }));
   });
   try {
-    const [dashboard, rawStore] = await Promise.all([api.getDashboardSummary(), api.getStore().catch(() => null)]);
-    const tray = rawStore ? needsYouPanel(needsYouTiles(scopeStoreToCurrentFirm(rawStore))) : "";
+    const [dashboard, rawStore, bkSignals] = await Promise.all([api.getDashboardSummary(), api.getStore().catch(() => null), api.getEdcsSignals().catch(() => null)]);
+    const tray = (rawStore ? needsYouPanel(needsYouTiles(scopeStoreToCurrentFirm(rawStore))) : "") + bizkickTrayPanel(bkSignals);
     const c = dashboard.counts ?? {};
     const health = dashboard.health ?? {};
     const activity = dashboard.latest_activity ?? [];
@@ -556,6 +574,7 @@ export async function mountWorkdesk(root) {
       ? `<span class="wd-sub" title="${escapeHtml(req.triage_suggestion.rationale ?? "")}">Clerk's suggestion: ${escapeHtml(humanize(req.triage_suggestion.suggested_position_id))}</span>`
       : "";
     return `<div class="wd-req-title"><span class="wd-num">${escapeHtml(req.request_number ?? "")}</span> ${escapeHtml(req.title)}</div>
+      ${req.source?.type === "BIZKICK_RULE" ? `<span class="wd-sub" title="${escapeHtml(req.source.reason ?? "")}">From BizKick: ${escapeHtml(req.source.transaction_id)}</span>` : ""}
       <span class="wd-sub">${escapeHtml(req.request_type_label ?? humanize(req.request_type_id))}${req.class_a ? " · Class A" : ""}${due}</span>
       ${req.instructions ? `<div class="wd-instructions">${escapeHtml(req.instructions)}</div>` : ""}
       ${suggestion}

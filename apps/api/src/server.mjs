@@ -1,5 +1,6 @@
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
+import { timingSafeEqual } from "node:crypto";
 import { join } from "node:path";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
@@ -26,6 +27,7 @@ import { runSkill, SkillInputError } from "../../../packages/core-domain/src/awi
 import { createFileStorage, fileMaxBytes, sanitizeFilename, resolveAllowedMimeType, sha256Hex, storageKeyFor, FILE_CLASSIFICATIONS } from "./file-storage.mjs";
 // CE-S1 (ADR-095): Connected EDCS -- BizKick register import and sync ledger.
 import { EDCS_COLLECTIONS, linkEdcsFile, listEdcsChains, readEdcsDocuments, importRegister as importEdcsRegister, linkCounterparty as linkEdcsCounterparty, listConflicts as listEdcsConflicts, listSyncRuns as listEdcsSyncRuns, listTransactions as listEdcsTransactions, readConnection as readEdcsConnection, readEdcsExportCollections, readSyncRun as readEdcsSyncRun, readTransaction as readEdcsTransaction, resolveConflict as resolveEdcsConflict, saveConnection as saveEdcsConnection } from "./edcs-service.mjs";
+import { createRule as createAutomationRule, dryRunRule as dryRunAutomationRule, evaluateAfter as evaluateAutomationAfter, evaluateNow as evaluateAutomationNow, listRuleActivity as listAutomationRuleActivity, listRules as listAutomationRules, readSignals as readEdcsSignals, setRuleEnabled as setAutomationRuleEnabled, tick as tickAutomation, updateRule as updateAutomationRule } from "./edcs-automation-service.mjs";
 
 const root = process.cwd();
 const port = Number(process.env.VFIRM_API_PORT ?? 3091);
@@ -3164,6 +3166,12 @@ const routes = new Map([
   ["POST /edcs/register-imports", importEdcsRegisterRoute],
   ["POST /edcs/conflicts/resolve", resolveEdcsConflictRoute],
   ["POST /edcs/transactions/link-counterparty", linkEdcsCounterpartyRoute],
+  // CE-S3 (ADR-097): register-driven work rules (owner only; see edcs-automation-service.mjs).
+  ["POST /automation/rules", createAutomationRuleRoute],
+  ["POST /automation/rules/update", updateAutomationRuleRoute],
+  ["POST /automation/rules/enable", enableAutomationRuleRoute],
+  ["POST /automation/rules/dry-run", dryRunAutomationRuleRoute],
+  ["POST /automation/evaluate", evaluateAutomationRoute],
   ["POST /awia/virtual-staff/memory/append", appendAwiaStaffMemoryEntry],
   ["POST /awia/virtual-staff/conversation/open", openAwiaStaffConversationThread],
   ["POST /awia/virtual-staff/conversation/message", postAwiaStaffConversationMessage],
@@ -3441,10 +3449,85 @@ async function saveEdcsConnectionRoute(body, req = null) {
   return saveEdcsConnection({ body, actor });
 }
 
+// CE-S3: what a rule needs from the governed W2 path, handed to the service so it never imports this file.
+const automationDeps = {
+  createWorkRequest: (body, actor) => createWorkRequestRecord(body, actor),
+  assignWorkRequest: (body, actor) => runWorkRequestAssignment(body, actor)
+};
+
 async function importEdcsRegisterRoute(body, req = null) {
   requireFields(body, ["tenant_id", "firm_id", "file_id"]);
-  const { actor } = edcsScope(req, body, "import a BizKick register");
-  return importEdcsRegister({ body, actor, readFileBytes: readEdcsFileBytes });
+  const { actor, scope } = edcsScope(req, body, "import a BizKick register");
+  const result = await importEdcsRegister({ body, actor, readFileBytes: readEdcsFileBytes });
+  // Rules run after a completed import; a rules failure never fails the import (it is reported alongside).
+  if (result.run?.status === "COMPLETED") Object.assign(result, await evaluateAutomationAfter({ scope, trigger: "IMPORT", actor, deps: automationDeps }));
+  return result;
+}
+
+async function createAutomationRuleRoute(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id"]);
+  const { actor } = edcsScope(req, body, "create a BizKick rule");
+  return createAutomationRule({ body, actor });
+}
+
+async function updateAutomationRuleRoute(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "rule_id"]);
+  const { actor } = edcsScope(req, body, "edit a BizKick rule");
+  return updateAutomationRule({ body, actor });
+}
+
+async function enableAutomationRuleRoute(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "rule_id"]);
+  const { actor } = edcsScope(req, body, "turn a BizKick rule on or off");
+  return setAutomationRuleEnabled({ body, actor });
+}
+
+async function dryRunAutomationRuleRoute(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "rule_id"]);
+  const { actor } = edcsScope(req, body, "preview a BizKick rule");
+  return dryRunAutomationRule({ body, actor });
+}
+
+async function evaluateAutomationRoute(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id"]);
+  const { actor } = edcsScope(req, body, "run BizKick rules");
+  return evaluateAutomationNow({ body, actor, deps: automationDeps });
+}
+
+// POST /automation/tick: the scheduled evaluation. No user is signed in, so it is guarded by a service
+// token (env VFIRM_SERVICE_TOKEN) in the x-vfirm-service-token header, compared in constant time. With
+// no token configured the endpoint refuses everything. It visits every firm that has an enabled rule,
+// each on its own, and each rule runs as its owner. Optional body {tenant_id, firm_id} limits it to one firm.
+async function automationTickRoute(req, url) {
+  const configured = process.env.VFIRM_SERVICE_TOKEN;
+  if (!configured) {
+    const error = new Error("The automation tick is not configured on this server (VFIRM_SERVICE_TOKEN is not set).");
+    error.status = 503;
+    error.code = "SERVICE_TOKEN_NOT_CONFIGURED";
+    throw error;
+  }
+  const given = String(headerValue(req, "x-vfirm-service-token") ?? "");
+  const same = given.length > 0 && timingSafeEqual(Buffer.from(sha256Hex(Buffer.from(given)), "hex"), Buffer.from(sha256Hex(Buffer.from(configured)), "hex"));
+  if (!same) {
+    const error = new Error("A valid service token is required for the automation tick.");
+    error.status = 401;
+    error.code = "SERVICE_TOKEN_REQUIRED";
+    throw error;
+  }
+  const tenant_id = url.searchParams.get("tenant_id");
+  const firm_id = url.searchParams.get("firm_id");
+  return tickAutomation({ deps: automationDeps, scope: tenant_id && firm_id ? { tenant_id, firm_id } : null });
+}
+
+// GET /automation/rules | /automation/rules/<id>/activity | /automation/activity (read: any verified member).
+async function readAutomationRoute(req, url) {
+  const match = url.pathname.match(/^\/automation\/(rules|activity)(?:\/([^/]+)\/activity)?$/);
+  if (!match) return null;
+  const { scope } = edcsScope(req, { tenant_id: url.searchParams.get("tenant_id"), firm_id: url.searchParams.get("firm_id") }, "read BizKick rules");
+  if (match[1] === "rules" && !match[2]) return listAutomationRules({ scope });
+  if (match[1] === "rules" && match[2]) return listAutomationRuleActivity({ scope, ruleId: decodeURIComponent(match[2]) });
+  if (match[1] === "activity") return listAutomationRuleActivity({ scope, ruleId: null });
+  return null;
 }
 
 // CE-S2 (ADR-096): POST /edcs/files/upload?tenant_id=&firm_id=&filename=[&transaction_id=] (raw binary body).
@@ -3464,14 +3547,17 @@ async function linkEdcsFileRoute(req, url) {
     error.code = "VALIDATION_ERROR";
     throw error;
   }
-  return linkEdcsFile({
-    scope, actor, filename, mime_type, buffer, transaction_id: url.searchParams.get("transaction_id"),
+  const linked = await linkEdcsFile({
+    scope, actor, filename, mime_type, buffer, transaction_id: url.searchParams.get("transaction_id"), role: url.searchParams.get("role") || "PRIMARY",
     storeBytes: async ({ file_id, buffer: bytes, mime_type: type }) => {
       const storage_key = storageKeyFor({ tenant_id, firm_id, file_id });
       await fileStorage.put(storage_key, bytes, type);
       return { storage_backend: fileStorage.backend, storage_key };
     }
   });
+  // A newly filed file can complete a rule's condition (for example a bank statement arriving).
+  if (["LINKED", "REVISED", "ATTACHED"].includes(linked.outcome)) Object.assign(linked, await evaluateAutomationAfter({ scope, trigger: "FILE", actor, deps: automationDeps }));
+  return linked;
 }
 
 async function resolveEdcsConflictRoute(body, req = null) {
@@ -3489,7 +3575,7 @@ async function linkEdcsCounterpartyRoute(body, req = null) {
 // GET /edcs/connection | /edcs/transactions[/<id>] | /edcs/sync-runs[/<id>] | /edcs/conflicts
 // (?tenant_id=&firm_id= required; transactions also take type, status, alert, flag, search, as_of).
 async function readEdcsRoute(req, url) {
-  const match = url.pathname.match(/^\/edcs\/(connection|transactions|sync-runs|conflicts|chains|documents)(?:\/([^/]+))?$/);
+  const match = url.pathname.match(/^\/edcs\/(connection|transactions|sync-runs|conflicts|chains|documents|signals)(?:\/([^/]+))?$/);
   if (!match) return null;
   const [, kind, rawId] = match;
   const { scope } = edcsScope(req, { tenant_id: url.searchParams.get("tenant_id"), firm_id: url.searchParams.get("firm_id") }, "read BizKick data");
@@ -3497,6 +3583,7 @@ async function readEdcsRoute(req, url) {
   if (kind === "connection" && !id) return readEdcsConnection(scope);
   if (kind === "conflicts" && !id) return listEdcsConflicts({ scope });
   if (kind === "chains" && !id) return listEdcsChains({ scope });
+  if (kind === "signals" && !id) return readEdcsSignals({ scope });
   if (kind === "documents" && id) return readEdcsDocuments({ scope, transactionId: id });
   if (kind === "transactions") return id ? readEdcsTransaction({ scope, transactionId: id, params: url.searchParams }) : listEdcsTransactions({ scope, params: url.searchParams });
   if (kind === "sync-runs") return id ? readEdcsSyncRun({ scope, runId: id }) : listEdcsSyncRuns({ scope });
@@ -3667,6 +3754,8 @@ const server = createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/accounts/cash-snapshot") return sendJson(req, res, 200, { ok: true, data: await readAccountsCashSnapshot(req, url) });
     if (req.method === "GET" && url.pathname === "/database/schema") { const schema = await readFile(join(root, "infra/database/schema.sql"), "utf8"); return sendJson(req, res, 200, { ok: true, data: { path: "infra/database/schema.sql", bytes: schema.length } }); }
     if (req.method === "GET" && url.pathname === "/work-requests/request-types") return sendJson(req, res, 200, { ok: true, data: listWorkRequestTypes() });
+    if (req.method === "POST" && url.pathname === "/automation/tick") return sendJson(req, res, 200, { ok: true, data: await automationTickRoute(req, url) });
+    { const automationRead = req.method === "GET" && url.pathname.startsWith("/automation/") ? await readAutomationRoute(req, url) : null; if (automationRead) return sendJson(req, res, 200, { ok: true, data: automationRead }); }
     if (req.method === "POST" && url.pathname === "/edcs/files/upload") return sendJson(req, res, 201, { ok: true, data: await linkEdcsFileRoute(req, url) });
     if (req.method === "POST" && url.pathname === "/files/upload") return sendJson(req, res, 201, { ok: true, data: await uploadFirmFile(req, url) });
     { const fileDownload = req.method === "GET" ? url.pathname.match(/^\/files\/([^/]+)\/download$/) : null; if (fileDownload) return await downloadFirmFile(req, res, url, decodeURIComponent(fileDownload[1])); }
@@ -3718,3 +3807,13 @@ const server = createServer(async (req, res) => {
 });
 
 server.listen(port, () => console.log(`vFirm API listening on http://127.0.0.1:${port}`));
+
+// CE-S3 local development only: an in-process timer runs the same tick the production scheduler calls
+// over HTTP. Off unless VFIRM_AUTOMATION_TICK_MS is set (at least one minute).
+{
+  const tickMs = Number(process.env.VFIRM_AUTOMATION_TICK_MS ?? 0);
+  if (Number.isFinite(tickMs) && tickMs >= 60000) {
+    setInterval(() => { tickAutomation({ deps: automationDeps }).catch((error) => console.error("automation tick failed:", error instanceof Error ? error.message : error)); }, tickMs).unref();
+    console.log(`vFirm automation tick every ${Math.round(tickMs / 60000)} min (development timer)`);
+  }
+}

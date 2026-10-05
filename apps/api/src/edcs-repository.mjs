@@ -17,7 +17,8 @@
 import { isPostgresStore, readStore, withStore } from "./store.mjs";
 import { query, setTenantContext, withClient } from "./repositories/shared/db.mjs";
 
-export const EDCS_COLLECTIONS = ["edcs_connections", "edcs_transactions", "edcs_transaction_revisions", "edcs_sync_runs", "edcs_sync_events"];
+// CE-S3 (ADR-097, migration 0051) adds the two automation tables to the same repository.
+export const EDCS_COLLECTIONS = ["edcs_connections", "edcs_transactions", "edcs_transaction_revisions", "edcs_sync_runs", "edcs_sync_events", "automation_rules", "automation_rule_runs"];
 
 // The natural key inside (tenant, firm) of each collection.
 const naturalKey = {
@@ -25,8 +26,14 @@ const naturalKey = {
   edcs_transactions: (record) => record.transaction_id,
   edcs_transaction_revisions: (record) => `${record.transaction_id}#${record.seq}`,
   edcs_sync_runs: (record) => record.id,
-  edcs_sync_events: (record) => record.id
+  edcs_sync_events: (record) => record.id,
+  automation_rules: (record) => record.id,
+  // An occurrence's key is rule | transaction | occurrence key (the dedupe key); an evaluation's is its id.
+  automation_rule_runs: (record) => record.key ?? record.id
 };
+
+// A claimed occurrence that failed may be claimed again, up to this many attempts in total.
+const MAX_OCCURRENCE_ATTEMPTS = 3;
 
 const inScope = (scope) => (record) => record?.tenant_id === scope.tenant_id && record?.firm_id === scope.firm_id;
 
@@ -50,6 +57,29 @@ const jsonImpl = {
   async commit(scope, batch) {
     await withStore((store) => {
       for (const collection of EDCS_COLLECTIONS) for (const record of batch[collection] ?? []) jsonUpsert(store, scope, collection, record);
+    });
+  },
+  async enabledScopes() {
+    const store = await readStore();
+    const seen = new Map();
+    for (const rule of store.automation_rules ?? []) if (rule.enabled) seen.set(`${rule.tenant_id}|${rule.firm_id}`, { tenant_id: rule.tenant_id, firm_id: rule.firm_id });
+    return [...seen.values()];
+  },
+  // Atomically take an occurrence (the dedupe record). Returns the stored record when this caller won
+  // the claim, or null when the occurrence already exists (CLAIMED/CREATED, or ERROR out of attempts).
+  async claim(scope, record) {
+    return withStore((store) => {
+      store.automation_rule_runs ??= [];
+      const index = store.automation_rule_runs.findIndex((item) => inScope(scope)(item) && naturalKey.automation_rule_runs(item) === record.key);
+      if (index >= 0) {
+        const existing = store.automation_rule_runs[index];
+        if (existing.status !== "ERROR" || (existing.attempts ?? 1) >= MAX_OCCURRENCE_ATTEMPTS) return null;
+        const retry = { ...record, attempts: (existing.attempts ?? 1) + 1 };
+        store.automation_rule_runs[index] = retry;
+        return retry;
+      }
+      store.automation_rule_runs.push(record);
+      return record;
     });
   }
 };
@@ -91,6 +121,43 @@ const pgImpl = {
         throw error;
       }
     });
+  },
+  async enabledScopes() {
+    const { rows } = await query(`select distinct tenant_id, firm_id from automation_rules where enabled_c is true`, []);
+    return rows.map((row) => ({ tenant_id: row.tenant_id, firm_id: row.firm_id }));
+  },
+  // Atomic claim in one statement pair: insert-if-absent, else retake an ERROR row that has attempts
+  // left (the where clause makes the retake atomic too). Returns the record or null.
+  async claim(scope, record) {
+    return withClient(async (client) => {
+      await client.query("begin");
+      try {
+        await setTenantContext(client, scope.tenant_id);
+        const inserted = await query(
+          `insert into automation_rule_runs (id, natural_key, tenant_id, firm_id, record, created_at, updated_at)
+           values ($1::uuid, $2, $3::uuid, $4::uuid, $5::jsonb, now(), now())
+           on conflict (tenant_id, firm_id, natural_key) do nothing returning id`,
+          [record.id, record.key, scope.tenant_id, scope.firm_id, JSON.stringify(record)],
+          client
+        );
+        let result = inserted.rows.length ? record : null;
+        if (!result) {
+          const retried = await query(
+            `update automation_rule_runs set record = jsonb_set($5::jsonb, '{attempts}', to_jsonb(coalesce((record->>'attempts')::int, 1) + 1)), updated_at = now()
+             where tenant_id = $1 and firm_id = $2 and natural_key = $3 and record->>'status' = 'ERROR' and coalesce((record->>'attempts')::int, 1) < $4
+             returning record`,
+            [scope.tenant_id, scope.firm_id, record.key, MAX_OCCURRENCE_ATTEMPTS, JSON.stringify(record)],
+            client
+          );
+          result = retried.rows[0]?.record ?? null;
+        }
+        await client.query("commit");
+        return result;
+      } catch (error) {
+        await client.query("rollback");
+        throw error;
+      }
+    });
   }
 };
 
@@ -123,6 +190,25 @@ export const edcsRepository = {
     return (await impl().read(scope, "edcs_sync_events"))
       .filter((record) => (!run_id || record.run_id === run_id) && (!transaction_id || record.transaction_id === transaction_id))
       .sort((a, b) => (a.run_number - b.run_number) || ((a.row_number ?? 0) - (b.row_number ?? 0)) || String(a.at).localeCompare(String(b.at)));
+  },
+  // CE-S3: automation rules, their occurrences (dedupe) and evaluations.
+  async listRules(scope) {
+    return (await impl().read(scope, "automation_rules")).sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
+  },
+  async getRule(scope, ruleId) {
+    return (await impl().read(scope, "automation_rules")).find((record) => record.id === ruleId) ?? null;
+  },
+  async listRuleRuns(scope, { kind = null, rule_id = null, transaction_id = null } = {}) {
+    return (await impl().read(scope, "automation_rule_runs"))
+      .filter((record) => (!kind || record.kind === kind) && (!rule_id || record.rule_id === rule_id) && (!transaction_id || record.transaction_id === transaction_id))
+      .sort((a, b) => String(b.at ?? b.created_at).localeCompare(String(a.at ?? a.created_at)));
+  },
+  // Every firm that has at least one enabled rule (the scheduled tick visits each on its own).
+  async listEnabledRuleScopes() {
+    return impl().enabledScopes();
+  },
+  async claimOccurrence(scope, record) {
+    return impl().claim(scope, record);
   },
   // One atomic write. `batch` maps a collection name to the records to insert-or-replace.
   async commit(scope, batch) {

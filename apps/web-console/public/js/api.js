@@ -151,8 +151,8 @@ async function uploadFile(file, { classification = "CLIENT_CONFIDENTIAL", purpos
 
 // CE-S2: one file linked to a BizKick transaction (raw bytes; the ID in the file name picks the
 // transaction, or pass transactionId to link by hand). Returns the per-file outcome.
-async function linkEdcsFile(file, { transactionId = "" } = {}) {
-  const query = `filename=${encodeURIComponent(file.name)}${transactionId ? `&transaction_id=${encodeURIComponent(transactionId)}` : ""}`;
+async function linkEdcsFile(file, { transactionId = "", role = "" } = {}) {
+  const query = `filename=${encodeURIComponent(file.name)}${transactionId ? `&transaction_id=${encodeURIComponent(transactionId)}` : ""}${role ? `&role=${encodeURIComponent(role)}` : ""}`;
   const res = await fetch(API_PREFIX + withScope(`/edcs/files/upload?${query}`), {
     method: "POST",
     headers: { "content-type": file.type || "application/octet-stream", ...(await authHeaders()) },
@@ -245,6 +245,15 @@ export const api = {
   listEdcsSyncRuns: () => request(withScope("/edcs/sync-runs"), { skipCache: true }),
   getEdcsSyncRun: (id) => request(withScope(`/edcs/sync-runs/${encodeURIComponent(id)}`), { skipCache: true }),
   getEdcsChains: () => request(withScope("/edcs/chains"), { skipCache: true }),
+  // CE-S3: register-driven work rules.
+  getEdcsSignals: () => request(withScope("/edcs/signals"), { skipCache: true }),
+  listAutomationRules: () => request(withScope("/automation/rules"), { skipCache: true }),
+  getAutomationActivity: (ruleId = "") => request(withScope(ruleId ? `/automation/rules/${encodeURIComponent(ruleId)}/activity` : "/automation/activity"), { skipCache: true }),
+  createAutomationRule: (body) => request("/automation/rules", { method: "POST", body }),
+  updateAutomationRule: (body) => request("/automation/rules/update", { method: "POST", body }),
+  setAutomationRuleEnabled: (body) => request("/automation/rules/enable", { method: "POST", body }),
+  dryRunAutomationRule: (body) => request("/automation/rules/dry-run", { method: "POST", body }),
+  runAutomationNow: (body = {}) => request("/automation/evaluate", { method: "POST", body }),
   listEdcsConflicts: () => request(withScope("/edcs/conflicts"), { skipCache: true }),
   resolveEdcsConflict: (body) => request("/edcs/conflicts/resolve", { method: "POST", body }),
   linkEdcsCounterparty: (body) => request("/edcs/transactions/link-counterparty", { method: "POST", body }),

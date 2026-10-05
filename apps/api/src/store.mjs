@@ -179,6 +179,8 @@ const initialStore = () => ({
   edcs_transaction_revisions: [],
   edcs_sync_runs: [],
   edcs_sync_events: [],
+  automation_rules: [],
+  automation_rule_runs: [],
   professional_authorities: [],
   actors: [],
   persons: [],
@@ -665,6 +667,10 @@ export async function createWorkRequestRecord(body, actor) {
       form_inputs: sanitizeSkillFormInputs(type.skill_id, body.form_inputs),
       file_roles: sanitizeFileRoles(type.skill_id, body.file_roles, fileIds),
       references,
+      // CE-S3: where the request came from when a BizKick rule raised it (shown as "From BizKick: <id>").
+      source: body.source && typeof body.source === "object" && body.source.type === "BIZKICK_RULE"
+        ? { type: "BIZKICK_RULE", transaction_id: String(body.source.transaction_id ?? "").slice(0, 60), rule_id: String(body.source.rule_id ?? "").slice(0, 60), rule_name: String(body.source.rule_name ?? "").slice(0, 120), reason: String(body.source.reason ?? "").slice(0, 80) }
+        : null,
       triage_suggestion: { category: triage.category, priority: triage.priority, routed_to: triage.routed_to, suggested_position_id: positionForTriageQueue[triage.routed_to] ?? null, rationale: triage.rationale, boundary: triage.boundary },
       status: "SUBMITTED",
       task_id: null,
@@ -1032,7 +1038,18 @@ export async function registerEdcsFileRevisionRecord(body, actor) {
     const tx = body.transaction;
     let entry = store.document_register_entries.find((record) => inScope(record) && record.document_number === tx.transaction_id) ?? null;
     const revisions = entry ? store.document_revision_records.filter((record) => inScope(record) && record.document_register_entry_id === entry.id) : [];
-    const previous = entry ? revisions.find((record) => record.id === entry.current_revision_id) ?? null : null;
+    // CE-S3 (decision: supporting files): role SUPPORTING files a supporting document (for example a bank
+    // statement under a bank reconciliation) as an attachment. It never becomes, replaces or supersedes
+    // the transaction's primary document revision.
+    const supporting = body.role === "SUPPORTING";
+    const primaryRevisions = revisions.filter((record) => record.metadata?.role !== "SUPPORTING");
+    const attachmentRevisions = revisions.filter((record) => record.metadata?.role === "SUPPORTING");
+    const previous = !supporting && entry ? primaryRevisions.find((record) => record.id === entry.current_revision_id) ?? null : null;
+    const sameAttachment = supporting ? attachmentRevisions.find((record) => record.content_hash === body.file.sha256) ?? null : null;
+    if (sameAttachment) {
+      const existingFile = store.file_objects.find((record) => inScope(record) && record.id === sameAttachment.metadata?.file_id) ?? null;
+      return { outcome: "UNCHANGED", document: entry, revision: sameAttachment, previous_revision: null, file: existingFile };
+    }
     if (previous && previous.content_hash === body.file.sha256) {
       const existingFile = store.file_objects.find((record) => inScope(record) && record.id === previous.metadata?.file_id) ?? null;
       return { outcome: "UNCHANGED", document: entry, revision: previous, previous_revision: null, file: existingFile };
@@ -1057,29 +1074,30 @@ export async function registerEdcsFileRevisionRecord(body, actor) {
       store.document_register_entries.push(entry);
     }
     const used = new Set(revisions.map((record) => record.revision));
-    let label = body.revision_label && !used.has(body.revision_label) ? body.revision_label : null;
+    let label = !supporting && body.revision_label && !used.has(body.revision_label) ? body.revision_label : null;
+    if (supporting) label = `A${attachmentRevisions.length + 1}`;
     if (!label) {
-      let n = revisions.reduce((max, record) => { const m = /^R(\d+)$/.exec(record.revision ?? ""); return m ? Math.max(max, Number(m[1])) : max; }, -1) + 1;
+      let n = primaryRevisions.reduce((max, record) => { const m = /^R(\d+)$/.exec(record.revision ?? ""); return m ? Math.max(max, Number(m[1])) : max; }, -1) + 1;
       while (used.has(`R${n}`)) n += 1;
       label = `R${n}`;
     }
     if (previous) previous.status = "SUPERSEDED";
     const revision = {
       id: sf3Id("document_revision"), tenant_id: scope.tenant_id, firm_id: scope.firm_id, document_register_entry_id: entry.id, revision: label, version_label: label,
-      storage_ref: `file:${file.id}`, content_hash: file.sha256, status: "CURRENT", supersedes_revision_id: previous?.id ?? null, created_by_actor_id: actor.actor_id ?? null,
-      created_at: timestamp, metadata: { file_id: file.id, filename: file.filename, transaction_id: tx.transaction_id, method: body.method, content_stored: body.content_stored === true, note: body.note ?? null }
+      storage_ref: `file:${file.id}`, content_hash: file.sha256, status: supporting ? "ATTACHMENT" : "CURRENT", supersedes_revision_id: previous?.id ?? null, created_by_actor_id: actor.actor_id ?? null,
+      created_at: timestamp, metadata: { file_id: file.id, filename: file.filename, transaction_id: tx.transaction_id, method: body.method, content_stored: body.content_stored === true, note: body.note ?? null, role: supporting ? "SUPPORTING" : "PRIMARY" }
     };
     store.document_revision_records.push(revision);
-    entry.current_revision_id = revision.id;
+    if (!supporting) entry.current_revision_id = revision.id;
     entry.updated_at = timestamp;
     appendEventAndAudit(store, {
-      event_type: created ? "edcs.file_linked" : "edcs.file_revised", actor, tenant_id: scope.tenant_id, firm_id: scope.firm_id, aggregate_type: "DocumentRegisterEntry", aggregate_id: entry.id,
+      event_type: supporting ? "edcs.file_attached" : created ? "edcs.file_linked" : "edcs.file_revised", actor, tenant_id: scope.tenant_id, firm_id: scope.firm_id, aggregate_type: "DocumentRegisterEntry", aggregate_id: entry.id,
       payload: { transaction_id: tx.transaction_id, document_number: entry.document_number, revision: label, supersedes_revision_id: previous?.id ?? null, file_id: file.id, sha256: file.sha256, content_stored: body.content_stored === true, method: body.method },
-      summary: created
+      summary: supporting ? `${tx.transaction_id}: supporting file filed as ${label}${body.content_stored ? "" : " (metadata and fingerprint only, per content policy)"}.` : created
         ? `${tx.transaction_id}: file linked as ${label}${body.content_stored ? "" : " (metadata and fingerprint only, per content policy)"}.`
         : `${tx.transaction_id}: new file filed as ${label}; ${previous?.revision ?? "prior revision"} superseded.`
     });
-    return { outcome: created ? "LINKED" : "REVISED", document: entry, revision, previous_revision: previous, file };
+    return { outcome: supporting ? "ATTACHED" : created ? "LINKED" : "REVISED", document: entry, revision, previous_revision: previous, file };
   });
 }
 
@@ -6495,6 +6513,8 @@ function stripRelationalCollections(store) {
   edcs_transaction_revisions: [],
   edcs_sync_runs: [],
   edcs_sync_events: [],
+  automation_rules: [],
+  automation_rule_runs: [],
   service_packs: [],
   service_skus: [],
   worker_templates: [],

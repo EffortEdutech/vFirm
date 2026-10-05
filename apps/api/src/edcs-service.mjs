@@ -467,27 +467,32 @@ function fileClassificationFor(documentType) {
 // document register. Download availability follows the content policy actually applied.
 async function documentHistory(scope, transactionId) {
   const { entry, revisions, files } = await findEdcsDocumentState(scope, transactionId);
-  if (!entry) return { linked: false, document: null, revisions: [], current_revision: null };
+  if (!entry) return { linked: false, document: null, revisions: [], attachments: [], current_revision: null };
   const fileById = new Map(files.map((file) => [file.id, file]));
-  const list = revisions.map((revision) => {
+  const describe = (revision) => {
     const file = fileById.get(revision.metadata?.file_id) ?? null;
     return {
-      revision_id: revision.id, revision: revision.revision, status: revision.status, supersedes_revision_id: revision.supersedes_revision_id ?? null,
+      revision_id: revision.id, revision: revision.revision, status: revision.status, role: revision.metadata?.role ?? "PRIMARY",
+      supersedes_revision_id: revision.supersedes_revision_id ?? null,
       content_hash: revision.content_hash, filed_at: revision.created_at, method: revision.metadata?.method ?? null, note: revision.metadata?.note ?? null,
       file_id: file?.id ?? null, filename: file?.filename ?? revision.metadata?.filename ?? null, size_bytes: file?.size_bytes ?? null,
       content_stored: file ? file.status === "STORED" : false, downloadable: file ? file.status === "STORED" : false
     };
-  }).reverse();
+  };
+  const all = revisions.map(describe);
+  const list = all.filter((item) => item.role !== "SUPPORTING").reverse();
+  const attachments = all.filter((item) => item.role === "SUPPORTING").reverse();
   return {
     linked: true,
     document: { id: entry.id, document_number: entry.document_number, title: entry.title, classification: entry.classification, content_policy: entry.metadata?.content_policy ?? null },
     revisions: list,
+    attachments,
     current_revision: list.find((item) => item.revision_id === entry.current_revision_id) ?? null
   };
 }
 
 const documentsSummary = (history) => history.linked ? {
-  linked: true, document_entry_id: history.document.id, current_revision: history.current_revision?.revision ?? null, revision_count: history.revisions.length,
+  linked: true, document_entry_id: history.document.id, attachment_count: history.attachments?.length ?? 0, current_revision: history.current_revision?.revision ?? null, revision_count: history.revisions.length,
   content_stored: history.current_revision?.content_stored ?? false, filename: history.current_revision?.filename ?? null, sha256: history.current_revision?.content_hash ?? null,
   last_filed_at: history.current_revision?.filed_at ?? null
 } : { linked: false };
@@ -498,11 +503,12 @@ const documentsSummary = (history) => history.linked ? {
 //   UNMATCHED                      no Transaction ID in the file name (nothing stored; owner can link by hand)
 //   ORPHAN                         ID found but the transaction is not in the imported register (nothing stored)
 //   WRONG_COMPANY / UNKNOWN_TYPE   well-formed ID that does not belong to this firm's connection
-export async function linkEdcsFile({ scope: scopeInput, actor, filename, mime_type, buffer, transaction_id, storeBytes }) {
+export async function linkEdcsFile({ scope: scopeInput, actor, filename, mime_type, buffer, transaction_id, role = "PRIMARY", storeBytes }) {
   requireOwner(actor, "Linking a file to a BizKick transaction");
   const scope = scopeOf(scopeInput);
   const connection = await repo.getConnection(scope);
   if (!connection) throw httpError(409, "EDCS_NOT_CONNECTED", "Set up the BizKick connection (company code) before linking files.");
+  if (!["PRIMARY", "SUPPORTING"].includes(role)) throw httpError(400, "VALIDATION_ERROR", "role must be PRIMARY or SUPPORTING.");
   const sha256 = sha256Hex(buffer);
   const base = { filename, size_bytes: buffer.length, sha256 };
   let method = "FILENAME";
@@ -532,13 +538,15 @@ export async function linkEdcsFile({ scope: scopeInput, actor, filename, mime_ty
   let stored = { storage_backend: "NONE", storage_key: null };
   const state = await findEdcsDocumentState(scope, id);
   const current = state.entry ? state.revisions.find((revision) => revision.id === state.entry.current_revision_id) : null;
-  const identical = current && current.content_hash === sha256;
+  const identical = role === "SUPPORTING"
+    ? state.revisions.some((revision) => revision.metadata?.role === "SUPPORTING" && revision.content_hash === sha256)
+    : current && current.content_hash === sha256;
   if (contentStored && !identical) stored = await storeBytes({ file_id: fileId, filename, mime_type, buffer });
   const result = await registerEdcsFileRevisionRecord({
     tenant_id: scope.tenant_id, firm_id: scope.firm_id,
     transaction: { transaction_id: id, document_type: record.document_type, title: `${EDCS_DOCUMENT_TYPES[record.document_type].name} ${id}${record.subject ? ` - ${record.subject}` : ""}` },
     file: { file_id: fileId, filename, mime_type, size_bytes: buffer.length, sha256, storage_backend: stored.storage_backend, storage_key: stored.storage_key, classification: fileClassificationFor(record.document_type) },
-    content_stored: contentStored, revision_label: revisionHint ?? record.revision ?? null, method, note: null
+    content_stored: contentStored, revision_label: revisionHint ?? record.revision ?? null, method, note: null, role
   }, actor);
 
   const history = await documentHistory(scope, id);
@@ -549,7 +557,7 @@ export async function linkEdcsFile({ scope: scopeInput, actor, filename, mime_ty
     await repo.commit(scope, { edcs_transactions: [updated] });
   }
   return {
-    ...base, outcome: result.outcome, transaction_id: id, document_type: record.document_type, method,
+    ...base, outcome: result.outcome, transaction_id: id, document_type: record.document_type, method, role,
     revision: result.revision?.revision ?? null, superseded_revision: result.previous_revision?.revision ?? null,
     content_policy: policy, content_stored: contentStored, file_id: result.file?.id ?? null, document_entry_id: result.document?.id ?? null
   };

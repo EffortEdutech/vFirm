@@ -165,6 +165,10 @@ async function showDetail(host, id) {
       { label: "SHA-256", render: (r) => `<code>${escapeHtml(String(r.content_hash ?? "").slice(0, 12))}</code>` },
       { label: "", render: (r) => r.downloadable ? `<button class="btn btn-sm bk-dl" data-file="${escapeHtml(r.file_id)}" data-name="${escapeHtml(r.filename ?? "download")}" type="button">Download</button>` : `<span class="field-note">details and fingerprint only</span>` }
     ], d.documents.revisions, (r) => r.revision_id))
+    + ((d.documents.attachments ?? []).length ? panel("Supporting documents", table([
+      { label: "Label", render: (r) => escapeHtml(r.revision) }, { label: "File", render: (r) => escapeHtml(r.filename ?? "") }, { label: "Filed", render: (r) => escapeHtml(dt(r.filed_at)) },
+      { label: "", render: (r) => r.downloadable ? `<button class="btn btn-sm bk-dl" data-file="${escapeHtml(r.file_id)}" data-name="${escapeHtml(r.filename ?? "download")}" type="button">Download</button>` : "" }
+    ], d.documents.attachments, (r) => r.revision_id)) : "")
     + panel("Revisions", table([{ label: "#", key: "seq" }, { label: "Revision", key: "revision" }, { label: "Kind", render: (r) => pill(r.kind.replace(/_/g, " "), "default") }, { label: "Recorded", render: (r) => escapeHtml(dt(r.created_at)) }, { label: "Note", render: (r) => escapeHtml(r.resolution_note ?? "") }], d.revisions, (r) => String(r.seq)))
     + panel("History", table([{ label: "Run", key: "run_number" }, { label: "Outcome", render: (e) => outcomePill(e.outcome) }, { label: "Changes", render: (e) => escapeHtml(Object.keys(e.changes ?? {}).join(", ")) }, { label: "When", render: (e) => escapeHtml(dt(e.at)) }], d.events, (e) => e.id));
   for (const button of host.querySelectorAll(".bk-link")) button.addEventListener("click", async () => { await api.linkEdcsCounterparty({ transaction_id: id, link_type: "CLIENT", client_id: button.dataset.client, note: "Confirmed from the transaction page" }); await showDetail(host, id); });
@@ -175,9 +179,9 @@ async function showDetail(host, id) {
 
 // ---------------- files (CE-S2) ----------------
 
-const FILE_OUTCOME_TONE = { LINKED: "moss", REVISED: "moss", UNCHANGED: "default", UNMATCHED: "amber", ORPHAN: "amber", WRONG_COMPANY: "rose", UNKNOWN_TYPE: "rose" };
+const FILE_OUTCOME_TONE = { ATTACHED: "moss", LINKED: "moss", REVISED: "moss", UNCHANGED: "default", UNMATCHED: "amber", ORPHAN: "amber", WRONG_COMPANY: "rose", UNKNOWN_TYPE: "rose" };
 const FILE_OUTCOME_TEXT = {
-  LINKED: "Filed", REVISED: "New revision filed", UNCHANGED: "Same file, nothing changed",
+  ATTACHED: "Attached as supporting document", LINKED: "Filed", REVISED: "New revision filed", UNCHANGED: "Same file, nothing changed",
   UNMATCHED: "No Transaction ID in the name", ORPHAN: "Transaction not in the register", WRONG_COMPANY: "Another company's ID", UNKNOWN_TYPE: "Unknown document type"
 };
 
@@ -191,6 +195,7 @@ async function mountFiles(root) {
     <p>Choose the files BizKick produced, for example <code>${escapeHtml(data.connection.company_code)}-QT-2026-0001_R1_Alpha.pdf</code>. vFirm finds the Transaction ID in each name and files it under that transaction.
     A file whose name has no ID is listed below so you can link it yourself. HR and legal documents keep only their details and a fingerprint unless you opted in on the Connection page.</p>
     <input id="bkFiles" type="file" multiple accept=".pdf,.docx,.doc,.xlsx,.xls,.csv,.txt,.png,.jpg,.jpeg" />
+    <label class="check"><input id="bkSupporting" type="checkbox" /> These are supporting documents (for example a bank statement). They are kept with the transaction and never replace its main document.</label>
     <button class="btn btn-primary" id="bkFilesBtn" type="button">Upload and link</button>
     <div id="bkFilesMsg" style="min-height:1.2em"></div>`) + `<div id="bkFilesResult"></div>`;
   const msg = root.querySelector("#bkFilesMsg");
@@ -227,8 +232,8 @@ async function mountFiles(root) {
     msg.textContent = `Uploading ${files.length} file${files.length === 1 ? "" : "s"}…`;
     for (const file of files) {
       try {
-        const outcome = await api.linkEdcsFile(file);
-        if (!["LINKED", "REVISED", "UNCHANGED"].includes(outcome.outcome)) pending.set(file.name, file);
+        const outcome = await api.linkEdcsFile(file, { role: root.querySelector("#bkSupporting")?.checked ? "SUPPORTING" : "" });
+        if (!["LINKED", "REVISED", "UNCHANGED", "ATTACHED"].includes(outcome.outcome)) pending.set(file.name, file);
         results.unshift(outcome);
       } catch (err) {
         results.unshift({ filename: file.name, outcome: "UNMATCHED", detail: err.message, sha256: "" });
@@ -310,7 +315,61 @@ async function mountConflicts(root) {
   for (const b of root.querySelectorAll(".bk-accept")) b.addEventListener("click", decide("ACCEPT_INCOMING"));
 }
 
+// ---------------- rules (CE-S3) ----------------
+
+const RULE_STATUS_TEXT = { CREATED: "Request raised", ERROR: "Failed", CLAIMED: "In progress" };
+
+async function mountRules(root) {
+  let data;
+  try { data = await api.listAutomationRules(); } catch (err) { root.innerHTML = errorBox(err, "BizKick rules"); return; }
+  const msgBox = `<div id="bkRuleMsg" style="min-height:1.2em"></div><div id="bkRulePreview"></div><div id="bkRuleActivity"></div>`;
+  const rules = data.rules ?? [];
+  root.innerHTML = GOLDEN_RULE
+    + panel("Your rules", rules.length ? table([
+      { label: "Rule", render: (r) => `<strong>${escapeHtml(r.name)}</strong><div class="field-note">${escapeHtml(r.description ?? "")}</div>` },
+      { label: "State", render: (r) => pill(r.enabled ? "On" : "Off", r.enabled ? "moss" : "default") },
+      { label: "Raised", render: (r) => String(r.activity?.created ?? 0) + (r.activity?.errors ? ` <span class="field-note">(${r.activity.errors} failed)</span>` : "") },
+      { label: "", render: (r) => `<div style="white-space:nowrap"><button class="btn btn-sm bk-rule-dry" data-id="${escapeHtml(r.id)}" type="button">Preview</button> `
+        + `<button class="btn btn-sm bk-rule-toggle" data-id="${escapeHtml(r.id)}" data-on="${r.enabled ? "1" : ""}" type="button">${r.enabled ? "Turn off" : "Turn on"}</button> `
+        + `<button class="btn btn-sm bk-rule-log" data-id="${escapeHtml(r.id)}" type="button">Activity</button></div>` }
+    ], rules, (r) => r.id) + `<div class="form-actions"><button class="btn btn-primary" id="bkRunNow" type="button">Run rules now</button></div>` : `<p class="field-note">No rules yet. Add one from the templates below.</p>`)
+    + msgBox
+    + panel("Templates", table([
+      { label: "Template", render: (t) => `<strong>${escapeHtml(t.name)}</strong><div class="field-note">${escapeHtml(t.description ?? "")}</div>` },
+      { label: "Raises", render: (t) => escapeHtml(t.request_type ?? "") },
+      { label: "", render: (t) => t.installed ? pill("Added", "default") : `<button class="btn btn-sm bk-rule-add" data-id="${escapeHtml(t.template_id)}" type="button">Add (starts off)</button>` }
+    ], data.templates ?? [], (t) => t.template_id));
+  const msg = root.querySelector("#bkRuleMsg");
+  const reload = async () => { await mountRules(root); };
+  const guard = (fn) => async (event) => { msg.textContent = "Working…"; try { await fn(event); } catch (err) { msg.textContent = err.message; } };
+  for (const b of root.querySelectorAll(".bk-rule-add")) b.addEventListener("click", guard(async () => { await api.createAutomationRule({ template_id: b.dataset.id }); await reload(); }));
+  for (const b of root.querySelectorAll(".bk-rule-dry")) b.addEventListener("click", guard(async () => {
+    const d = await api.dryRunAutomationRule({ rule_id: b.dataset.id });
+    msg.textContent = d.summary ?? "";
+    root.querySelector("#bkRulePreview").innerHTML = panel(`Preview — as of ${escapeHtml(fmtDate(d.as_of))}`, (d.would_create ?? []).length ? table([
+      { label: "Transaction", render: (m) => escapeHtml(m.transaction_id) }, { label: "Request", render: (m) => escapeHtml(m.title) },
+      { label: "Why", render: (m) => escapeHtml(m.reason ?? "") }, { label: "Files", render: (m) => String(m.file_count ?? 0) }
+    ], d.would_create, (m) => `${m.transaction_id}-${m.occurrence_key}`) : `<p class="field-note">Nothing would be created right now.${d.older_than_rule ? ` ${d.older_than_rule} older transaction(s) are ignored because this rule only acts on new events.` : ""}</p>`);
+  }));
+  for (const b of root.querySelectorAll(".bk-rule-toggle")) b.addEventListener("click", guard(async () => { await api.setAutomationRuleEnabled({ rule_id: b.dataset.id, enabled: !b.dataset.on }); await reload(); }));
+  for (const b of root.querySelectorAll(".bk-rule-log")) b.addEventListener("click", guard(async () => {
+    const a = await api.getAutomationActivity(b.dataset.id);
+    msg.textContent = "";
+    root.querySelector("#bkRuleActivity").innerHTML = panel(`Activity — ${escapeHtml(a.rule?.name ?? "")}`, (a.occurrences ?? []).length ? table([
+      { label: "Transaction", render: (o) => escapeHtml(o.transaction_id) }, { label: "Result", render: (o) => pill(RULE_STATUS_TEXT[o.status] ?? o.status, o.status === "CREATED" ? "moss" : o.status === "ERROR" ? "rose" : "default") },
+      { label: "Request", render: (o) => escapeHtml(o.work_request_number ?? "—") },
+      { label: "Assignment", render: (o) => escapeHtml(o.assignment ? (o.assignment.outcome === "REFUSED" ? `Refused — in Inbox (${o.assignment.message ?? ""})` : o.assignment.outcome === "ASSIGNED" ? `Assigned to ${o.assignment.staff_code}` : "Waiting in Inbox") : "") },
+      { label: "When", render: (o) => escapeHtml(dt(o.at)) }
+    ], a.occurrences, (o) => o.id) : `<p class="field-note">This rule has not raised anything yet.</p>`);
+  }));
+  root.querySelector("#bkRunNow")?.addEventListener("click", guard(async () => {
+    const r = await api.runAutomationNow({});
+    msg.textContent = r.created.length ? `Raised ${r.created.length} request(s): ${r.created.map((c) => c.request_number).join(", ")}.` : "Nothing new to raise.";
+  }));
+}
+
 export const BIZKICK_PAGES = {
+  "bizkick-rules": mountRules,
   "bizkick-connection": mountConnection,
   "bizkick-import": mountImport,
   "bizkick-transactions": mountTransactions,

@@ -167,6 +167,7 @@
                     "check:ce:s0-contract-and-fixtures":  "node scripts/verify-ce-s0-contract-and-fixtures.mjs",
                     "check:ce:s1-register-import":  "node scripts/smoke-ce-s1-register-import.mjs",
                     "check:ce:s2-file-linking":     "node scripts/smoke-ce-s2-file-linking.mjs",
+                    "check:ce:s3-register-rules":  "node scripts/smoke-ce-s3-register-rules.mjs",
                     "dev:web-console":  "node apps/web-console/src/server.mjs",
                     "check:post-hm-s4:mvp-store-scoping-fix":  "node scripts/smoke-post-hm-s4-mvp-store-tenant-scoping-fix.mjs",
                     "check:post-hm-s4:my-team-retire-worker":  "node scripts/smoke-post-hm-s4-my-team-retire-worker.mjs",

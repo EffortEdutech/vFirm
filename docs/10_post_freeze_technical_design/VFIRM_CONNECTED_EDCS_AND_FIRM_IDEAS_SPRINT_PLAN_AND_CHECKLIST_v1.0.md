@@ -212,13 +212,15 @@ Scope:
 
 Acceptance checks (`npm run check:ce:s3-register-rules`):
 
-- [ ] Disabled rule creates nothing; dry-run shows the would-be requests.
-- [ ] Enabled rule creates one request per occurrence; re-import / repeated tick creates no duplicate.
-- [ ] Request carries the transaction reference and linked files; the W3 runner can use them (e.g. BR statement → FAO-11 slot).
-- [ ] Rule with assign-to uses the governed assignment; wrong-position worker refused and the request stays in the Inbox.
-- [ ] Class A request still requires owner Class A approval.
-- [ ] Tick endpoint refuses calls without the service token; rules never see other firms' transactions.
-- [ ] Tray counts match the fixture.
+- [x] Disabled rule creates nothing; dry-run shows the would-be requests.
+- [x] Enabled rule creates one request per occurrence; re-import / repeated tick creates no duplicate.
+- [x] Request carries the transaction reference and linked files; the W3 runner can use them (e.g. BR statement → FAO-11 slot).
+- [x] Rule with assign-to uses the governed assignment; wrong-position worker refused and the request stays in the Inbox.
+- [x] Class A request still requires owner Class A approval.
+- [x] Tick endpoint refuses calls without the service token; rules never see other firms' transactions.
+- [x] Tray counts match the fixture.
+
+CE-S3 evidence (2026-10-05): `npm run check:ce:s3-register-rules` passes on the JSON store and on a fresh, fully migrated scratch Postgres (migrations 0001-0051). Regression set (W1, W2, W4, hiring, work-assignment, workdesk-archive, HM-S4 items 2 to 7, CE-S0, CE-S1, CE-S2) passes. Browser click-through (Rules page: add from template, refused enable without preview, preview, enable, Run rules now, no duplicate on second run, activity; dashboard BizKick tray; supporting-document tickbox and transaction detail) ran with no unexpected console errors. Decisions taken: supporting files carry a PRIMARY/SUPPORTING role and never replace the primary revision; File Link/Path matching is left to the folder connector. Production scheduler recommendation: Supabase `pg_cron` + `pg_net` calling `POST /automation/tick` with `VFIRM_SERVICE_TOKEN` (not applied; owner to confirm). Not verified: `check:awia:hire-a-worker` was not re-run in the cloud copy (its script file is absent there); RLS is not re-proved by the Postgres smoke because it connects as the database owner.
 
 ### CE-S4 — Number Authority
 
@@ -454,7 +456,7 @@ Acceptance checks (`npm run check:vi:s6-einvoice-readiness`):
 
 - [x] ADR-094 Connected EDCS (D1, D2, D3, D6, D7, D8)
 - [x] Integration contract v1.0 approved (2026-10-05; Inventory = full content, Legal = metadata only, recorded in ADR-095)
-- [ ] Production scheduler for ticks chosen (CE-S3)
+- [x] Production scheduler for ticks chosen (CE-S3): recommendation is Supabase `pg_cron` + `pg_net` to `POST /automation/tick`; owner to apply
 - [ ] BizKick v1.1 "Connected edition" release decision (CE-S4)
 - [ ] D5 Trust Ladder decision + its ADR (before VI-S5)
 - [ ] Current LHDN spec confirmed (before VI-S6)
@@ -472,7 +474,7 @@ Acceptance checks (`npm run check:vi:s6-einvoice-readiness`):
 
 - [ ] `/edcs/connection`, `/edcs/register-imports`, `/edcs/transactions`, `/edcs/sync-runs`, `/edcs/conflicts/resolve`, `/edcs/transactions/link-counterparty`
 - [x] File matching / linking endpoints (CE-S2): `POST /edcs/files/upload`, `GET /edcs/chains`, `GET /edcs/documents/<id>`
-- [ ] `/automation/rules` CRUD + dry-run; `/automation/tick` (service token)
+- [x] `/automation/rules` CRUD + dry-run; `/automation/tick` (service token) (CE-S3)
 - [ ] `/edcs/numbers/reserve`, void, list
 - [ ] `/edcs/approval-policy/import`, role mapping
 - [ ] `/edcs/sync` (connector); token issue/rotate/revoke; heartbeat
