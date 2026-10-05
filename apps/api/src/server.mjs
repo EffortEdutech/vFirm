@@ -25,7 +25,7 @@ import { listWorkRequestTypes } from "../../../packages/core-domain/src/awia-wor
 import { runSkill, SkillInputError } from "../../../packages/core-domain/src/awia-skill-runner.mjs";
 import { createFileStorage, fileMaxBytes, sanitizeFilename, resolveAllowedMimeType, sha256Hex, storageKeyFor, FILE_CLASSIFICATIONS } from "./file-storage.mjs";
 // CE-S1 (ADR-095): Connected EDCS -- BizKick register import and sync ledger.
-import { EDCS_COLLECTIONS, importRegister as importEdcsRegister, linkCounterparty as linkEdcsCounterparty, listConflicts as listEdcsConflicts, listSyncRuns as listEdcsSyncRuns, listTransactions as listEdcsTransactions, readConnection as readEdcsConnection, readEdcsExportCollections, readSyncRun as readEdcsSyncRun, readTransaction as readEdcsTransaction, resolveConflict as resolveEdcsConflict, saveConnection as saveEdcsConnection } from "./edcs-service.mjs";
+import { EDCS_COLLECTIONS, linkEdcsFile, listEdcsChains, readEdcsDocuments, importRegister as importEdcsRegister, linkCounterparty as linkEdcsCounterparty, listConflicts as listEdcsConflicts, listSyncRuns as listEdcsSyncRuns, listTransactions as listEdcsTransactions, readConnection as readEdcsConnection, readEdcsExportCollections, readSyncRun as readEdcsSyncRun, readTransaction as readEdcsTransaction, resolveConflict as resolveEdcsConflict, saveConnection as saveEdcsConnection } from "./edcs-service.mjs";
 
 const root = process.cwd();
 const port = Number(process.env.VFIRM_API_PORT ?? 3091);
@@ -3447,6 +3447,33 @@ async function importEdcsRegisterRoute(body, req = null) {
   return importEdcsRegister({ body, actor, readFileBytes: readEdcsFileBytes });
 }
 
+// CE-S2 (ADR-096): POST /edcs/files/upload?tenant_id=&firm_id=&filename=[&transaction_id=] (raw binary body).
+// One call = one file. The owner's file is matched to a transaction by the ID in its name (or the
+// manual transaction_id) and filed in the document register; HR/Legal types keep only metadata.
+async function linkEdcsFileRoute(req, url) {
+  const tenant_id = url.searchParams.get("tenant_id");
+  const firm_id = url.searchParams.get("firm_id");
+  requireFields({ tenant_id, firm_id, filename: url.searchParams.get("filename") }, ["tenant_id", "firm_id", "filename"]);
+  const { actor, scope } = edcsScope(req, { tenant_id, firm_id }, "link a file to a BizKick transaction");
+  const filename = sanitizeFilename(url.searchParams.get("filename"));
+  const mime_type = resolveAllowedMimeType(filename, req.headers["content-type"]);
+  const buffer = await readBinaryBody(req, fileMaxBytes());
+  if (buffer.length === 0) {
+    const error = new Error("Uploaded file is empty.");
+    error.status = 400;
+    error.code = "VALIDATION_ERROR";
+    throw error;
+  }
+  return linkEdcsFile({
+    scope, actor, filename, mime_type, buffer, transaction_id: url.searchParams.get("transaction_id"),
+    storeBytes: async ({ file_id, buffer: bytes, mime_type: type }) => {
+      const storage_key = storageKeyFor({ tenant_id, firm_id, file_id });
+      await fileStorage.put(storage_key, bytes, type);
+      return { storage_backend: fileStorage.backend, storage_key };
+    }
+  });
+}
+
 async function resolveEdcsConflictRoute(body, req = null) {
   requireFields(body, ["tenant_id", "firm_id", "transaction_id", "choose"]);
   const { actor } = edcsScope(req, body, "resolve a BizKick conflict");
@@ -3462,13 +3489,15 @@ async function linkEdcsCounterpartyRoute(body, req = null) {
 // GET /edcs/connection | /edcs/transactions[/<id>] | /edcs/sync-runs[/<id>] | /edcs/conflicts
 // (?tenant_id=&firm_id= required; transactions also take type, status, alert, flag, search, as_of).
 async function readEdcsRoute(req, url) {
-  const match = url.pathname.match(/^\/edcs\/(connection|transactions|sync-runs|conflicts)(?:\/([^/]+))?$/);
+  const match = url.pathname.match(/^\/edcs\/(connection|transactions|sync-runs|conflicts|chains|documents)(?:\/([^/]+))?$/);
   if (!match) return null;
   const [, kind, rawId] = match;
   const { scope } = edcsScope(req, { tenant_id: url.searchParams.get("tenant_id"), firm_id: url.searchParams.get("firm_id") }, "read BizKick data");
   const id = rawId ? decodeURIComponent(rawId) : null;
   if (kind === "connection" && !id) return readEdcsConnection(scope);
   if (kind === "conflicts" && !id) return listEdcsConflicts({ scope });
+  if (kind === "chains" && !id) return listEdcsChains({ scope });
+  if (kind === "documents" && id) return readEdcsDocuments({ scope, transactionId: id });
   if (kind === "transactions") return id ? readEdcsTransaction({ scope, transactionId: id, params: url.searchParams }) : listEdcsTransactions({ scope, params: url.searchParams });
   if (kind === "sync-runs") return id ? readEdcsSyncRun({ scope, runId: id }) : listEdcsSyncRuns({ scope });
   return null;
@@ -3638,6 +3667,7 @@ const server = createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/accounts/cash-snapshot") return sendJson(req, res, 200, { ok: true, data: await readAccountsCashSnapshot(req, url) });
     if (req.method === "GET" && url.pathname === "/database/schema") { const schema = await readFile(join(root, "infra/database/schema.sql"), "utf8"); return sendJson(req, res, 200, { ok: true, data: { path: "infra/database/schema.sql", bytes: schema.length } }); }
     if (req.method === "GET" && url.pathname === "/work-requests/request-types") return sendJson(req, res, 200, { ok: true, data: listWorkRequestTypes() });
+    if (req.method === "POST" && url.pathname === "/edcs/files/upload") return sendJson(req, res, 201, { ok: true, data: await linkEdcsFileRoute(req, url) });
     if (req.method === "POST" && url.pathname === "/files/upload") return sendJson(req, res, 201, { ok: true, data: await uploadFirmFile(req, url) });
     { const fileDownload = req.method === "GET" ? url.pathname.match(/^\/files\/([^/]+)\/download$/) : null; if (fileDownload) return await downloadFirmFile(req, res, url, decodeURIComponent(fileDownload[1])); }
     { const edcsRead = req.method === "GET" && url.pathname.startsWith("/edcs/") ? await readEdcsRoute(req, url) : null; if (edcsRead) return sendJson(req, res, 200, { ok: true, data: edcsRead }); }

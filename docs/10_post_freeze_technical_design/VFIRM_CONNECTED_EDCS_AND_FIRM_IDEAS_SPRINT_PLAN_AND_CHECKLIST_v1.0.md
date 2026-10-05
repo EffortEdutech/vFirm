@@ -184,12 +184,14 @@ Scope:
 
 Acceptance checks (`npm run check:ce:s2-file-linking`):
 
-- [ ] Fixture files match by ID; unmatched files listed for manual linking.
-- [ ] Document register shows the Transaction ID number, correct revision, real SHA-256.
-- [ ] Same file uploaded twice → no new revision; changed file → new revision, prior superseded.
-- [ ] HR transaction file content not stored under the default policy; fingerprint kept.
-- [ ] Chain view shows QT→…→RC for the fixture and flags the GRN without a PO.
-- [ ] Download of a linked file re-verifies SHA-256; cross-firm access refused.
+- [x] Fixture files match by ID; unmatched files listed for manual linking.
+- [x] Document register shows the Transaction ID number, correct revision, real SHA-256.
+- [x] Same file uploaded twice → no new revision; changed file → new revision, prior superseded.
+- [x] HR transaction file content not stored under the default policy; fingerprint kept.
+- [x] Chain view shows QT→…→RC for the fixture and flags the GRN without a PO.
+- [x] Download of a linked file re-verifies SHA-256; cross-firm access refused.
+
+CE-S2 evidence (2026-10-05): `npm run check:ce:s2-file-linking` passes on the JSON store and on a fresh, fully migrated scratch Postgres (migrations 0001-0050; CE-S2 adds no migration). Regression set (W1, W2, W4, hiring, work-assignment, workdesk-archive, HM-S4 items 2, 3 and 7, CE-S0, CE-S1) passes. Browser click-through (Files, Chains, transaction detail, download, HR metadata-only) ran with no console errors. Not verified: `check:awia:hire-a-worker` (its script file is missing from the working copy used this sprint).
 
 ### CE-S3 — Rule engine and register-driven work
 
@@ -469,7 +471,7 @@ Acceptance checks (`npm run check:vi:s6-einvoice-readiness`):
 ### API
 
 - [ ] `/edcs/connection`, `/edcs/register-imports`, `/edcs/transactions`, `/edcs/sync-runs`, `/edcs/conflicts/resolve`, `/edcs/transactions/link-counterparty`
-- [ ] File matching / linking endpoints (CE-S2)
+- [x] File matching / linking endpoints (CE-S2): `POST /edcs/files/upload`, `GET /edcs/chains`, `GET /edcs/documents/<id>`
 - [ ] `/automation/rules` CRUD + dry-run; `/automation/tick` (service token)
 - [ ] `/edcs/numbers/reserve`, void, list
 - [ ] `/edcs/approval-policy/import`, role mapping

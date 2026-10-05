@@ -457,6 +457,13 @@ export async function recordFileDownloadRecord(body, actor) {
   return withStore((store) => {
     const record = (store.file_objects ?? []).find((item) => item.id === body.file_id && item.tenant_id === body.tenant_id && item.firm_id === body.firm_id);
     if (!record) throwNotFound("file_objects", body.file_id);
+    // CE-S2: a METADATA_ONLY record (content policy kept the bytes out) has nothing to download.
+    if (record.status === "METADATA_ONLY" || !record.storage_key) {
+      const error = new Error("This file is recorded as metadata and fingerprint only; its content is not stored in vFirm.");
+      error.status = 409;
+      error.code = "FILE_METADATA_ONLY";
+      throw error;
+    }
     appendEventAndAudit(store, { event_type: "file.downloaded", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "FileObject", aggregate_id: record.id, payload: { filename: record.filename, sha256: record.sha256 }, summary: "File downloaded from firm storage." });
     return record;
   });
@@ -994,6 +1001,85 @@ export async function reviseFileDocumentRecord(body, actor) {
     entry.updated_at = timestamp;
     appendEventAndAudit(store, { event_type: "administration.document_revision_registered", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "DocumentRegisterEntry", aggregate_id: entry.id, payload: { revision_id: revision.id, revision: label, supersedes_revision_id: previous?.id ?? null, sha256: file.sha256 }, summary: "New document revision registered from an uploaded file; prior revision superseded." });
     return { document: entry, revision, previous_revision: previous };
+  });
+}
+
+// CE-S2 (ADR-096, 2026-10-05): file a BizKick transaction's file in the firm's document register.
+// One withStore call = one transaction: the file_objects record, the document register entry
+// (numbered with the Transaction ID), the revision and the audit event commit together or not at all.
+// The same SHA-256 as the current revision changes nothing (UNCHANGED); a different one is a new
+// revision and the prior is SUPERSEDED. `body.content_stored` false means the content policy (D7)
+// keeps metadata + fingerprint only: the file record exists with no storage key and cannot be
+// downloaded. Callers: apps/api/src/edcs-service.mjs (linkEdcsFile).
+export function newFileId() { return storeBackend === "postgres" ? newUuid() : newId("file"); }
+
+export async function findEdcsDocumentState(scope, transactionId) {
+  const store = await readStore(scope.tenant_id);
+  const inScope = (record) => record.tenant_id === scope.tenant_id && record.firm_id === scope.firm_id;
+  const entry = (store.document_register_entries ?? []).find((record) => inScope(record) && record.document_number === transactionId) ?? null;
+  const revisions = entry ? (store.document_revision_records ?? []).filter((record) => inScope(record) && record.document_register_entry_id === entry.id).sort((a, b) => String(a.created_at).localeCompare(String(b.created_at))) : [];
+  const files = (store.file_objects ?? []).filter((record) => inScope(record) && revisions.some((revision) => revision.metadata?.file_id === record.id));
+  return { entry, revisions, files };
+}
+
+export async function registerEdcsFileRevisionRecord(body, actor) {
+  return withStore((store) => {
+    store.file_objects ??= [];
+    store.document_register_entries ??= [];
+    store.document_revision_records ??= [];
+    const scope = { tenant_id: body.tenant_id, firm_id: body.firm_id };
+    const inScope = (record) => record.tenant_id === scope.tenant_id && record.firm_id === scope.firm_id;
+    const tx = body.transaction;
+    let entry = store.document_register_entries.find((record) => inScope(record) && record.document_number === tx.transaction_id) ?? null;
+    const revisions = entry ? store.document_revision_records.filter((record) => inScope(record) && record.document_register_entry_id === entry.id) : [];
+    const previous = entry ? revisions.find((record) => record.id === entry.current_revision_id) ?? null : null;
+    if (previous && previous.content_hash === body.file.sha256) {
+      const existingFile = store.file_objects.find((record) => inScope(record) && record.id === previous.metadata?.file_id) ?? null;
+      return { outcome: "UNCHANGED", document: entry, revision: previous, previous_revision: null, file: existingFile };
+    }
+    const timestamp = now();
+    const file = {
+      id: body.file.file_id, tenant_id: scope.tenant_id, firm_id: scope.firm_id, filename: body.file.filename, mime_type: body.file.mime_type,
+      size_bytes: body.file.size_bytes, sha256: body.file.sha256, storage_backend: body.content_stored ? body.file.storage_backend : "NONE",
+      storage_key: body.content_stored ? body.file.storage_key : null, classification: body.file.classification, purpose: "EDCS_LINK",
+      linked_to: `edcs:${tx.transaction_id}`, scan_status: "NOT_SCANNED", status: body.content_stored ? "STORED" : "METADATA_ONLY",
+      uploaded_by_actor_id: actor.actor_id ?? actor.id ?? null, created_at: timestamp, updated_at: timestamp
+    };
+    store.file_objects.push(file);
+    const created = !entry;
+    if (!entry) {
+      entry = {
+        id: sf3Id("document_register"), tenant_id: scope.tenant_id, firm_id: scope.firm_id, relationship_id: null, project_id: null,
+        document_number: tx.transaction_id, title: String(tx.title ?? tx.transaction_id).slice(0, 200), document_type: tx.document_type, discipline: null,
+        classification: body.file.classification, status: "ACTIVE", current_revision_id: null, owner_actor_id: actor.actor_id ?? null,
+        created_at: timestamp, updated_at: timestamp, metadata: { source: "bizkick_edcs", transaction_id: tx.transaction_id, content_policy: body.content_stored ? "CONTENT" : "METADATA_ONLY" }
+      };
+      store.document_register_entries.push(entry);
+    }
+    const used = new Set(revisions.map((record) => record.revision));
+    let label = body.revision_label && !used.has(body.revision_label) ? body.revision_label : null;
+    if (!label) {
+      let n = revisions.reduce((max, record) => { const m = /^R(\d+)$/.exec(record.revision ?? ""); return m ? Math.max(max, Number(m[1])) : max; }, -1) + 1;
+      while (used.has(`R${n}`)) n += 1;
+      label = `R${n}`;
+    }
+    if (previous) previous.status = "SUPERSEDED";
+    const revision = {
+      id: sf3Id("document_revision"), tenant_id: scope.tenant_id, firm_id: scope.firm_id, document_register_entry_id: entry.id, revision: label, version_label: label,
+      storage_ref: `file:${file.id}`, content_hash: file.sha256, status: "CURRENT", supersedes_revision_id: previous?.id ?? null, created_by_actor_id: actor.actor_id ?? null,
+      created_at: timestamp, metadata: { file_id: file.id, filename: file.filename, transaction_id: tx.transaction_id, method: body.method, content_stored: body.content_stored === true, note: body.note ?? null }
+    };
+    store.document_revision_records.push(revision);
+    entry.current_revision_id = revision.id;
+    entry.updated_at = timestamp;
+    appendEventAndAudit(store, {
+      event_type: created ? "edcs.file_linked" : "edcs.file_revised", actor, tenant_id: scope.tenant_id, firm_id: scope.firm_id, aggregate_type: "DocumentRegisterEntry", aggregate_id: entry.id,
+      payload: { transaction_id: tx.transaction_id, document_number: entry.document_number, revision: label, supersedes_revision_id: previous?.id ?? null, file_id: file.id, sha256: file.sha256, content_stored: body.content_stored === true, method: body.method },
+      summary: created
+        ? `${tx.transaction_id}: file linked as ${label}${body.content_stored ? "" : " (metadata and fingerprint only, per content policy)"}.`
+        : `${tx.transaction_id}: new file filed as ${label}; ${previous?.revision ?? "prior revision"} superseded.`
+    });
+    return { outcome: created ? "LINKED" : "REVISED", document: entry, revision, previous_revision: previous, file };
   });
 }
 

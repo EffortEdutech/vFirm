@@ -158,10 +158,100 @@ async function showDetail(host, id) {
       : suggestions.length
         ? `<p class="field-note">vFirm suggests, you confirm. Nothing is linked or created automatically.</p>${suggestions.map((s) => `<div>${escapeHtml(s.name ?? s.client_id)} ${pill(s.match, "default")} <button class="btn btn-sm bk-link" data-client="${escapeHtml(s.client_id)}" type="button">Link this client</button></div>`).join("")}`
         : `<p class="field-note">No matching client found. The counterparty stays as BizKick named it.</p>`)
+    + (d.chain && d.chain.size > 1 ? panel("Chain", `<div style="padding:.75rem 1rem;line-height:1.9">${d.chain.nodes.map((n) => `<div style="margin-left:${n.depth * 1.5}rem">${n.depth ? "↳ " : ""}${n.transaction_id === id ? `<strong>${escapeHtml(n.transaction_id)}</strong> (this one)` : escapeHtml(n.transaction_id)} ${pill(n.status ?? n.document_type, "default")} ${n.flags.map((f) => pill(FLAG_TEXT[f.flag] ?? f.flag, "amber")).join(" ")}</div>`).join("")}</div>`) : "")
+    + panel("Files", !d.documents?.linked ? `<p class="field-note">No file linked yet. Upload it on BizKick → Files.</p>` : `<p class="field-note">Filed in the document register as ${escapeHtml(d.documents.document.document_number)}.</p>` + table([
+      { label: "Rev", render: (r) => escapeHtml(r.revision) }, { label: "Status", render: (r) => pill(r.status, r.status === "CURRENT" ? "moss" : "default") },
+      { label: "File", render: (r) => escapeHtml(r.filename ?? "") }, { label: "Filed", render: (r) => escapeHtml(dt(r.filed_at)) },
+      { label: "SHA-256", render: (r) => `<code>${escapeHtml(String(r.content_hash ?? "").slice(0, 12))}</code>` },
+      { label: "", render: (r) => r.downloadable ? `<button class="btn btn-sm bk-dl" data-file="${escapeHtml(r.file_id)}" data-name="${escapeHtml(r.filename ?? "download")}" type="button">Download</button>` : `<span class="field-note">details and fingerprint only</span>` }
+    ], d.documents.revisions, (r) => r.revision_id))
     + panel("Revisions", table([{ label: "#", key: "seq" }, { label: "Revision", key: "revision" }, { label: "Kind", render: (r) => pill(r.kind.replace(/_/g, " "), "default") }, { label: "Recorded", render: (r) => escapeHtml(dt(r.created_at)) }, { label: "Note", render: (r) => escapeHtml(r.resolution_note ?? "") }], d.revisions, (r) => String(r.seq)))
     + panel("History", table([{ label: "Run", key: "run_number" }, { label: "Outcome", render: (e) => outcomePill(e.outcome) }, { label: "Changes", render: (e) => escapeHtml(Object.keys(e.changes ?? {}).join(", ")) }, { label: "When", render: (e) => escapeHtml(dt(e.at)) }], d.events, (e) => e.id));
   for (const button of host.querySelectorAll(".bk-link")) button.addEventListener("click", async () => { await api.linkEdcsCounterparty({ transaction_id: id, link_type: "CLIENT", client_id: button.dataset.client, note: "Confirmed from the transaction page" }); await showDetail(host, id); });
+  for (const button of host.querySelectorAll(".bk-dl")) button.addEventListener("click", async () => { try { await api.downloadFile(button.dataset.file, button.dataset.name); } catch (err) { button.textContent = err.message; } });
   host.querySelector("#bkUnlink")?.addEventListener("click", async () => { await api.linkEdcsCounterparty({ transaction_id: id, link_type: "NONE" }); await showDetail(host, id); });
+}
+
+
+// ---------------- files (CE-S2) ----------------
+
+const FILE_OUTCOME_TONE = { LINKED: "moss", REVISED: "moss", UNCHANGED: "default", UNMATCHED: "amber", ORPHAN: "amber", WRONG_COMPANY: "rose", UNKNOWN_TYPE: "rose" };
+const FILE_OUTCOME_TEXT = {
+  LINKED: "Filed", REVISED: "New revision filed", UNCHANGED: "Same file, nothing changed",
+  UNMATCHED: "No Transaction ID in the name", ORPHAN: "Transaction not in the register", WRONG_COMPANY: "Another company's ID", UNKNOWN_TYPE: "Unknown document type"
+};
+
+async function mountFiles(root) {
+  let data;
+  try { data = await api.getEdcsConnection(); } catch (err) { root.innerHTML = errorBox(err, "the BizKick connection"); return; }
+  if (!data.connection) { root.innerHTML = GOLDEN_RULE + empty("Connect this firm to BizKick first (BizKick → Connection)."); return; }
+  const pending = new Map(); // filename -> File, kept so an unmatched file can be linked by hand without re-choosing it
+  const results = [];
+  root.innerHTML = GOLDEN_RULE + panel("Upload BizKick documents", `
+    <p>Choose the files BizKick produced, for example <code>${escapeHtml(data.connection.company_code)}-QT-2026-0001_R1_Alpha.pdf</code>. vFirm finds the Transaction ID in each name and files it under that transaction.
+    A file whose name has no ID is listed below so you can link it yourself. HR and legal documents keep only their details and a fingerprint unless you opted in on the Connection page.</p>
+    <input id="bkFiles" type="file" multiple accept=".pdf,.docx,.doc,.xlsx,.xls,.csv,.txt,.png,.jpg,.jpeg" />
+    <button class="btn btn-primary" id="bkFilesBtn" type="button">Upload and link</button>
+    <div id="bkFilesMsg" style="min-height:1.2em"></div>`) + `<div id="bkFilesResult"></div>`;
+  const msg = root.querySelector("#bkFilesMsg");
+  const draw = () => {
+    const host = root.querySelector("#bkFilesResult");
+    if (!results.length) { host.innerHTML = ""; return; }
+    host.innerHTML = panel("Results", `<div style="overflow-x:auto">` + table([
+      { label: "File", render: (r) => escapeHtml(r.filename) },
+      { label: "Outcome", render: (r) => pill(FILE_OUTCOME_TEXT[r.outcome] ?? r.outcome, FILE_OUTCOME_TONE[r.outcome] ?? "default") },
+      { label: "Transaction", render: (r) => escapeHtml(r.transaction_id ?? "—") },
+      { label: "Revision", render: (r) => escapeHtml(r.revision ?? "—") + (r.superseded_revision ? ` <span class="field-note">(${escapeHtml(r.superseded_revision)} superseded)</span>` : "") },
+      { label: "Stored", render: (r) => r.content_stored === undefined ? "—" : r.content_stored ? "Content kept" : "Details and fingerprint only" },
+      { label: "SHA-256", render: (r) => `<code>${escapeHtml(String(r.sha256 ?? "").slice(0, 12))}</code>` },
+      { label: "", render: (r) => (!["LINKED", "REVISED", "UNCHANGED"].includes(r.outcome) && pending.has(r.filename))
+        ? `<input class="bk-manual-id" data-name="${escapeHtml(r.filename)}" placeholder="${escapeHtml(data.connection.company_code)}-QT-2026-0001" size="16" style="max-width:11rem" /> <button class="btn btn-sm bk-manual" data-name="${escapeHtml(r.filename)}" type="button">Link</button><div class="field-note">${escapeHtml(r.detail ?? "")}</div>`
+        : escapeHtml(r.detail && !["LINKED", "REVISED", "UNCHANGED"].includes(r.outcome) ? r.detail : "") }
+    ], results, (r) => `${r.filename}-${r.sha256}`) + `</div>`);
+    for (const button of host.querySelectorAll(".bk-manual")) button.addEventListener("click", async () => {
+      const name = button.dataset.name;
+      const id = host.querySelector(`.bk-manual-id[data-name="${CSS.escape(name)}"]`).value.trim();
+      if (!id) return;
+      try {
+        const outcome = await api.linkEdcsFile(pending.get(name), { transactionId: id });
+        const index = results.findIndex((r) => r.filename === name);
+        results[index] = outcome;
+        if (["LINKED", "REVISED", "UNCHANGED"].includes(outcome.outcome)) pending.delete(name);
+      } catch (err) { msg.textContent = err.message; }
+      draw();
+    });
+  };
+  root.querySelector("#bkFilesBtn").addEventListener("click", async () => {
+    const files = [...root.querySelector("#bkFiles").files];
+    if (!files.length) { msg.textContent = "Choose at least one file."; return; }
+    msg.textContent = `Uploading ${files.length} file${files.length === 1 ? "" : "s"}…`;
+    for (const file of files) {
+      try {
+        const outcome = await api.linkEdcsFile(file);
+        if (!["LINKED", "REVISED", "UNCHANGED"].includes(outcome.outcome)) pending.set(file.name, file);
+        results.unshift(outcome);
+      } catch (err) {
+        results.unshift({ filename: file.name, outcome: "UNMATCHED", detail: err.message, sha256: "" });
+      }
+    }
+    msg.textContent = "";
+    draw();
+  });
+}
+
+// ---------------- chains (CE-S2) ----------------
+
+const FLAG_TEXT = { RELATED_NOT_FOUND: "Related transaction not in the register", MISSING_PREDECESSOR: "Missing predecessor", RELATED_UNEXPECTED_TYPE: "Unexpected predecessor type" };
+
+async function mountChains(root) {
+  let data;
+  try { data = await api.getEdcsChains(); } catch (err) { root.innerHTML = errorBox(err, "transaction chains"); return; }
+  if (!data.chains.length && !data.flags.length) { root.innerHTML = GOLDEN_RULE + empty(data.total_transactions ? "No linked transactions yet. Chains appear when a transaction names a related one." : "Import a register first."); return; }
+  root.innerHTML = GOLDEN_RULE
+    + statRow([{ value: data.chains.length, label: "Chains" }, { value: data.flags.length, label: "Missing links" }, { value: data.standalone, label: "Standalone" }])
+    + (data.flags.length ? panel("Missing links", table([{ label: "Transaction", render: (f) => escapeHtml(f.transaction_id) }, { label: "Flag", render: (f) => pill(FLAG_TEXT[f.flag] ?? f.flag, "amber") }, { label: "Detail", render: (f) => escapeHtml(f.detail) }], data.flags, (f) => `${f.transaction_id}-${f.flag}`)) : "")
+    + data.chains.map((chain) => panel(`${chain.family === "SALES" ? "Sales" : chain.family === "PROCUREMENT" ? "Procurement" : "Related"} chain — ${escapeHtml(chain.chain_id)} (${chain.size})`,
+      `<div class="bk-chain" style="padding:.75rem 1rem;line-height:1.9">${chain.nodes.map((n) => `<div style="margin-left:${n.depth * 1.5}rem">${n.depth ? "↳ " : ""}<strong>${escapeHtml(n.transaction_id)}</strong> ${pill(n.status ?? n.document_type, "default")} ${n.flags.map((f) => pill(FLAG_TEXT[f.flag] ?? f.flag, "amber")).join(" ")}</div>`).join("")}</div>`)).join("");
 }
 
 // ---------------- sync history ----------------
@@ -224,6 +314,8 @@ export const BIZKICK_PAGES = {
   "bizkick-connection": mountConnection,
   "bizkick-import": mountImport,
   "bizkick-transactions": mountTransactions,
+  "bizkick-files": mountFiles,
+  "bizkick-chains": mountChains,
   "bizkick-history": mountHistory,
   "bizkick-conflicts": mountConflicts,
 };

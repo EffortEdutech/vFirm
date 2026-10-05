@@ -149,6 +149,27 @@ async function uploadFile(file, { classification = "CLIENT_CONFIDENTIAL", purpos
   return payload.data;
 }
 
+// CE-S2: one file linked to a BizKick transaction (raw bytes; the ID in the file name picks the
+// transaction, or pass transactionId to link by hand). Returns the per-file outcome.
+async function linkEdcsFile(file, { transactionId = "" } = {}) {
+  const query = `filename=${encodeURIComponent(file.name)}${transactionId ? `&transaction_id=${encodeURIComponent(transactionId)}` : ""}`;
+  const res = await fetch(API_PREFIX + withScope(`/edcs/files/upload?${query}`), {
+    method: "POST",
+    headers: { "content-type": file.type || "application/octet-stream", ...(await authHeaders()) },
+    body: file,
+  });
+  let payload = null;
+  try { payload = await res.json(); } catch { /* non-JSON error body */ }
+  if (!res.ok || payload?.ok === false) {
+    const err = new Error(payload?.error?.message ?? `Upload failed (${res.status})`);
+    err.status = res.status;
+    err.code = payload?.error?.code;
+    throw err;
+  }
+  getCache.clear();
+  return payload.data;
+}
+
 async function downloadFile(fileId, filename = "download") {
   const res = await fetch(API_PREFIX + withScope(`/files/${encodeURIComponent(fileId)}/download`), { headers: { ...(await authHeaders()) } });
   if (!res.ok) {
@@ -199,6 +220,7 @@ export const api = {
   archiveWorkdeskItem: (body) => request("/awia/virtual-staff/workdesk-item/archive", { method: "POST", body }),
   decideClassAApproval: (body) => request("/awia/virtual-staff/output-class-a-approval", { method: "POST", body }),
   uploadFile,
+  linkEdcsFile,
   downloadFile,
   // ADR-090 W2: owner work requests (the firm's front door) + internal work completion.
   getRequestTypes: () => request("/work-requests/request-types"),
@@ -222,6 +244,7 @@ export const api = {
   getEdcsTransaction: (id) => request(withScope(`/edcs/transactions/${encodeURIComponent(id)}`), { skipCache: true }),
   listEdcsSyncRuns: () => request(withScope("/edcs/sync-runs"), { skipCache: true }),
   getEdcsSyncRun: (id) => request(withScope(`/edcs/sync-runs/${encodeURIComponent(id)}`), { skipCache: true }),
+  getEdcsChains: () => request(withScope("/edcs/chains"), { skipCache: true }),
   listEdcsConflicts: () => request(withScope("/edcs/conflicts"), { skipCache: true }),
   resolveEdcsConflict: (body) => request("/edcs/conflicts/resolve", { method: "POST", body }),
   linkEdcsCounterparty: (body) => request("/edcs/transactions/link-counterparty", { method: "POST", body }),

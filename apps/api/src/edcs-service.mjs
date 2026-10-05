@@ -11,12 +11,14 @@
 // conflict resolution, counterparty link) needs the firm owner (a human principal). A caller can
 // only ever reach its own tenant/firm -- every repository call is scoped.
 
-import { appendEventAndAudit, newUuid, now, readStore, withStore } from "./store.mjs";
+import { appendEventAndAudit, findEdcsDocumentState, newFileId, newUuid, now, readStore, registerEdcsFileRevisionRecord, withStore } from "./store.mjs";
+import { sha256Hex } from "./file-storage.mjs";
 import { edcsRepository as repo, EDCS_COLLECTIONS } from "./edcs-repository.mjs";
 import {
   EDCS_DOCUMENT_TYPES, EDCS_STATUSES, EDCS_OUTCOMES, computeEdcsAlert, daysToDue, describeChanges, effectiveContentPolicy,
   processRegisterRows, readRegisterFile, rowFingerprint
 } from "../../../packages/core-domain/src/edcs-register.mjs";
+import { buildTransactionChains, chainForTransaction, extractTransactionId, revisionLabelFromFilename } from "../../../packages/core-domain/src/edcs-chains.mjs";
 import { TabularReadError } from "../../../packages/core-domain/src/tabular-file-reader.mjs";
 
 const OWNER_ROLES = ["principal", "PILOT_PRINCIPAL", "FIRM_PRINCIPAL", "ADMIN"];
@@ -343,9 +345,13 @@ export async function readTransaction({ scope, transactionId, params }) {
   const asOf = validAsOf(params?.get("as_of"));
   const record = await repo.getTransaction(scope, transactionId);
   if (!record) throw httpError(404, "NOT_FOUND", `edcs_transactions record not found: ${transactionId}`);
+  const documents = await documentHistory(scope, transactionId);
+  const chain = chainForTransaction(await repo.listTransactions(scope), transactionId);
   return {
     as_of: asOf,
     transaction: decorate(record, asOf),
+    documents,
+    chain,
     revisions: await repo.listRevisions(scope, transactionId),
     events: await repo.listEvents(scope, { transaction_id: transactionId }),
     counterparty_suggestions: await counterpartySuggestions(scope, record)
@@ -443,6 +449,120 @@ export async function linkCounterparty({ body, actor }) {
     summary: link ? `Owner confirmed ${updated.transaction_id}'s counterparty as ${link.link_type.toLowerCase()} ${link.name}.` : `Owner removed the counterparty link on ${updated.transaction_id}.`
   }]);
   return { transaction: decorate(updated, todayUtc()) };
+}
+
+
+// ---------------- file linking and document history (CE-S2) ----------------
+
+function fileClassificationFor(documentType) {
+  const type = EDCS_DOCUMENT_TYPES[documentType];
+  if (!type) return "CLIENT_CONFIDENTIAL";
+  if (type.module === "HR" || type.classification === "Restricted") return "HR_RESTRICTED";
+  if (type.module === "Finance") return "FINANCE_RESTRICTED";
+  if (type.classification === "Internal") return "FIRM_INTERNAL";
+  return "CLIENT_CONFIDENTIAL";
+}
+
+// The revision history of the file(s) filed under a transaction, newest first, from the firm's
+// document register. Download availability follows the content policy actually applied.
+async function documentHistory(scope, transactionId) {
+  const { entry, revisions, files } = await findEdcsDocumentState(scope, transactionId);
+  if (!entry) return { linked: false, document: null, revisions: [], current_revision: null };
+  const fileById = new Map(files.map((file) => [file.id, file]));
+  const list = revisions.map((revision) => {
+    const file = fileById.get(revision.metadata?.file_id) ?? null;
+    return {
+      revision_id: revision.id, revision: revision.revision, status: revision.status, supersedes_revision_id: revision.supersedes_revision_id ?? null,
+      content_hash: revision.content_hash, filed_at: revision.created_at, method: revision.metadata?.method ?? null, note: revision.metadata?.note ?? null,
+      file_id: file?.id ?? null, filename: file?.filename ?? revision.metadata?.filename ?? null, size_bytes: file?.size_bytes ?? null,
+      content_stored: file ? file.status === "STORED" : false, downloadable: file ? file.status === "STORED" : false
+    };
+  }).reverse();
+  return {
+    linked: true,
+    document: { id: entry.id, document_number: entry.document_number, title: entry.title, classification: entry.classification, content_policy: entry.metadata?.content_policy ?? null },
+    revisions: list,
+    current_revision: list.find((item) => item.revision_id === entry.current_revision_id) ?? null
+  };
+}
+
+const documentsSummary = (history) => history.linked ? {
+  linked: true, document_entry_id: history.document.id, current_revision: history.current_revision?.revision ?? null, revision_count: history.revisions.length,
+  content_stored: history.current_revision?.content_stored ?? false, filename: history.current_revision?.filename ?? null, sha256: history.current_revision?.content_hash ?? null,
+  last_filed_at: history.current_revision?.filed_at ?? null
+} : { linked: false };
+
+// One uploaded file. `storeBytes` is supplied by the route layer ({file_id, filename, mime_type, buffer} ->
+// {storage_backend, storage_key}) so this module stays storage-agnostic. Outcomes:
+//   LINKED / REVISED / UNCHANGED   filed in the register (the owner's own register entry for this ID)
+//   UNMATCHED                      no Transaction ID in the file name (nothing stored; owner can link by hand)
+//   ORPHAN                         ID found but the transaction is not in the imported register (nothing stored)
+//   WRONG_COMPANY / UNKNOWN_TYPE   well-formed ID that does not belong to this firm's connection
+export async function linkEdcsFile({ scope: scopeInput, actor, filename, mime_type, buffer, transaction_id, storeBytes }) {
+  requireOwner(actor, "Linking a file to a BizKick transaction");
+  const scope = scopeOf(scopeInput);
+  const connection = await repo.getConnection(scope);
+  if (!connection) throw httpError(409, "EDCS_NOT_CONNECTED", "Set up the BizKick connection (company code) before linking files.");
+  const sha256 = sha256Hex(buffer);
+  const base = { filename, size_bytes: buffer.length, sha256 };
+  let method = "FILENAME";
+  let revisionHint = null;
+  let id = null;
+  const manual = String(transaction_id ?? "").trim();
+  if (manual) {
+    method = "MANUAL";
+    id = manual.toUpperCase();
+    revisionHint = revisionLabelFromFilename(filename);
+    const parsed = extractTransactionId(id, connection.company_code);
+    if (parsed.status !== "FOUND" || parsed.transaction_id !== id) return { ...base, outcome: "UNMATCHED", reason: "TRANSACTION_ID_INVALID", detail: `${manual} is not a Transaction ID for company ${connection.company_code}.` };
+  } else {
+    const found = extractTransactionId(filename, connection.company_code);
+    if (found.status === "NONE") return { ...base, outcome: "UNMATCHED", reason: "NO_TRANSACTION_ID", detail: "No Transaction ID in the file name." };
+    if (found.status === "WRONG_COMPANY") return { ...base, outcome: "WRONG_COMPANY", reason: "WRONG_COMPANY", detail: `The ID carries company code ${found.company_code}, but this firm's connection is ${connection.company_code}.` };
+    if (found.status === "UNKNOWN_TYPE") return { ...base, outcome: "UNKNOWN_TYPE", reason: "UNKNOWN_TYPE", detail: `${found.document_type} is not one of the contract document types.` };
+    id = found.transaction_id;
+    revisionHint = revisionLabelFromFilename(found.remainder);
+  }
+  const record = await repo.getTransaction(scope, id);
+  if (!record) return { ...base, outcome: "ORPHAN", transaction_id: id, reason: "TRANSACTION_NOT_IN_REGISTER", detail: `${id} is not in the imported register. Import the register first, or check the file name.` };
+
+  const policy = effectiveContentPolicy(record.document_type, connection);
+  const contentStored = policy === "CONTENT";
+  const fileId = newFileId();
+  let stored = { storage_backend: "NONE", storage_key: null };
+  const state = await findEdcsDocumentState(scope, id);
+  const current = state.entry ? state.revisions.find((revision) => revision.id === state.entry.current_revision_id) : null;
+  const identical = current && current.content_hash === sha256;
+  if (contentStored && !identical) stored = await storeBytes({ file_id: fileId, filename, mime_type, buffer });
+  const result = await registerEdcsFileRevisionRecord({
+    tenant_id: scope.tenant_id, firm_id: scope.firm_id,
+    transaction: { transaction_id: id, document_type: record.document_type, title: `${EDCS_DOCUMENT_TYPES[record.document_type].name} ${id}${record.subject ? ` - ${record.subject}` : ""}` },
+    file: { file_id: fileId, filename, mime_type, size_bytes: buffer.length, sha256, storage_backend: stored.storage_backend, storage_key: stored.storage_key, classification: fileClassificationFor(record.document_type) },
+    content_stored: contentStored, revision_label: revisionHint ?? record.revision ?? null, method, note: null
+  }, actor);
+
+  const history = await documentHistory(scope, id);
+  if (result.outcome !== "UNCHANGED") {
+    const updated = cloneRecord(record);
+    updated.documents = documentsSummary(history);
+    updated.updated_at = now();
+    await repo.commit(scope, { edcs_transactions: [updated] });
+  }
+  return {
+    ...base, outcome: result.outcome, transaction_id: id, document_type: record.document_type, method,
+    revision: result.revision?.revision ?? null, superseded_revision: result.previous_revision?.revision ?? null,
+    content_policy: policy, content_stored: contentStored, file_id: result.file?.id ?? null, document_entry_id: result.document?.id ?? null
+  };
+}
+
+export async function listEdcsChains({ scope }) {
+  const transactions = await repo.listTransactions(scope);
+  const { chains, flags } = buildTransactionChains(transactions);
+  return { total_transactions: transactions.length, chains: chains.filter((chain) => !chain.trivial), flags, standalone: chains.filter((chain) => chain.trivial).length };
+}
+
+export async function readEdcsDocuments({ scope, transactionId }) {
+  return documentHistory(scope, transactionId);
 }
 
 // ---------------- tenant export ----------------
