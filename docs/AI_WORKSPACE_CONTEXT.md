@@ -164,3 +164,33 @@ Start with:
 5. only the active sprint/checklist docs
 
 Avoid rereading every frozen architecture document unless the task specifically requires architecture review or baseline changes. Prefer focused smoke checks while building, and full `npm run check` only for release/gate/shared-runtime closeout.
+
+## Current Durable State - 2026-10-05 (supersedes the JSON-store/Docker framing above)
+
+Read this section first; older sections above are history.
+
+Database and infrastructure:
+
+- Production database is Supabase (project `gvjjljgzguimpybpgjsf`). The JSON store and the old Docker Postgres setup are legacy and must not be suggested. `infra/docker/docker-compose.postgres.yml` and `.env.local.example` are kept only for historical reference and are labelled legacy.
+- The app connects as the dedicated `vfirm_app` role (nosuperuser, nobypassrls), so row-level security is enforced. The Supabase pooler is in Session Mode with a cap of 15; the app pool default `max` is 10 (`DATABASE_POOL_MAX` may override but must stay under the cap).
+- The owner applies migrations himself in the Supabase SQL editor. Migrations 0001-0050 are applied in production. Always list the real migrations folder before naming a new migration.
+- Migrations 0028, 0029 and 0030 were delivered by chat before the repo was linked. The files in the repo were reconstructed on 2026-10-05 from their recorded descriptions; they are idempotent but are not byte-identical to what was applied, so do not run `scripts/db-migrate.mjs` against production without checking `schema_migrations` checksums first.
+- Smoke tests must never point at production. Use a disposable local Postgres, or the JSON backend where a script supports it.
+
+Architecture review status (see Project doc `claude/vfirm-architecture-review.md`):
+
+- Phases 0-6 and 4h/4i slice 1 are done: fail-closed scoping, AWIA identity unification, relational column promotion (0031-0033), transaction standardisation, repository layer wiring (Phase 4c), write-side RLS backstop on every viable write path (0034-0046), bulk load/save dedup (Phase 4f), AWIA lifecycle state machine and budget caps (Phase 5), shared identity-resolution module and client cache (Phase 6).
+- Still open: tenant-scoped reads across the ~230 `withStore` call sites, splitting `assertActorScope` (4e), retiring the JSON store (4f), and `apps/web/public/app.js` retirement (only when web-console reaches write/action parity).
+- Write path rule: every Postgres write runs in one transaction and calls `setTenantContext(client, tenantId)` right after `begin`.
+
+Connected EDCS (BizKick integration), governed by `docs/10_post_freeze_technical_design/VFIRM_CONNECTED_EDCS_AND_FIRM_IDEAS_SPRINT_PLAN_AND_CHECKLIST_v1.0.md` and ADR-095:
+
+- Golden rule: BizKick is the source, the Bridge is the contract, vFirm is the governed record. vFirm never edits BizKick files.
+- CE-S0 (contract v1.0 and fixtures) and CE-S1 (register import and sync ledger, migration 0050) are done. CE-S2 (file linking and document history) starts only when the owner says "Proceed CE-S2".
+- Content policy (D7): HR and Legal are metadata-only unless the owner opts in per firm; Inventory and everything else are full content.
+- Verify with `npm run check:ce:s0-contract-and-fixtures` and `npm run check:ce:s1-register-import`.
+
+Repository hygiene:
+
+- `apps/api/src/store-1.mjs` is dead code (nothing imports it) and is scheduled for removal.
+- Commit CE-S0/CE-S1 work with explicit `git add` paths; the working tree may still show CRLF/LF churn.

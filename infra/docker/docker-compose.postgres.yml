@@ -1,4 +1,7 @@
-﻿name: vfirm-stage2
+﻿# LEGACY - DO NOT USE. vFirm production runs on Supabase (project gvjjljgzguimpybpgjsf).
+# This local Docker Postgres setup predates that move and is kept for history only.
+# See docs/AI_WORKSPACE_CONTEXT.md, Current Durable State - 2026-10-05.
+name: vfirm-stage2
 
 services:
   postgres:
