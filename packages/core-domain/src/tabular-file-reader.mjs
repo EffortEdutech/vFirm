@@ -180,6 +180,73 @@ function readXlsxMatrix(buffer, filename) {
   return matrix;
 }
 
+// ---- named-sheet reader with real row numbers (CE-S1, ADR-095) ----
+// The Connected EDCS register importer must read ONE named worksheet ("TRANSACTION REGISTER") and
+// report problems against the row numbers the user sees in Excel, which readTabularFile() cannot do
+// (first sheet only, blank rows dropped, header-relative numbering). This is additive: readTabularFile
+// and everything the W3 skill runner uses are untouched.
+//
+// Returns { sheet_found, sheet_names, rows: Map<rowNumber(1-based), string[]> }. Formula cells with
+// no cached value come back as "" (BizKick ships workbooks that way). CSV input has no sheets: the
+// whole file is treated as the requested sheet and line N is row N.
+export function readSheetRows({ filename = "", mime_type = "", buffer, sheetName }) {
+  if (!Buffer.isBuffer(buffer)) throw new TabularReadError(`${filename || "File"} has no content.`);
+  const name = String(filename).toLowerCase();
+  if (name.endsWith(".xls")) throw new TabularReadError(`${filename} is an old-format Excel file (.xls). Save it as .xlsx and upload it again.`);
+  if (!(name.endsWith(".xlsx") || mime_type === XLSX_MIME)) {
+    const matrix = parseCsv(stripBom(buffer.toString("utf8")));
+    return { sheet_found: true, sheet_names: [sheetName], rows: new Map(matrix.map((row, index) => [index + 1, row])) };
+  }
+  // Some producers (the Open XML SDK, which the BizKick fixtures use) write every element with a
+  // namespace prefix (<x:row>, <x:c>, <x:t>); Excel and LibreOffice write none. Accept both.
+  const ns = "(?:[A-Za-z0-9_]+:)?";
+  const zip = readZipEntries(buffer, filename);
+  const workbook = zip.text("xl/workbook.xml");
+  if (!workbook) throw new TabularReadError(`${filename} is not a valid .xlsx workbook.`);
+  const rels = zip.text("xl/_rels/workbook.xml.rels") ?? "";
+  const sheets = [...workbook.matchAll(new RegExp(`<${ns}sheet\\b([^>]*?)\\/?>`, "g"))].map((m) => ({
+    name: decodeXml(m[1].match(/\bname="([^"]*)"/)?.[1] ?? ""),
+    rid: m[1].match(/\br:id="([^"]+)"/)?.[1] ?? null
+  }));
+  const sheet_names = sheets.map((s) => s.name);
+  const wanted = sheets.find((s) => s.name === sheetName);
+  if (!wanted) return { sheet_found: false, sheet_names, rows: new Map() };
+  const relAttrs = [...rels.matchAll(/<Relationship\b([^>]*?)\/?>/g)].map((m) => m[1]).find((attrs) => attrs.includes(`Id="${wanted.rid}"`));
+  const target = relAttrs?.match(/Target="([^"]+)"/)?.[1];
+  const sheetPath = target ? (target.startsWith("/") ? target.slice(1) : `xl/${target.replace(/^\.\//, "")}`) : "xl/worksheets/sheet1.xml";
+  const xml = zip.text(sheetPath);
+  if (!xml) throw new TabularReadError(`${filename} has no readable "${sheetName}" worksheet.`);
+  const runs = (fragment) => [...String(fragment).matchAll(new RegExp(`<${ns}t(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${ns}t>`, "g"))].map((m) => decodeXml(m[1])).join("");
+  const shared = [];
+  const sst = zip.text("xl/sharedStrings.xml");
+  if (sst) for (const m of sst.matchAll(new RegExp(`<${ns}si>([\\s\\S]*?)<\\/${ns}si>`, "g"))) shared.push(runs(m[1]));
+  const rows = new Map();
+  let autoRow = 0;
+  for (const rowMatch of xml.matchAll(new RegExp(`<${ns}row\\b([^>]*?)(?:\\/>|>([\\s\\S]*?)<\\/${ns}row>)`, "g"))) {
+    autoRow += 1;
+    const rowNumber = Number(rowMatch[1].match(/\br="(\d+)"/)?.[1] ?? autoRow);
+    autoRow = rowNumber;
+    const row = [];
+    for (const cellMatch of (rowMatch[2] ?? "").matchAll(new RegExp(`<${ns}c\\b([^>]*?)(?:\\/>|>([\\s\\S]*?)<\\/${ns}c>)`, "g"))) {
+      const attrs = cellMatch[1];
+      const inner = cellMatch[2] ?? "";
+      const ref = attrs.match(/\br="([A-Z]+\d+)"/i)?.[1];
+      const type = attrs.match(/\bt="([^"]+)"/)?.[1] ?? "n";
+      const rawValue = inner.match(new RegExp(`<${ns}v>([\\s\\S]*?)<\\/${ns}v>`))?.[1];
+      let value = "";
+      if (type === "s") value = shared[Number(rawValue)] ?? "";
+      else if (type === "inlineStr") value = runs(inner);
+      else if (type === "b") value = rawValue === "1" ? "TRUE" : "FALSE";
+      else if (rawValue !== undefined) value = decodeXml(rawValue);
+      const index = ref ? columnIndex(ref) : row.length;
+      while (row.length < index) row.push("");
+      row[index] = value;
+    }
+    rows.set(rowNumber, row);
+  }
+  return { sheet_found: true, sheet_names, rows };
+}
+
 // ---- value helpers shared by the skill runner ----
 
 // Accepts the common Malaysian/English forms: currency prefix/suffix (RM, MYR, USD, SGD, $),

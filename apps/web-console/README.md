@@ -32,6 +32,8 @@ apps/web-console/
   public/js/pages-admin.js   Firms & Tenants / Users & Access / Ops Console / Technical Delivery /
                               Audit & Compliance / Sales & Accounts / Service Packs & Billing / Growth /
                               Engineering Console
+  public/js/pages-bizkick.js  BizKick (Connected EDCS, CE-S1): Connection / Import register / Transactions /
+                              Sync history / Conflicts
   public/js/main.js      boot sequence, router, event wiring
 ```
 
@@ -202,3 +204,25 @@ as the raw file body. Server side: `apps/api/src/file-storage.mjs`, `file_object
   *Request work* on each project, and the Dashboard's **Needs you** tray.
 - API: `POST /awia/virtual-staff/workdesk-item/message`, `POST /documents`, `POST /documents/revise`;
   workdesk status `NEEDS_INFO`. Smoke test: `npm run check:w4:collaboration-and-filing`.
+
+## BizKick pages (CE-S1, ADR-095)
+
+The "BizKick" sidebar group is the owner's view of the Connected EDCS: BizKick is the source, the
+Bridge (integration contract v1.0) is the contract, vFirm is the governed record. vFirm reads the
+register and never edits BizKick files.
+
+1. **Connection** - set the company code (for example NEX) and whether HR content may be kept.
+   HR and Legal are metadata-only by default. The code locks once transactions exist.
+2. **Import register** - upload the BizKick workbook (sheet TRANSACTION REGISTER) or a CSV export.
+   The summary shows created / updated / revised / unchanged / conflicts / rejected / row missing, and
+   lists every row that needs attention with its reason. A file with a changed header is rejected
+   whole and nothing changes.
+3. **Transactions** - filter by type, status, alert and flag, or search. Click an ID for revisions,
+   history, and the counterparty link (suggestions only; you confirm).
+4. **Sync history** - every import with the SHA-256 of its source file; open one to see each row.
+5. **Conflicts** - rows where BizKick and vFirm disagree. Keep vFirm's record or accept BizKick's
+   row, with a required note. If you keep vFirm's record, the next import holds the row again while
+   BizKick still differs.
+
+Only the firm owner can connect, resolve conflicts and link counterparties. The database changes are
+in migration 0050; apply it before using these pages.

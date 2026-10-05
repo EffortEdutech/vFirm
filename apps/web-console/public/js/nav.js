@@ -27,6 +27,17 @@ export const OWNER_NAV = [
     items: [{ id: "finance", label: "Finance", icon: "◊" }],
   },
   {
+    // CE-S1 (ADR-095): Connected EDCS -- the firm's BizKick Smart Transaction Register, governed in vFirm.
+    category: "BizKick",
+    items: [
+      { id: "bizkick-connection", label: "Connection", icon: "⇄" },
+      { id: "bizkick-import", label: "Import register", icon: "⇪" },
+      { id: "bizkick-transactions", label: "Transactions", icon: "▥" },
+      { id: "bizkick-history", label: "Sync history", icon: "◷" },
+      { id: "bizkick-conflicts", label: "Conflicts", icon: "⚑" },
+    ],
+  },
+  {
     category: "Firm",
     items: [
       // ADR-093 W4 (F3): the firm's document register -- uploads and filed work outputs.
@@ -74,6 +85,11 @@ export const PAGE_META = {
   projects: { eyebrow: "Clients", title: "Projects", desc: "Active and delivered client engagements." },
   finance: { eyebrow: "Finance", title: "Finance", desc: "Cash position, invoices and expenses." },
   documents: { eyebrow: "Firm", title: "Documents", desc: "Every file your firm keeps: uploads and approved work, with revisions." },
+  "bizkick-connection": { eyebrow: "BizKick", title: "Connection", desc: "Link this firm to its BizKick company and choose what content vFirm may keep." },
+  "bizkick-import": { eyebrow: "BizKick", title: "Import register", desc: "Upload the BizKick Transaction Register. vFirm reads it, never edits it." },
+  "bizkick-transactions": { eyebrow: "BizKick", title: "Transactions", desc: "The governed record of every transaction BizKick has told vFirm about." },
+  "bizkick-history": { eyebrow: "BizKick", title: "Sync history", desc: "Every import, what it did to each row, and the file it came from." },
+  "bizkick-conflicts": { eyebrow: "BizKick", title: "Conflicts", desc: "Rows where BizKick and vFirm disagree. You decide which stands." },
   "firm-settings": { eyebrow: "Firm", title: "Firm Settings", desc: "Profile, workspace and governance settings." },
 
   "admin-firms": { eyebrow: "Platform", title: "Firms & Tenants", desc: "Every firm running on the platform." },

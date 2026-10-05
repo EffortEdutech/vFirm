@@ -171,6 +171,14 @@ const initialStore = () => ({
   file_objects: [],
   // ADR-090 W2 (B2): owner work requests -- the firm's front door. Migration 0049.
   work_requests: [],
+  // CE-S1 (ADR-095): Connected EDCS collections. Postgres reads/writes its own tables directly
+  // (edcs-repository.mjs, migration 0050); these empty arrays exist so the JSON dev/test backend,
+  // whose normalizeStore() drops unknown keys, keeps them across saves.
+  edcs_connections: [],
+  edcs_transactions: [],
+  edcs_transaction_revisions: [],
+  edcs_sync_runs: [],
+  edcs_sync_events: [],
   professional_authorities: [],
   actors: [],
   persons: [],
@@ -6395,6 +6403,12 @@ function stripRelationalCollections(store) {
   // from the app_state blob like every other relational collection.
   file_objects: [],
   work_requests: [],
+  // CE-S1 (ADR-095): EDCS collections are never part of the app_state blob (migration 0050 tables).
+  edcs_connections: [],
+  edcs_transactions: [],
+  edcs_transaction_revisions: [],
+  edcs_sync_runs: [],
+  edcs_sync_events: [],
   service_packs: [],
   service_skus: [],
   worker_templates: [],

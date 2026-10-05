@@ -6,10 +6,14 @@
 import { api, getIdentity, setIdentity } from "./api.js";
 import { getSession, signOut } from "./auth.js";
 import { PAGE_META, navForMode, defaultPageForMode } from "./nav.js";
-import { OWNER_PAGES } from "./pages-owner.js";
+import { OWNER_PAGES as OWNER_PAGES_BASE } from "./pages-owner.js";
+import { BIZKICK_PAGES } from "./pages-bizkick.js";
 import { ADMIN_PAGES } from "./pages-admin.js";
 import { initials, escapeHtml } from "./ui.js";
 import { openNewRequestDrawer } from "./request-drawer.js";
+
+// CE-S1 (ADR-095): the BizKick pages join the owner workspace registry.
+const OWNER_PAGES = { ...OWNER_PAGES_BASE, ...BIZKICK_PAGES };
 
 const state = {
   mode: "owner", // "owner" | "admin"

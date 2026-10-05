@@ -50,6 +50,23 @@ tests/                Architecture, policy, and integration tests
 archive/              Drafts and original scaffold material
 ```
 
+## Connected EDCS (BizKick)
+
+BizKick is the source, the Bridge (integration contract v1.0) is the contract, vFirm is the governed
+record. vFirm reads a firm's BizKick Transaction Register and never edits BizKick files.
+
+- Contract: `docs/10_post_freeze_technical_design/CONNECTED_EDCS_INTEGRATION_CONTRACT_v1.0.md`
+- Decisions: ADR-094 and ADR-095 in `docs/00_project_control/DECISION_REGISTER.md`
+- Sprint plan: `docs/10_post_freeze_technical_design/VFIRM_CONNECTED_EDCS_AND_FIRM_IDEAS_SPRINT_PLAN_AND_CHECKLIST_v1.0.md`
+- Fixtures (synthetic Nexa Office Supplies, NEX): `scripts/fixtures/bizkick/`
+- Console: the "BizKick" nav group (Connection, Import register, Transactions, Sync history, Conflicts)
+- Database: migration `0050_connected_edcs.sql` (apply before enabling the BizKick pages)
+
+```powershell
+npm run check:ce:s0-contract-and-fixtures
+npm run check:ce:s1-register-import
+```
+
 ## Port Convention
 
 vFirm uses the `309#` localhost family:

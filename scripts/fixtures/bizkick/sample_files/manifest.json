@@ -1,0 +1,117 @@
+{
+  "synthetic": true,
+  "files": [
+    {
+      "file": "NEX-QT-2026-0001_R0_Alpha-Tech-Resources.xlsx",
+      "sha256": "952b7c3a0653cc1acd455ce3880fcfbde8e15baa68e430f68099d03ee414b45f",
+      "bytes": 12140,
+      "transaction_id": "NEX-QT-2026-0001",
+      "revision": "R0",
+      "expectation": "MATCH_BY_ID: first document revision R0; superseded when the R1 file is added"
+    },
+    {
+      "file": "NEX-QT-2026-0001_R1_Alpha-Tech-Resources.xlsx",
+      "sha256": "395230ab9ad83c53f52608c77b79a3a42c77f65830135ebe1deb380fc5bd5c6a",
+      "bytes": 12321,
+      "transaction_id": "NEX-QT-2026-0001",
+      "revision": "R1",
+      "expectation": "MATCH_BY_ID: new content hash -> new document revision R1, R0 superseded"
+    },
+    {
+      "file": "NEX-SO-2026-0001_Alpha-Tech-Resources.xlsx",
+      "sha256": "09655f6cd3d51172abbccacbd9283a517cb78e7181ddceed82e78f0d3fad9571",
+      "bytes": 10888,
+      "transaction_id": "NEX-SO-2026-0001",
+      "revision": "R0",
+      "expectation": "MATCH_BY_ID"
+    },
+    {
+      "file": "NEX-DO-2026-0001_Alpha-Tech-Resources.xlsx",
+      "sha256": "a8feb6f1215c24cbd89034923b4307e1e69aa4ae6de1ffa0920f6a5679d88aa1",
+      "bytes": 11012,
+      "transaction_id": "NEX-DO-2026-0001",
+      "revision": "R0",
+      "expectation": "MATCH_BY_ID"
+    },
+    {
+      "file": "NEX-INV-2026-0001_Alpha-Tech-Resources.xlsx",
+      "sha256": "cc1ab670454996d74141ade5b2dfdf68d3eff5d152e2bcb381bc785b484c6c1b",
+      "bytes": 12333,
+      "transaction_id": "NEX-INV-2026-0001",
+      "revision": "R0",
+      "expectation": "MATCH_BY_ID"
+    },
+    {
+      "file": "NEX-INV-2026-0002_Beta-Mart.xlsx",
+      "sha256": "cc1ab670454996d74141ade5b2dfdf68d3eff5d152e2bcb381bc785b484c6c1b",
+      "bytes": 12333,
+      "transaction_id": "NEX-INV-2026-0002",
+      "revision": "R0",
+      "expectation": "MATCH_BY_ID (overdue invoice)"
+    },
+    {
+      "file": "NEX-RC-2026-0001_Alpha-Tech-Resources.xlsx",
+      "sha256": "b94641785612dab50490b5ef2f057df37ceb6260a610b80ada6b32a46b280b6e",
+      "bytes": 10515,
+      "transaction_id": "NEX-RC-2026-0001",
+      "revision": "R0",
+      "expectation": "MATCH_BY_ID"
+    },
+    {
+      "file": "NEX-PO-2026-0001_PaperPlus-Trading.xlsx",
+      "sha256": "f483348326124ddf8a088e3ad1317caf634bff035efd9a190e3c9fcc1d51a561",
+      "bytes": 13525,
+      "transaction_id": "NEX-PO-2026-0001",
+      "revision": "R0",
+      "expectation": "MATCH_BY_ID"
+    },
+    {
+      "file": "NEX-GRN-2026-0001_PaperPlus-Trading.xlsx",
+      "sha256": "57b2c5fcb4223e7a25721abe87f23fd0ef208c24550f794daa610a4305f4c8c1",
+      "bytes": 12875,
+      "transaction_id": "NEX-GRN-2026-0001",
+      "revision": "R0",
+      "expectation": "MATCH_BY_ID"
+    },
+    {
+      "file": "NEX-BR-2026-0002_Bank_Reconciliation.xlsx",
+      "sha256": "4de3cbfde92f29604f85d3d89e55028e03d2a4f372fce1ae71e473a6f1d56f6a",
+      "bytes": 8953,
+      "transaction_id": "NEX-BR-2026-0002",
+      "revision": "R0",
+      "expectation": "MATCH_BY_ID"
+    },
+    {
+      "file": "NEX-BR-2026-0002_bank_statement_2026-09.csv",
+      "sha256": "ced05a7dbf752578bcddca9d990860256b6f294739ac52d1b8819517842352ed",
+      "bytes": 916,
+      "transaction_id": "NEX-BR-2026-0002",
+      "revision": "R0",
+      "expectation": "MATCH_BY_ID; bank statement input for the FAO-11 bank slot (CE-S3)"
+    },
+    {
+      "file": "NEX-EMP-2026-0001_Offer_Letter.docx",
+      "sha256": "22e5a8433f70193d283525bf4a31a69d5abf13cd43b2610bb28e431082b6080a",
+      "bytes": 42187,
+      "transaction_id": "NEX-EMP-2026-0001",
+      "revision": "R0",
+      "expectation": "MATCH_BY_ID; HR module: metadata + SHA-256 only under the default content policy (content NOT stored)"
+    },
+    {
+      "file": "NEX-QT-2026-0099_R0_Orphan.xlsx",
+      "sha256": "b95663419cce5d96ec566f82f3f1b47d5495eb1594f8185f75d0fd08031ee532",
+      "bytes": 12307,
+      "transaction_id": null,
+      "revision": "R0",
+      "expectation": "ORPHAN_ID: name carries NEX-QT-2026-0099, which is not in the register -> listed for manual link, never auto-created"
+    },
+    {
+      "file": "Supplier_price_list_misc.xlsx",
+      "sha256": "d361c65fa661b2c12ac4c87645da443bf1c552183f6336ec1f912013a31856c3",
+      "bytes": 12305,
+      "transaction_id": null,
+      "revision": "R0",
+      "expectation": "UNMATCHED: no Transaction ID in the name -> listed for manual linking"
+    }
+  ]
+}

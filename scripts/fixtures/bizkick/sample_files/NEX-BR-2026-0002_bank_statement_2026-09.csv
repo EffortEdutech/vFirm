@@ -1,0 +1,16 @@
+Date,Description,Reference,Debit,Credit,Balance
+2026-09-01,Opening balance,,,,41250.00
+2026-09-02,Customer receipt - Alpha Tech Resources,RC-0001,,18400.00,59650.00
+2026-09-03,Supplier payment - PaperPlus Trading,PV-0001,2850.00,,56800.00
+2026-09-05,Bank charges,CHG,15.00,,56785.00
+2026-09-08,Courier,PCV-0001,85.00,,56700.00
+2026-09-10,Customer receipt - Gamma Learning Centre,TT-7731,,2100.00,58800.00
+2026-09-12,Utilities,DD-0912,640.20,,58159.80
+2026-09-15,Salary run (synthetic),SAL-SEP,9800.00,,48359.80
+2026-09-17,Customer receipt - Delta Clinic,TT-7790,,3300.00,51659.80
+2026-09-19,Insurance,DD-0919,410.00,,51249.80
+2026-09-22,Supplier payment - Omega Stationery,CHQ-1042,1200.00,,50049.80
+2026-09-24,Customer receipt - Epsilon Logistics,TT-7812,,5600.00,55649.80
+2026-09-26,Unidentified deposit,DEP-0926,,750.00,56399.80
+2026-09-29,Interest,INT,,12.40,56412.20
+2026-09-30,Bank charges,CHG,15.00,,56397.20

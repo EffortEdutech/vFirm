@@ -24,6 +24,8 @@ import { createWorkRequestRecord, prepareWorkRequestAssignment, recordWorkReques
 import { listWorkRequestTypes } from "../../../packages/core-domain/src/awia-work-request-types.mjs";
 import { runSkill, SkillInputError } from "../../../packages/core-domain/src/awia-skill-runner.mjs";
 import { createFileStorage, fileMaxBytes, sanitizeFilename, resolveAllowedMimeType, sha256Hex, storageKeyFor, FILE_CLASSIFICATIONS } from "./file-storage.mjs";
+// CE-S1 (ADR-095): Connected EDCS -- BizKick register import and sync ledger.
+import { EDCS_COLLECTIONS, importRegister as importEdcsRegister, linkCounterparty as linkEdcsCounterparty, listConflicts as listEdcsConflicts, listSyncRuns as listEdcsSyncRuns, listTransactions as listEdcsTransactions, readConnection as readEdcsConnection, readEdcsExportCollections, readSyncRun as readEdcsSyncRun, readTransaction as readEdcsTransaction, resolveConflict as resolveEdcsConflict, saveConnection as saveEdcsConnection } from "./edcs-service.mjs";
 
 const root = process.cwd();
 const port = Number(process.env.VFIRM_API_PORT ?? 3091);
@@ -866,7 +868,10 @@ async function readTenantExportPackage(req, url) {
   requireFields({ tenant_id: tenantId }, ["tenant_id"]);
   assertActorScope(actor, { tenant_id: tenantId, firm_id: firmId }, "tenant export package");
   const store = await readStore();
-  const records = Object.fromEntries(tenantExportCollections.map((collection) => [collection, tenantExportRecords(store, collection, tenantId, firmId)]));
+  // CE-S1 (ADR-095): the EDCS collections live in their own tables on Postgres (not in the whole
+  // store), so they come from the EDCS repository, firm-scoped. Without a firm scope they are listed empty.
+  const edcsRecords = firmId ? await readEdcsExportCollections({ tenant_id: tenantId, firm_id: firmId }) : Object.fromEntries(EDCS_COLLECTIONS.map((collection) => [collection, []]));
+  const records = { ...Object.fromEntries(tenantExportCollections.map((collection) => [collection, tenantExportRecords(store, collection, tenantId, firmId)])), ...edcsRecords };
   const counts = Object.fromEntries(Object.entries(records).map(([collection, rows]) => [collection, rows.length]));
   return {
     package_type: "tenant_business_records_export",
@@ -898,6 +903,10 @@ async function readDataExportManifest(req, url) {
     const scoped = tenantExportRecords(store, collection, tenantId);
     return [collection, scoped.length];
   }));
+  // CE-S1 (ADR-095): EDCS collection counts, firm-scoped (needs ?firm_id=).
+  const manifestFirmId = url.searchParams.get("firm_id");
+  const edcsExport = tenantId && manifestFirmId ? await readEdcsExportCollections({ tenant_id: tenantId, firm_id: manifestFirmId }) : {};
+  for (const collection of EDCS_COLLECTIONS) counts[collection] = (edcsExport[collection] ?? []).length;
   return {
     manifest_type: "tenant_export_manifest",
     tenant_id: tenantId ?? null,
@@ -3150,6 +3159,11 @@ const routes = new Map([
   ["POST /awia/virtual-staff/workdesk-item/message", postWorkdeskItemMessage],
   ["POST /documents", registerFileDocument],
   ["POST /documents/revise", reviseFileDocument],
+  // CE-S1 (ADR-095): Connected EDCS (owner only; see edcs-service.mjs).
+  ["POST /edcs/connection", saveEdcsConnectionRoute],
+  ["POST /edcs/register-imports", importEdcsRegisterRoute],
+  ["POST /edcs/conflicts/resolve", resolveEdcsConflictRoute],
+  ["POST /edcs/transactions/link-counterparty", linkEdcsCounterpartyRoute],
   ["POST /awia/virtual-staff/memory/append", appendAwiaStaffMemoryEntry],
   ["POST /awia/virtual-staff/conversation/open", openAwiaStaffConversationThread],
   ["POST /awia/virtual-staff/conversation/message", postAwiaStaffConversationMessage],
@@ -3398,6 +3412,68 @@ async function addWorkRequestFiles(body, req = null) {
   return addWorkRequestFilesRecord(body, actorFromBody(body, req, body.tenant_id, body.firm_id));
 }
 
+// CE-S1 (ADR-095, 2026-10-05): Connected EDCS -- the BizKick register import and sync ledger.
+// Reads need a verified member of the firm; every write needs the firm owner (enforced in
+// edcs-service.mjs). There is no system-actor fallback: scope always comes from a verified identity
+// that must match the tenant/firm in the request.
+function edcsScope(req, source, label) {
+  const tenant_id = source.tenant_id ?? null;
+  const firm_id = source.firm_id ?? null;
+  requireFields({ tenant_id, firm_id }, ["tenant_id", "firm_id"]);
+  const actor = requireVerifiedActor(req, tenant_id, firm_id, label);
+  return { actor, scope: { tenant_id, firm_id } };
+}
+
+async function readEdcsFileBytes(record) {
+  const buffer = await fileStorage.get(record.storage_key);
+  if (sha256Hex(buffer) !== record.sha256) {
+    const error = new Error("Stored file failed its integrity check (SHA-256 mismatch).");
+    error.status = 500;
+    error.code = "FILE_INTEGRITY_ERROR";
+    throw error;
+  }
+  return buffer;
+}
+
+async function saveEdcsConnectionRoute(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "company_code"]);
+  const { actor } = edcsScope(req, body, "set up the BizKick connection");
+  return saveEdcsConnection({ body, actor });
+}
+
+async function importEdcsRegisterRoute(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "file_id"]);
+  const { actor } = edcsScope(req, body, "import a BizKick register");
+  return importEdcsRegister({ body, actor, readFileBytes: readEdcsFileBytes });
+}
+
+async function resolveEdcsConflictRoute(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "transaction_id", "choose"]);
+  const { actor } = edcsScope(req, body, "resolve a BizKick conflict");
+  return resolveEdcsConflict({ body, actor });
+}
+
+async function linkEdcsCounterpartyRoute(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "transaction_id", "link_type"]);
+  const { actor } = edcsScope(req, body, "link a BizKick counterparty");
+  return linkEdcsCounterparty({ body, actor });
+}
+
+// GET /edcs/connection | /edcs/transactions[/<id>] | /edcs/sync-runs[/<id>] | /edcs/conflicts
+// (?tenant_id=&firm_id= required; transactions also take type, status, alert, flag, search, as_of).
+async function readEdcsRoute(req, url) {
+  const match = url.pathname.match(/^\/edcs\/(connection|transactions|sync-runs|conflicts)(?:\/([^/]+))?$/);
+  if (!match) return null;
+  const [, kind, rawId] = match;
+  const { scope } = edcsScope(req, { tenant_id: url.searchParams.get("tenant_id"), firm_id: url.searchParams.get("firm_id") }, "read BizKick data");
+  const id = rawId ? decodeURIComponent(rawId) : null;
+  if (kind === "connection" && !id) return readEdcsConnection(scope);
+  if (kind === "conflicts" && !id) return listEdcsConflicts({ scope });
+  if (kind === "transactions") return id ? readEdcsTransaction({ scope, transactionId: id, params: url.searchParams }) : listEdcsTransactions({ scope, params: url.searchParams });
+  if (kind === "sync-runs") return id ? readEdcsSyncRun({ scope, runId: id }) : listEdcsSyncRuns({ scope });
+  return null;
+}
+
 // ADR-093 W4 (B6, F3): item thread messages and document register filing from uploaded files.
 async function postWorkdeskItemMessage(body, req = null) {
   requireFields(body, ["tenant_id", "firm_id", "workdesk_item_id"]);
@@ -3564,6 +3640,7 @@ const server = createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/work-requests/request-types") return sendJson(req, res, 200, { ok: true, data: listWorkRequestTypes() });
     if (req.method === "POST" && url.pathname === "/files/upload") return sendJson(req, res, 201, { ok: true, data: await uploadFirmFile(req, url) });
     { const fileDownload = req.method === "GET" ? url.pathname.match(/^\/files\/([^/]+)\/download$/) : null; if (fileDownload) return await downloadFirmFile(req, res, url, decodeURIComponent(fileDownload[1])); }
+    { const edcsRead = req.method === "GET" && url.pathname.startsWith("/edcs/") ? await readEdcsRoute(req, url) : null; if (edcsRead) return sendJson(req, res, 200, { ok: true, data: edcsRead }); }
     if (req.method === "GET" && url.pathname === "/mvp/store") {
       const storeData = await readStore();
       // Phase 5, slice 5a (2026-09-30): attach server-computed display_status /

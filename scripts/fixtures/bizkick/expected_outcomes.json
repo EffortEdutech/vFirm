@@ -1,0 +1,587 @@
+{
+  "as_of": "2026-10-05",
+  "company_code": "NEX",
+  "register_sheet": "TRANSACTION REGISTER",
+  "header_row": 6,
+  "first_data_row": 7,
+  "files": {
+    "register_01_baseline.xlsx": {
+      "description": "Baseline import into an empty firm",
+      "rows": 57,
+      "counts": {
+        "CREATED": 55,
+        "REJECTED": 2
+      },
+      "per_row": {
+        "7": {
+          "transaction_id": "NEX-QT-2026-0001",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "8": {
+          "transaction_id": "NEX-SO-2026-0001",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "9": {
+          "transaction_id": "NEX-DO-2026-0001",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "10": {
+          "transaction_id": "NEX-INV-2026-0001",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "11": {
+          "transaction_id": "NEX-RC-2026-0001",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "12": {
+          "transaction_id": "NEX-CN-2026-0001",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "13": {
+          "transaction_id": "NEX-QT-2026-0002",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "14": {
+          "transaction_id": "NEX-SO-2026-0002",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "15": {
+          "transaction_id": "NEX-DO-2026-0002",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "16": {
+          "transaction_id": "NEX-INV-2026-0002",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "17": {
+          "transaction_id": "NEX-CMP-2026-0001",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "18": {
+          "transaction_id": "NEX-CMP-2026-0002",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "19": {
+          "transaction_id": "NEX-QT-2026-0003",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "20": {
+          "transaction_id": "NEX-QT-2026-0004",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "21": {
+          "transaction_id": "NEX-QT-2026-0005",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "22": {
+          "transaction_id": "NEX-QT-2026-0006",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "23": {
+          "transaction_id": "NEX-QT-2026-0007",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "24": {
+          "transaction_id": "NEX-QT-2026-0008",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "25": {
+          "transaction_id": "NEX-QT-2026-0009",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "26": {
+          "transaction_id": "NEX-QT-2025-0042",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "27": {
+          "transaction_id": "NEX-SO-2026-0004",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "28": {
+          "transaction_id": "NEX-DO-2026-0003",
+          "outcome": "CREATED",
+          "reasons": [],
+          "warnings": [
+            "RELATED_NOT_FOUND:NEX-SO-2026-0003"
+          ]
+        },
+        "29": {
+          "transaction_id": "NEX-INV-2026-0003",
+          "outcome": "REJECTED",
+          "reasons": [
+            "DUPLICATE_ID_IN_FILE"
+          ]
+        },
+        "30": {
+          "transaction_id": "NEX-INV-2026-0003",
+          "outcome": "REJECTED",
+          "reasons": [
+            "DUPLICATE_ID_IN_FILE"
+          ]
+        },
+        "31": {
+          "transaction_id": "NEX-INV-2026-0004",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "32": {
+          "transaction_id": "NEX-PR-2026-0001",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "33": {
+          "transaction_id": "NEX-RFQ-2026-0001",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "34": {
+          "transaction_id": "NEX-QC-2026-0001",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "35": {
+          "transaction_id": "NEX-PO-2026-0001",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "36": {
+          "transaction_id": "NEX-GRN-2026-0001",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "37": {
+          "transaction_id": "NEX-PV-2026-0001",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "38": {
+          "transaction_id": "NEX-PR-2026-0002",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "39": {
+          "transaction_id": "NEX-PO-2026-0002",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "40": {
+          "transaction_id": "NEX-GRN-2026-0002",
+          "outcome": "CREATED",
+          "reasons": [],
+          "warnings": [
+            "CHAIN_MISSING_PREDECESSOR:PO"
+          ]
+        },
+        "41": {
+          "transaction_id": "NEX-PR-2026-0003",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "42": {
+          "transaction_id": "NEX-PO-2026-0003",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "43": {
+          "transaction_id": "NEX-SE-2026-0001",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "44": {
+          "transaction_id": "NEX-BR-2026-0001",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "45": {
+          "transaction_id": "NEX-BR-2026-0002",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "46": {
+          "transaction_id": "NEX-EC-2026-0001",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "47": {
+          "transaction_id": "NEX-PCV-2026-0001",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "48": {
+          "transaction_id": "NEX-JV-2026-0001",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "49": {
+          "transaction_id": "NEX-EMP-2026-0001",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "50": {
+          "transaction_id": "NEX-LV-2026-0001",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "51": {
+          "transaction_id": "NEX-LV-2026-0002",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "52": {
+          "transaction_id": "NEX-TS-2026-0001",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "53": {
+          "transaction_id": "NEX-OT-2026-0001",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "54": {
+          "transaction_id": "NEX-EXIT-2026-0001",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "55": {
+          "transaction_id": "NEX-SI-2026-0001",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "56": {
+          "transaction_id": "NEX-ST-2026-0001",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "57": {
+          "transaction_id": "NEX-SA-2026-0001",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "58": {
+          "transaction_id": "NEX-SCV-2026-0001",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "59": {
+          "transaction_id": "NEX-NDA-2026-0001",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "60": {
+          "transaction_id": "NEX-AGR-2026-0001",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "61": {
+          "transaction_id": "NEX-MIN-2026-0001",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "62": {
+          "transaction_id": "NEX-DEC-2026-0001",
+          "outcome": "CREATED",
+          "reasons": []
+        },
+        "63": {
+          "transaction_id": "NEX-INC-2026-0001",
+          "outcome": "CREATED",
+          "reasons": []
+        }
+      },
+      "reimport_note": "Re-import of the same file: 55 valid rows UNCHANGED; the 2 duplicate rows are REJECTED again (no state change)."
+    },
+    "register_02_status_update.xlsx": {
+      "description": "QT-0004 status Issued->Accepted (tracking field, same revision)",
+      "apply_after": "register_01_baseline.xlsx",
+      "changed": {
+        "NEX-QT-2026-0004": {
+          "outcome": "UPDATED",
+          "reasons_or_fields": [
+            "status",
+            "remarks",
+            "last_updated"
+          ]
+        }
+      },
+      "all_other_valid_rows": "UNCHANGED",
+      "duplicate_rows": "REJECTED (DUPLICATE_ID_IN_FILE) again"
+    },
+    "register_03_revision.xlsx": {
+      "description": "QT-0003 revision R0->R1 with a commercial change",
+      "apply_after": "register_01_baseline.xlsx",
+      "changed": {
+        "NEX-QT-2026-0003": {
+          "outcome": "REVISED",
+          "reasons_or_fields": [
+            "revision",
+            "amount",
+            "expiry_due",
+            "date_issued",
+            "last_updated",
+            "remarks"
+          ]
+        }
+      },
+      "all_other_valid_rows": "UNCHANGED",
+      "duplicate_rows": "REJECTED (DUPLICATE_ID_IN_FILE) again"
+    },
+    "register_04_conflict_same_revision.xlsx": {
+      "description": "QT-0006 amount changed but revision stays R0",
+      "apply_after": "register_01_baseline.xlsx",
+      "changed": {
+        "NEX-QT-2026-0006": {
+          "outcome": "CONFLICT",
+          "reasons_or_fields": [
+            "SAME_REVISION_COMMERCIAL_CHANGE:amount"
+          ]
+        }
+      },
+      "all_other_valid_rows": "UNCHANGED",
+      "duplicate_rows": "REJECTED (DUPLICATE_ID_IN_FILE) again"
+    },
+    "register_05_conflict_backwards_and_reopen.xlsx": {
+      "description": "QT-0007 revision R1->R0; QT-0008 Cancelled->Draft",
+      "apply_after": "register_01_baseline.xlsx",
+      "changed": {
+        "NEX-QT-2026-0007": {
+          "outcome": "CONFLICT",
+          "reasons_or_fields": [
+            "REVISION_BACKWARDS"
+          ]
+        },
+        "NEX-QT-2026-0008": {
+          "outcome": "CONFLICT",
+          "reasons_or_fields": [
+            "TERMINAL_STATUS_REOPENED"
+          ]
+        }
+      },
+      "all_other_valid_rows": "UNCHANGED",
+      "duplicate_rows": "REJECTED (DUPLICATE_ID_IN_FILE) again"
+    },
+    "register_06_row_missing.xlsx": {
+      "description": "PO-0002 row cleared from the register",
+      "apply_after": "register_01_baseline.xlsx",
+      "changed": {
+        "NEX-PO-2026-0002": {
+          "outcome": "ROW_MISSING",
+          "reasons_or_fields": [
+            "ROW_NOT_IN_SOURCE"
+          ]
+        }
+      },
+      "all_other_valid_rows": "UNCHANGED",
+      "duplicate_rows": "REJECTED (DUPLICATE_ID_IN_FILE) again"
+    },
+    "register_07_rejects.xlsx": {
+      "description": "Eight invalid new rows appended (per-row reasons)",
+      "apply_after": "register_01_baseline.xlsx",
+      "changed": {
+        "ROW 64": {
+          "outcome": "REJECTED",
+          "reasons_or_fields": [
+            "COMPANY_CODE_MISMATCH"
+          ]
+        },
+        "ROW 65": {
+          "outcome": "REJECTED",
+          "reasons_or_fields": [
+            "UNKNOWN_DOCUMENT_TYPE"
+          ]
+        },
+        "ROW 66": {
+          "outcome": "REJECTED",
+          "reasons_or_fields": [
+            "INVALID_STATUS"
+          ]
+        },
+        "ROW 67": {
+          "outcome": "REJECTED",
+          "reasons_or_fields": [
+            "INVALID_AMOUNT"
+          ]
+        },
+        "ROW 68": {
+          "outcome": "REJECTED",
+          "reasons_or_fields": [
+            "ID_MISMATCH_CACHED_VS_PARTS"
+          ]
+        },
+        "ROW 69": {
+          "outcome": "REJECTED",
+          "reasons_or_fields": [
+            "INCOMPLETE_ID"
+          ]
+        },
+        "ROW 70": {
+          "outcome": "REJECTED",
+          "reasons_or_fields": [
+            "INVALID_DATE"
+          ]
+        },
+        "ROW 71": {
+          "outcome": "REJECTED",
+          "reasons_or_fields": [
+            "INVALID_CURRENCY"
+          ]
+        }
+      },
+      "all_other_valid_rows": "UNCHANGED",
+      "duplicate_rows": "REJECTED (DUPLICATE_ID_IN_FILE) again"
+    },
+    "register_08_no_cached_values.xlsx": {
+      "description": "Same content as the baseline, saved the way BizKick ships it: formulas WITHOUT cached values. The importer must compose the Transaction ID from Company Code-Type-Year-Sequence.",
+      "apply_after": "register_01_baseline.xlsx",
+      "all_other_valid_rows": "UNCHANGED",
+      "duplicate_rows": "REJECTED again",
+      "also": "Imported alone into an empty firm it must produce exactly the baseline outcomes."
+    },
+    "register_09_header_changed.xlsx": {
+      "description": "Header cell L6 renamed 'Amount' -> 'Total' (customer changed the register structure)",
+      "file_level_outcome": "REJECTED",
+      "reason": "STRUCTURE_CHANGED:Amount",
+      "rows_processed": 0
+    }
+  },
+  "workbook_alert_values_at_as_of": {
+    "OVERDUE": [
+      "NEX-INV-2026-0002",
+      "NEX-QT-2026-0001",
+      "NEX-QT-2026-0002"
+    ],
+    "Closed": [
+      "NEX-BR-2026-0001",
+      "NEX-CMP-2026-0002",
+      "NEX-DEC-2026-0001",
+      "NEX-DO-2026-0001",
+      "NEX-DO-2026-0002",
+      "NEX-GRN-2026-0001",
+      "NEX-GRN-2026-0002",
+      "NEX-INV-2026-0001",
+      "NEX-MIN-2026-0001",
+      "NEX-PCV-2026-0001",
+      "NEX-PO-2026-0001",
+      "NEX-PR-2026-0001",
+      "NEX-PR-2026-0002",
+      "NEX-QC-2026-0001",
+      "NEX-QT-2025-0042",
+      "NEX-QT-2026-0005",
+      "NEX-QT-2026-0008",
+      "NEX-RC-2026-0001",
+      "NEX-RFQ-2026-0001",
+      "NEX-SCV-2026-0001",
+      "NEX-SE-2026-0001",
+      "NEX-SI-2026-0001",
+      "NEX-SO-2026-0001",
+      "NEX-SO-2026-0002",
+      "NEX-ST-2026-0001",
+      "NEX-TS-2026-0001"
+    ],
+    "No due date": [
+      "NEX-CN-2026-0001",
+      "NEX-DO-2026-0003",
+      "NEX-EC-2026-0001",
+      "NEX-EMP-2026-0001",
+      "NEX-JV-2026-0001",
+      "NEX-LV-2026-0001",
+      "NEX-LV-2026-0002",
+      "NEX-OT-2026-0001",
+      "NEX-PO-2026-0003",
+      "NEX-PR-2026-0003",
+      "NEX-PV-2026-0001",
+      "NEX-QT-2026-0009",
+      "NEX-SA-2026-0001",
+      "NEX-SO-2026-0004"
+    ],
+    "DUE SOON": [
+      "NEX-BR-2026-0002",
+      "NEX-CMP-2026-0001",
+      "NEX-INC-2026-0001",
+      "NEX-QT-2026-0003",
+      "NEX-QT-2026-0007"
+    ],
+    "Open": [
+      "NEX-AGR-2026-0001",
+      "NEX-EXIT-2026-0001",
+      "NEX-INV-2026-0004",
+      "NEX-NDA-2026-0001",
+      "NEX-PO-2026-0002",
+      "NEX-QT-2026-0004",
+      "NEX-QT-2026-0006"
+    ],
+    "STOP — DUPLICATE": [
+      "NEX-INV-2026-0003"
+    ]
+  },
+  "rule_inputs_at_as_of": {
+    "quotation_expiring_within_7_days_status_issued": [
+      "NEX-QT-2026-0003",
+      "NEX-QT-2026-0007"
+    ],
+    "invoice_overdue_not_closed": [
+      "NEX-INV-2026-0002"
+    ],
+    "bank_reconciliation_draft_with_statement": [
+      "NEX-BR-2026-0002"
+    ],
+    "new_employee_record": [
+      "NEX-EMP-2026-0001"
+    ],
+    "grn_without_related_po": [
+      "NEX-GRN-2026-0002"
+    ],
+    "note": "QT-0001/0002 are Accepted with past validity: the workbook Alert shows OVERDUE, but quotation-expiry rules must act only on Issued/Under Review quotations."
+  },
+  "transaction_chains": {
+    "sales_complete": [
+      "NEX-QT-2026-0001",
+      "NEX-SO-2026-0001",
+      "NEX-DO-2026-0001",
+      "NEX-INV-2026-0001",
+      "NEX-RC-2026-0001"
+    ],
+    "sales_open_invoice": [
+      "NEX-QT-2026-0002",
+      "NEX-SO-2026-0002",
+      "NEX-DO-2026-0002",
+      "NEX-INV-2026-0002"
+    ],
+    "quotation_replacement": [
+      "NEX-QT-2026-0005",
+      "NEX-QT-2026-0006"
+    ],
+    "procurement_complete": [
+      "NEX-PR-2026-0001",
+      "NEX-RFQ-2026-0001",
+      "NEX-QC-2026-0001",
+      "NEX-PO-2026-0001",
+      "NEX-GRN-2026-0001",
+      "NEX-PV-2026-0001"
+    ],
+    "missing_links": {
+      "NEX-GRN-2026-0002": "no related PO",
+      "NEX-DO-2026-0003": "related SO-2026-0003 not in register"
+    }
+  }
+}
