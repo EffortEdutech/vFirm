@@ -180,7 +180,7 @@ const initialStore = () => ({
   edcs_sync_runs: [],
   edcs_sync_events: [],
   automation_rules: [],
-  automation_rule_runs: [], edcs_number_reservations: [], approval_policies: [],
+  automation_rule_runs: [], edcs_number_reservations: [], approval_policies: [], edcs_connectors: [],
   professional_authorities: [],
   actors: [],
   persons: [],
@@ -250,11 +250,16 @@ export function getStoreInfo() {
   };
 }
 
-async function loadStore(tenantId = null) {
+// CE-H1 (ADR-100): `options.ledger === false` leaves event_log, audit_events and policy_decisions empty on a
+// Postgres load. They are append-only ledgers that grow with every transaction (tens of thousands of rows at
+// the CE-H1 volume) and dominate the cost of a store read; a caller that neither reads nor needs them (a
+// scoped console read, a mutator that only appends events) opts out. The append path is unaffected: new
+// events are pushed and persisted by index, whatever the baseline length.
+async function loadStore(tenantId = null, options = {}) {
   // tenantId only ever does anything on the postgres backend (see loadPostgresStore's comment).
   // The JSON backend is dev/test-only -- confirmed in the Phase 2 audit that production only ever
   // runs postgres -- so there's no equivalent scoped-read path for it, and none is needed.
-  if (storeBackend === "postgres") return loadPostgresStore(tenantId);
+  if (storeBackend === "postgres") return loadPostgresStore(tenantId, options);
   return loadJsonStore();
 }
 
@@ -305,7 +310,7 @@ async function saveJsonStore(store) {
 // same-request mutation, so each needs its own per-handler audit before it's safe to scope) is
 // deliberately NOT done in this pass -- see the architecture review doc for why, and the planned
 // slice-by-slice approach for doing it, the same way Phase 4c/4d rolled out their own patterns.
-async function loadPostgresStore(tenantId = null) {
+async function loadPostgresStore(tenantId = null, options = {}) {
   const client = await getPool().connect();
   let store;
   try {
@@ -316,7 +321,7 @@ async function loadPostgresStore(tenantId = null) {
     client.release();
   }
   const [relational, awiaRelational, firmFactoryRelational, quotationAwiaRelational, workIntakeRelational] = await Promise.all([
-    readRelationalStore(tenantId),
+    readRelationalStore(tenantId, options),
     readAwiaVirtualStaffRelational(tenantId),
     readFirmFactoryRelational(tenantId),
     readQuotationAwiaRelational(tenantId),
@@ -689,7 +694,7 @@ export async function createWorkRequestRecord(body, actor) {
     store.work_requests.push(request);
     appendEventAndAudit(store, { event_type: "work_request.submitted", actor, tenant_id: body.tenant_id, firm_id: body.firm_id, aggregate_type: "WorkRequest", aggregate_id: request.id, payload: { request_number: request.request_number, request_type_id: request.request_type_id, risk_class: request.risk_class, file_count: fileIds.length, priority }, summary: "Owner submitted a work request to the firm." });
     return request;
-  });
+  }, { tenantId: body.tenant_id, ledger: false }); // CE-H1: reads this firm's records only, appends (never reads) the ledgers
 }
 
 // Checks the chosen worker can take this request, then makes sure the request has its ad-hoc task
@@ -1025,7 +1030,7 @@ export async function reviseFileDocumentRecord(body, actor) {
 export function newFileId() { return storeBackend === "postgres" ? newUuid() : newId("file"); }
 
 export async function findEdcsDocumentState(scope, transactionId) {
-  const store = await readStore(scope.tenant_id);
+  const store = await readStore(scope.tenant_id, { ledger: false });
   const inScope = (record) => record.tenant_id === scope.tenant_id && record.firm_id === scope.firm_id;
   const entry = (store.document_register_entries ?? []).find((record) => inScope(record) && record.document_number === transactionId) ?? null;
   const revisions = entry ? (store.document_revision_records ?? []).filter((record) => inScope(record) && record.document_register_entry_id === entry.id).sort((a, b) => String(a.created_at).localeCompare(String(b.created_at))) : [];
@@ -1103,7 +1108,7 @@ export async function registerEdcsFileRevisionRecord(body, actor) {
         : `${tx.transaction_id}: new file filed as ${label}; ${previous?.revision ?? "prior revision"} superseded.`
     });
     return { outcome: supporting ? "ATTACHED" : created ? "LINKED" : "REVISED", document: entry, revision, previous_revision: previous, file };
-  });
+  }, { tenantId: body.tenant_id, ledger: false }); // CE-H1: one firm's records, appends (never reads) the ledgers
 }
 
 export function computeWorkdeskItemStatus(item, drafts = [], deliveries = []) {
@@ -1490,8 +1495,9 @@ async function seedWorkerTemplates(client) {
 // comment above for why (this now fires its queries across the pool, not one held connection).
 // seedWorkerTemplates() runs through the pool too; it's an idempotent (on conflict do nothing)
 // one-time upsert, so it doesn't need a dedicated connection or transaction.
-async function readRelationalStore(tenantId = null) {
+async function readRelationalStore(tenantId = null, options = {}) {
   const pool = getPool();
+  const skipLedger = options.ledger === false;
   const scope = tenantId ? { where: " where tenant_id = $1", params: [tenantId] } : { where: "", params: [] };
   const servicePacks$p = pool.query(`select id::text, code, name, discipline, status, version, description, configuration, created_at, updated_at from service_packs order by created_at, id`);
   const serviceSkus$p = pool.query(`select id::text, service_pack_id::text, code, name, status, pricing_model, created_at, updated_at from service_skus order by created_at, id`);
@@ -1580,9 +1586,9 @@ async function readRelationalStore(tenantId = null) {
   const subscriptionPackages$p = pool.query(`select id::text, tenant_id::text, firm_id::text, created_by_actor_id::text, package_code, package_name, package_status, pricing_model, base_price, currency, usage_limits, features, created_at, updated_at, metadata from subscription_packages${scope.where} order by created_at, id`, scope.params);
   const commercialLaunchControls$p = pool.query(`select id::text, tenant_id::text, firm_id::text, payment_provider_config_id::text, subscription_package_id::text, reviewed_by_actor_id::text, launch_status, required_controls, decision_summary, created_at, decided_at, metadata from commercial_launch_controls${scope.where} order by created_at, id`, scope.params);
   const pilotHandoffRecords$p = pool.query(`select id::text, tenant_id::text, firm_id::text, accepted_by_actor_id::text, rehearsal_ref, handoff_status, checklist, evidence_refs, decision_summary, accepted_at, created_at, metadata from pilot_handoff_records${scope.where} order by created_at, id`, scope.params);
-  const policyDecisions$p = pool.query(`select id::text, tenant_id::text, firm_id::text, policy_id, policy_version, actor_id::text, action, resource_type, resource_id::text, context_ref, result, reasons, created_at from policy_decisions${scope.where} order by created_at, id`, scope.params);
-  const events$p = pool.query(`select id::text, event_type, event_version, occurred_at, recorded_at, actor_id::text, actor_type, tenant_id::text, firm_id::text, aggregate_type, aggregate_id::text, aggregate_version, correlation_id::text, causation_id::text, idempotency_key, payload, payload_ref, payload_summary, policy_decision_id::text, audit_event_id::text, provenance from event_log${scope.where} order by occurred_at, id`, scope.params);
-  const audits$p = pool.query(`select id::text, tenant_id::text, firm_id::text, actor_id::text, action, resource_type, resource_id::text, resource_version, policy_decision_id::text, correlation_id::text, causation_id::text, occurred_at, summary, evidence_ref from audit_events${scope.where} order by occurred_at, id`, scope.params);
+  const policyDecisions$p = skipLedger ? Promise.resolve({ rows: [] }) : pool.query(`select id::text, tenant_id::text, firm_id::text, policy_id, policy_version, actor_id::text, action, resource_type, resource_id::text, context_ref, result, reasons, created_at from policy_decisions${scope.where} order by created_at, id`, scope.params);
+  const events$p = skipLedger ? Promise.resolve({ rows: [] }) : pool.query(`select id::text, event_type, event_version, occurred_at, recorded_at, actor_id::text, actor_type, tenant_id::text, firm_id::text, aggregate_type, aggregate_id::text, aggregate_version, correlation_id::text, causation_id::text, idempotency_key, payload, payload_ref, payload_summary, policy_decision_id::text, audit_event_id::text, provenance from event_log${scope.where} order by occurred_at, id`, scope.params);
+  const audits$p = skipLedger ? Promise.resolve({ rows: [] }) : pool.query(`select id::text, tenant_id::text, firm_id::text, actor_id::text, action, resource_type, resource_id::text, resource_version, policy_decision_id::text, correlation_id::text, causation_id::text, occurred_at, summary, evidence_ref from audit_events${scope.where} order by occurred_at, id`, scope.params);
 
   const [servicePacks, serviceSkus, workerTemplates, workerInstances, taskOutputs, toolInvocations, memberships, professionalProfiles, professionalAuthorities, tenants, persons, actors, firms, clients, relationships, leads, intakeSessions, prices, proposals, approvals, engagements, projects, workPackages, frontDeskEnquiries, communicationDrafts, tasks, documents, documentVersions, administrationSkillBindings, correspondenceRecords, documentRegisterEntries, documentRevisionRecords, administrativeDeadlines, transmittalDrafts, evidence, invoices, paymentStatuses, marketplaceListings, capacityOffers, collaborationRequests, directoryReviewBoardDecisions, directoryPrivateEnquiries, qualificationRenewalReviews, networkProfessionalProfiles, networkFirmProfiles, networkCapabilities, networkCredentials, networkTrustSignals, networkConflictChecks, networkQualificationGates, specialistInvitations, collaborationWorkspaces, collaborationWorkspaceParticipants, collaborationWorkspaceEvidence, responsibilityMatrices, specialistAssignments, observatorySnapshots, pilotUsers, commercialSkillBindings, salesPipelineRecords, proposalDispatchRecords, expenseRecords, receivableFollowUps, supportCases, technicalSkillBindings, drawingReviewRecords, calculationInputSets, technicalQaFindings, deliveryPackageRecords, pilotIncidents, pilotFeedback, acceptanceReviews, improvementItems, reportPacks, reviewBoards, reviewDecisions, expansionCohorts, onboardingPlans, rcGates, pilotControls, usageEvents, billingReviews, paymentProviderConfigs, subscriptionPackages, commercialLaunchControls, pilotHandoffRecords, policyDecisions, events, audits] = await Promise.all([servicePacks$p, serviceSkus$p, workerTemplates$p, workerInstances$p, taskOutputs$p, toolInvocations$p, memberships$p, professionalProfiles$p, professionalAuthorities$p, tenants$p, persons$p, actors$p, firms$p, clients$p, relationships$p, leads$p, intakeSessions$p, prices$p, proposals$p, approvals$p, engagements$p, projects$p, workPackages$p, frontDeskEnquiries$p, communicationDrafts$p, tasks$p, documents$p, documentVersions$p, administrationSkillBindings$p, correspondenceRecords$p, documentRegisterEntries$p, documentRevisionRecords$p, administrativeDeadlines$p, transmittalDrafts$p, evidence$p, invoices$p, paymentStatuses$p, marketplaceListings$p, capacityOffers$p, collaborationRequests$p, directoryReviewBoardDecisions$p, directoryPrivateEnquiries$p, qualificationRenewalReviews$p, networkProfessionalProfiles$p, networkFirmProfiles$p, networkCapabilities$p, networkCredentials$p, networkTrustSignals$p, networkConflictChecks$p, networkQualificationGates$p, specialistInvitations$p, collaborationWorkspaces$p, collaborationWorkspaceParticipants$p, collaborationWorkspaceEvidence$p, responsibilityMatrices$p, specialistAssignments$p, observatorySnapshots$p, pilotUsers$p, commercialSkillBindings$p, salesPipelineRecords$p, proposalDispatchRecords$p, expenseRecords$p, receivableFollowUps$p, supportCases$p, technicalSkillBindings$p, drawingReviewRecords$p, calculationInputSets$p, technicalQaFindings$p, deliveryPackageRecords$p, pilotIncidents$p, pilotFeedback$p, acceptanceReviews$p, improvementItems$p, reportPacks$p, reviewBoards$p, reviewDecisions$p, expansionCohorts$p, onboardingPlans$p, rcGates$p, pilotControls$p, usageEvents$p, billingReviews$p, paymentProviderConfigs$p, subscriptionPackages$p, commercialLaunchControls$p, pilotHandoffRecords$p, policyDecisions$p, events$p, audits$p]);
   return {
@@ -5864,9 +5870,11 @@ function changedRecords(store, name, recordBaseline) {
 // never both read the same state and overwrite each other (that would hand out one number twice). Production
 // (Postgres) is unchanged; its numbers are guarded by the unique index and an advisory lock instead.
 let jsonStoreChain = Promise.resolve();
-export async function withStore(mutator) {
+export async function withStore(mutator, options = {}) {
   const run = async () => {
-    const store = await loadStore();
+    // CE-H1: options.tenantId / options.ledger narrow the Postgres load (see loadStore). Only for mutators
+    // audited to touch one tenant's records and not to read the ledgers.
+    const store = await loadStore(options.tenantId ?? null, { ledger: options.ledger });
     const ledgerBaseline = captureLedgerBaseline(store);
     const recordBaseline = captureRecordBaseline(store);
     const result = await mutator(store);
@@ -5892,10 +5900,10 @@ async function withAppState(mutator) {
 // genuinely only needs one tenant's data and isn't also about to mutate/save the store in the same
 // call (that's withStore/withAppState, deliberately left unscoped for now -- see loadPostgresStore's
 // comment). Every existing call site (readStore() with no argument) is completely unaffected.
-export async function readStore(tenantId = null) {
-  if (storeBackend === "postgres") return loadStore(tenantId);
+export async function readStore(tenantId = null, options = {}) {
+  if (storeBackend === "postgres") return loadStore(tenantId, options);
   // Development JSON store: queue the read behind any write in flight, so it never sees a half-written file.
-  const next = jsonStoreChain.then(() => loadStore(tenantId), () => loadStore(tenantId));
+  const next = jsonStoreChain.then(() => loadStore(tenantId, options), () => loadStore(tenantId, options));
   jsonStoreChain = next.catch(() => {});
   return next;
 }
@@ -6533,7 +6541,7 @@ function stripRelationalCollections(store) {
   edcs_sync_runs: [],
   edcs_sync_events: [],
   automation_rules: [],
-  automation_rule_runs: [], edcs_number_reservations: [], approval_policies: [],
+  automation_rule_runs: [], edcs_number_reservations: [], approval_policies: [], edcs_connectors: [],
   service_packs: [],
   service_skus: [],
   worker_templates: [],

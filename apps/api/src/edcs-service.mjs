@@ -46,7 +46,7 @@ async function recordAudit(scope, actor, events) {
   if (!events.length) return;
   await withStore((store) => {
     for (const event of events) appendEventAndAudit(store, { actor, tenant_id: scope.tenant_id, firm_id: scope.firm_id, ...event });
-  });
+  }, { tenantId: scope.tenant_id, ledger: false }); // CE-H1: append-only, so no whole-database or ledger load
 }
 
 // ---------------- connection ----------------
@@ -150,18 +150,34 @@ export async function importRegister({ body, actor, readFileBytes }) {
   const connection = await repo.getConnection(scope);
   if (!connection) throw httpError(409, "EDCS_NOT_CONNECTED", "Set up the BizKick connection (company code) before importing a register.");
 
-  const store = await readStore(scope.tenant_id);
+  const store = await readStore(scope.tenant_id, { ledger: false });
   const file = (store.file_objects ?? []).find((item) => item.id === body.file_id && item.tenant_id === scope.tenant_id && item.firm_id === scope.firm_id);
   if (!file) throw httpError(404, "NOT_FOUND", `file_objects record not found: ${body.file_id}`);
   const buffer = await readFileBytes(file);
 
+  let parsed;
+  try {
+    parsed = readRegisterFile({ filename: file.filename, mime_type: file.mime_type, buffer });
+  } catch (error) {
+    if (!(error instanceof TabularReadError)) throw error;
+    parsed = { ok: false, reason: "FILE_UNREADABLE", detail: error.message };
+  }
+  return applyRegisterRun({ scope, connection, actor, parsed, source: { file_id: file.id, filename: file.filename, sha256: file.sha256, size_bytes: file.size_bytes } });
+}
+
+// CE-S1 + CE-S6 (ADR-101): the one place a register is judged and committed. A browser/API upload (a whole
+// file, `context` null) and a connector delivery (a DELTA of changed rows plus the whole file's identities in
+// `context`) both end here, so they share the engine, the outcomes, the ledger and the audit trail.
+// `parsed` is { ok: true, rows } or { ok: false, reason, detail, ... } (the whole file is rejected).
+export async function applyRegisterRun({ scope, connection, actor, parsed, source, context = null, connector = null, idempotencyKey = null }) {
   const startedAt = now();
   const runs = await repo.listRuns(scope);
   const runId = newUuid();
   const runNumber = (runs[0]?.run_number ?? 0) + 1;
   const run = {
     id: runId, tenant_id: scope.tenant_id, firm_id: scope.firm_id, run_number: runNumber, status: "COMPLETED",
-    source_file_id: file.id, source_filename: file.filename, source_sha256: file.sha256, source_size_bytes: file.size_bytes,
+    source_file_id: source.file_id ?? null, source_filename: source.filename, source_sha256: source.sha256 ?? null, source_size_bytes: source.size_bytes ?? null,
+    source_kind: connector ? "CONNECTOR" : "UPLOAD", sync_mode: context ? "DELTA" : "FULL", connector_id: connector?.id ?? null, connector_name: connector?.name ?? null, idempotency_key: idempotencyKey,
     actor_id: actor.actor_id ?? null, started_at: startedAt, finished_at: null,
     counts: Object.fromEntries(EDCS_OUTCOMES.map((outcome) => [outcome, 0])), rows_total: 0, rows_ignored: 0, warnings_count: 0, file_outcome: null
   };
@@ -174,14 +190,6 @@ export async function importRegister({ body, actor, readFileBytes }) {
     changes: {}, before_fingerprint: row.before_fingerprint ?? null, after_fingerprint: row.after_fingerprint ?? null, raw: row.raw ?? null, at: startedAt, ...extra
   });
 
-  let parsed;
-  try {
-    parsed = readRegisterFile({ filename: file.filename, mime_type: file.mime_type, buffer });
-  } catch (error) {
-    if (!(error instanceof TabularReadError)) throw error;
-    parsed = { ok: false, reason: "FILE_UNREADABLE", detail: error.message };
-  }
-
   let rows = [];
   let missing = [];
   if (!parsed.ok) {
@@ -192,7 +200,7 @@ export async function importRegister({ body, actor, readFileBytes }) {
   } else {
     const existingList = await repo.listTransactions(scope);
     const existing = new Map(existingList.map((record) => [record.transaction_id, record]));
-    const engine = processRegisterRows({ rows: parsed.rows, connection, existing });
+    const engine = processRegisterRows({ rows: parsed.rows, connection, existing, context });
     run.counts = engine.counts;
     run.rows_total = engine.results.length;
     run.rows_ignored = engine.ignored_rows;
@@ -283,10 +291,12 @@ export async function importRegister({ body, actor, readFileBytes }) {
   run.finished_at = now();
   batch.edcs_sync_runs.push(run);
   await repo.commit(scope, batch);
+  const label = source.filename ?? "register";
+  const verb = connector ? "synced" : "imported";
   audits.unshift({
-    event_type: "edcs.register_imported", aggregate_type: "EdcsSyncRun", aggregate_id: run.id,
-    payload: { run_number: runNumber, status: run.status, file_id: file.id, filename: file.filename, source_sha256: file.sha256, counts: run.counts, rows_total: run.rows_total, file_outcome: run.file_outcome },
-    summary: run.status === "REJECTED" ? `Register ${file.filename} rejected (${run.file_outcome.reason}); no rows processed.` : `Register ${file.filename} imported: ${run.counts.CREATED} created, ${run.counts.UPDATED} updated, ${run.counts.REVISED} revised, ${run.counts.UNCHANGED} unchanged, ${run.counts.REJECTED} rejected, ${run.counts.CONFLICT} conflicts, ${run.counts.ROW_MISSING} missing.`
+    event_type: connector ? "edcs.register_synced" : "edcs.register_imported", aggregate_type: "EdcsSyncRun", aggregate_id: run.id,
+    payload: { run_number: runNumber, status: run.status, file_id: source.file_id ?? null, filename: source.filename, source_sha256: source.sha256 ?? null, counts: run.counts, rows_total: run.rows_total, file_outcome: run.file_outcome, ...(connector ? { connector_id: connector.id, connector_name: connector.name, sync_mode: run.sync_mode } : {}) },
+    summary: run.status === "REJECTED" ? `Register ${label} rejected (${run.file_outcome.reason}); no rows processed.` : `Register ${label} ${verb}${connector ? ` by connector "${connector.name}"` : ""}: ${run.counts.CREATED} created, ${run.counts.UPDATED} updated, ${run.counts.REVISED} revised, ${run.counts.UNCHANGED} unchanged, ${run.counts.REJECTED} rejected, ${run.counts.CONFLICT} conflicts, ${run.counts.ROW_MISSING} missing.`
   });
   await recordAudit(scope, actor, audits);
   return {
@@ -404,7 +414,7 @@ const normalizeName = (value) => String(value ?? "").toLowerCase().replace(/[^a-
 
 async function counterpartySuggestions(scope, record) {
   if (!record.counterparty_name || record.counterparty_link) return [];
-  const store = await readStore(scope.tenant_id);
+  const store = await readStore(scope.tenant_id, { ledger: false });
   const wanted = normalizeName(record.counterparty_name);
   const matches = [];
   for (const client of store.clients ?? []) {
@@ -505,7 +515,7 @@ export async function linkCounterparty({ body, actor }) {
   const timestamp = now();
   let link = null;
   if (linkType === "CLIENT") {
-    const store = await readStore(scope.tenant_id);
+    const store = await readStore(scope.tenant_id, { ledger: false });
     const client = (store.clients ?? []).find((item) => item.id === body.client_id && item.tenant_id === scope.tenant_id && item.firm_id === scope.firm_id);
     if (!client) throw httpError(404, "NOT_FOUND", `clients record not found: ${body.client_id}`);
     link = { link_type: "CLIENT", client_id: client.id, name: client.name };
@@ -579,14 +589,22 @@ const documentsSummary = (history) => history.linked ? {
 //   UNMATCHED                      no Transaction ID in the file name (nothing stored; owner can link by hand)
 //   ORPHAN                         ID found but the transaction is not in the imported register (nothing stored)
 //   WRONG_COMPANY / UNKNOWN_TYPE   well-formed ID that does not belong to this firm's connection
-export async function linkEdcsFile({ scope: scopeInput, actor, filename, mime_type, buffer, transaction_id, role = "PRIMARY", storeBytes }) {
-  requireOwner(actor, "Linking a file to a BizKick transaction");
+//
+// CE-S6: a connector delivers a file it found in a controlled folder. `connector` replaces the owner check (the
+// connector's token was issued by the owner) and is named in the revision note. `meta` ({sha256, size_bytes})
+// lets it deliver metadata only, with no bytes -- which is all a metadata-only content policy ever stores. If
+// the policy stores content, bytes are required (409 CONTENT_REQUIRED); if bytes arrive under a metadata-only
+// policy they are still never stored.
+export async function linkEdcsFile({ scope: scopeInput, actor, filename, mime_type, buffer = null, meta = null, connector = null, transaction_id, role = "PRIMARY", storeBytes }) {
+  if (!connector) requireOwner(actor, "Linking a file to a BizKick transaction");
   const scope = scopeOf(scopeInput);
   const connection = await repo.getConnection(scope);
   if (!connection) throw httpError(409, "EDCS_NOT_CONNECTED", "Set up the BizKick connection (company code) before linking files.");
   if (!["PRIMARY", "SUPPORTING"].includes(role)) throw httpError(400, "VALIDATION_ERROR", "role must be PRIMARY or SUPPORTING.");
-  const sha256 = sha256Hex(buffer);
-  const base = { filename, size_bytes: buffer.length, sha256 };
+  if (!buffer && !(/^[0-9a-f]{64}$/.test(String(meta?.sha256 ?? "")) && Number.isInteger(meta?.size_bytes) && meta.size_bytes >= 0)) throw httpError(400, "VALIDATION_ERROR", "Send the file bytes, or its sha256 and size_bytes.");
+  const sha256 = buffer ? sha256Hex(buffer) : meta.sha256;
+  const sizeBytes = buffer ? buffer.length : meta.size_bytes;
+  const base = { filename, size_bytes: sizeBytes, sha256 };
   let method = "FILENAME";
   let revisionHint = null;
   let id = null;
@@ -617,12 +635,13 @@ export async function linkEdcsFile({ scope: scopeInput, actor, filename, mime_ty
   const identical = role === "SUPPORTING"
     ? state.revisions.some((revision) => revision.metadata?.role === "SUPPORTING" && revision.content_hash === sha256)
     : current && current.content_hash === sha256;
+  if (contentStored && !identical && !buffer) throw httpError(409, "CONTENT_REQUIRED", `${record.document_type} files are stored under this firm's content policy; send the file bytes, not only its fingerprint.`);
   if (contentStored && !identical) stored = await storeBytes({ file_id: fileId, filename, mime_type, buffer });
   const result = await registerEdcsFileRevisionRecord({
     tenant_id: scope.tenant_id, firm_id: scope.firm_id,
     transaction: { transaction_id: id, document_type: record.document_type, title: `${EDCS_DOCUMENT_TYPES[record.document_type].name} ${id}${record.subject ? ` - ${record.subject}` : ""}` },
-    file: { file_id: fileId, filename, mime_type, size_bytes: buffer.length, sha256, storage_backend: stored.storage_backend, storage_key: stored.storage_key, classification: fileClassificationFor(record.document_type) },
-    content_stored: contentStored, revision_label: revisionHint ?? record.revision ?? null, method, note: null, role
+    file: { file_id: fileId, filename, mime_type, size_bytes: sizeBytes, sha256, storage_backend: stored.storage_backend, storage_key: stored.storage_key, classification: fileClassificationFor(record.document_type) },
+    content_stored: contentStored, revision_label: revisionHint ?? record.revision ?? null, method, note: connector ? `Delivered by connector "${connector.name}"` : null, role
   }, actor);
 
   const history = await documentHistory(scope, id);

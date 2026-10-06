@@ -1,0 +1,20 @@
+{
+  "vfirm_url": "https://YOUR-VFIRM-API-ADDRESS",
+  "connector_token": "vfc_PASTE_THE_TOKEN_FROM_THE_VFIRM_CONSOLE (or leave this and set the VFIRM_CONNECTOR_TOKEN environment variable)",
+  "topology": "A",
+  "bizkick_root": "C:\\BizKick",
+  "register_path": "EDCS\\NEX_BK-SYS-005_Smart_Transaction_Register.xlsx",
+  "controlled_folders": [
+    "Sales",
+    "Finance",
+    "Procurement",
+    { "path": "Finance\\Bank statements", "role": "SUPPORTING" },
+    "HR"
+  ],
+  "state_dir": "C:\\ProgramData\\vFirmConnector",
+  "poll_interval_seconds": 60,
+  "heartbeat_interval_seconds": 60,
+  "watch": true,
+  "retry": { "base_ms": 5000, "max_ms": 900000 },
+  "outbox_enabled": false
+}

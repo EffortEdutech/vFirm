@@ -276,8 +276,11 @@ Scope (finalised at sprint start after measuring):
 
 Acceptance checks:
 
-- [ ] Before/after measurements recorded against the agreed budgets.
-- [ ] No functional regression (full regression set).
+- [x] Before/after measurements recorded against the agreed budgets.
+- [x] No functional regression (full regression set).
+
+CE-H1 evidence (2026-10-06): scratch Postgres, 5 firms x 2,000 rows x 3 revisions. Median ms before to after: scoped store read 3841 to 25, work request create 1580 to 19, transaction detail 932 to 107, slowest 500-row import 3348 to 1578; all budgets met. Regression set passes on JSON and Postgres 0001-0054 (ADR-100).
+
 
 ### CE-S6 — Connector agent: local PC and NAS (Topology A/C)
 
@@ -293,11 +296,14 @@ Scope:
 
 Acceptance checks (`npm run check:ce:s6-connector` + manual Windows test):
 
-- [ ] Changing a register row produces exactly one sync event with the right outcome.
-- [ ] Network off → queued → delivered after reconnect, no duplicates.
-- [ ] Revoked token → refused; console shows the connector as revoked.
-- [ ] Connector never writes outside the outbox (file-system audit in the test).
-- [ ] HR files: metadata only under the default policy.
+- [x] Changing a register row produces exactly one sync event with the right outcome.
+- [x] Network off → queued → delivered after reconnect, no duplicates.
+- [x] Revoked token → refused; console shows the connector as revoked.
+- [x] Connector never writes outside the outbox (file-system audit in the test).
+- [x] HR files: metadata only under the default policy.
+
+CE-S6 evidence (2026-10-06): `npm run check:ce:s6-connector` passes on the JSON store and on Postgres 0001-0054, including the packaged build. Manual Windows test pending with the owner (ADR-101).
+
 
 ### CE-S7 — Cloud adapter: OneDrive/SharePoint (Topology B)
 
@@ -512,8 +518,8 @@ Acceptance checks (`npm run check:vi:s6-einvoice-readiness`):
 - [ ] `check:ce:s3-register-rules`
 - [x] `check:ce:s4-number-authority` (CE-S4)
 - [x] `check:ce:s5-delegation-of-authority` (CE-S5)
-- [ ] CE-H1 measurements
-- [ ] `check:ce:s6-connector`
+- [x] CE-H1 measurements (CE-H1)
+- [x] `check:ce:s6-connector` (CE-S6)
 - [ ] CE-S7 Graph test
 - [ ] `check:ce:s8-template-drafting`
 - [ ] CE-S9 evidence pack + acceptance gate

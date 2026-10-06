@@ -1,0 +1,15 @@
+{
+  "name": "vfirm-edcs-connector",
+  "version": "1.0.0",
+  "private": true,
+  "description": "vFirm Connected EDCS connector agent: reads the BizKick register and controlled folders (read-only) and delivers deltas to vFirm.",
+  "type": "module",
+  "bin": { "edcs-connector": "bin/edcs-connector.mjs" },
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node bin/edcs-connector.mjs run",
+    "once": "node bin/edcs-connector.mjs once",
+    "status": "node bin/edcs-connector.mjs status",
+    "package": "node scripts/package.mjs"
+  }
+}

@@ -38,11 +38,11 @@ async function recordAudit(scope, actor, events) {
   if (!events.length) return;
   await withStore((store) => {
     for (const event of events) appendEventAndAudit(store, { actor, tenant_id: scope.tenant_id, firm_id: scope.firm_id, ...event });
-  });
+  }, { tenantId: scope.tenant_id, ledger: false }); // CE-H1: append-only, so no whole-database or ledger load
 }
 
 async function readWorkbook(scope, body, readFileBytes) {
-  const store = await readStore(scope.tenant_id);
+  const store = await readStore(scope.tenant_id, { ledger: false });
   const file = (store.file_objects ?? []).find((item) => item.id === body.file_id && item.tenant_id === scope.tenant_id && item.firm_id === scope.firm_id);
   if (!file) throw httpError(404, "NOT_FOUND", `file_objects record not found: ${body.file_id}`);
   const buffer = await readFileBytes(file);
@@ -170,7 +170,7 @@ const findDraft = (store, scope, id) => (store.awia_staff_output_drafts ?? []).f
 
 // Read-only: what would approving this draft need, and would the caller pass?
 export async function checkDraftApproval({ scope, actor, output_draft_id }) {
-  const store = await readStore(scope.tenant_id);
+  const store = await readStore(scope.tenant_id, { ledger: false });
   const draft = findDraft(store, scope, output_draft_id);
   if (!draft) throw httpError(404, "NOT_FOUND", `awia_staff_output_drafts record not found: ${output_draft_id}`);
   const { linked, transaction, policy, requirement } = await requirementForDraft(scope, draft, store);
@@ -185,7 +185,7 @@ export async function checkDraftApproval({ scope, actor, output_draft_id }) {
 // Both outcomes are audited when a limit applied; ungoverned and non-EDCS work leaves no trace here.
 export async function enforceDraftApproval({ scope, actor, output_draft_id, review_decision }) {
   if (review_decision !== "APPROVED_FOR_CLIENT_DRAFT") return { enforced: false };
-  const store = await readStore(scope.tenant_id);
+  const store = await readStore(scope.tenant_id, { ledger: false });
   const draft = findDraft(store, scope, output_draft_id);
   if (!draft) return { enforced: false }; // the review itself reports the missing draft
   const { transaction, policy, requirement } = await requirementForDraft(scope, draft, store);
@@ -205,7 +205,7 @@ export async function enforceDraftApproval({ scope, actor, output_draft_id, revi
 
 // Called after a draft is produced: record the tier on the draft so the reviewer sees it before deciding.
 export async function annotateDraftRequirement({ scope, actor, output_draft_id }) {
-  const store = await readStore(scope.tenant_id);
+  const store = await readStore(scope.tenant_id, { ledger: false });
   const draft = findDraft(store, scope, output_draft_id);
   if (!draft) return null;
   const { requirement } = await requirementForDraft(scope, draft, store);
@@ -216,6 +216,6 @@ export async function annotateDraftRequirement({ scope, actor, output_draft_id }
     if (!target) return;
     target.delegation_requirement = note;
     appendEventAndAudit(live, { actor, tenant_id: scope.tenant_id, firm_id: scope.firm_id, event_type: "edcs.delegation_requirement_recorded", aggregate_type: "AwiaStaffOutputDraft", aggregate_id: output_draft_id, payload: { output_draft_id, transaction_id: requirement.transaction_id, tier: requirement.tier, required_approver: requirement.approver_label, policy_version: requirement.policy_version }, summary: `Approval tier recorded on the draft: Tier ${requirement.tier}, needs ${requirement.approver_label}.` });
-  });
+  }, { tenantId: scope.tenant_id, ledger: false });
   return note;
 }

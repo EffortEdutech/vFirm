@@ -190,7 +190,10 @@ async function downloadFile(fileId, filename = "download") {
 
 export const api = {
   // ---- confirmed real GET endpoints ----
-  getStore: () => request("/mvp/store"),
+  // CE-H1 (ADR-100): once the signed-in identity is known the store read is scoped to that tenant on the
+  // server (withScope adds tenant_id + firm_id; the server uses the tenant). Before identity is resolved
+  // (boot) it stays the unscoped read it always was.
+  getStore: () => request(withScope("/mvp/store")),
   getWorkspaceSummary: () => request(withScope("/workspace/active-summary")),
   getAuthContext: () => request("/auth/context"),
   getDashboardSummary: () => request("/dashboard/summary"),
@@ -246,6 +249,11 @@ export const api = {
   listEdcsSyncRuns: () => request(withScope("/edcs/sync-runs"), { skipCache: true }),
   getEdcsSyncRun: (id) => request(withScope(`/edcs/sync-runs/${encodeURIComponent(id)}`), { skipCache: true }),
   getEdcsChains: () => request(withScope("/edcs/chains"), { skipCache: true }),
+  // CE-S6: connector agent (register, rotate, revoke, health).
+  listEdcsConnectors: () => request(withScope("/edcs/connectors"), { skipCache: true }),
+  issueEdcsConnector: (body) => request("/edcs/connectors", { method: "POST", body }),
+  rotateEdcsConnector: (body) => request("/edcs/connectors/rotate", { method: "POST", body }),
+  revokeEdcsConnector: (body) => request("/edcs/connectors/revoke", { method: "POST", body }),
   // CE-S5: Delegation of Authority.
   getEdcsDelegation: (version = "") => request(withScope(`/edcs/delegation${version ? `?version=${encodeURIComponent(version)}` : ""}`), { skipCache: true }),
   previewEdcsDelegation: (body) => request("/edcs/delegation/preview", { method: "POST", body }),

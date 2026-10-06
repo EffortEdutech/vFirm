@@ -29,6 +29,7 @@ import { createFileStorage, fileMaxBytes, sanitizeFilename, resolveAllowedMimeTy
 import { annotateDraftRequirement, checkDraftApproval, enforceDraftApproval, importDelegation as importEdcsDelegation, previewDelegation as previewEdcsDelegation, readDelegation as readEdcsDelegation } from "./edcs-delegation-service.mjs";
 import { EDCS_COLLECTIONS, listNumbers as listEdcsNumbers, reserveNumber as reserveEdcsNumber, voidNumber as voidEdcsNumber, linkEdcsFile, listEdcsChains, readEdcsDocuments, importRegister as importEdcsRegister, linkCounterparty as linkEdcsCounterparty, listConflicts as listEdcsConflicts, listSyncRuns as listEdcsSyncRuns, listTransactions as listEdcsTransactions, readConnection as readEdcsConnection, readEdcsExportCollections, readSyncRun as readEdcsSyncRun, readTransaction as readEdcsTransaction, resolveConflict as resolveEdcsConflict, saveConnection as saveEdcsConnection } from "./edcs-service.mjs";
 import { createRule as createAutomationRule, dryRunRule as dryRunAutomationRule, evaluateAfter as evaluateAutomationAfter, evaluateNow as evaluateAutomationNow, listRuleActivity as listAutomationRuleActivity, listRules as listAutomationRules, readSignals as readEdcsSignals, setRuleEnabled as setAutomationRuleEnabled, tick as tickAutomation, updateRule as updateAutomationRule } from "./edcs-automation-service.mjs";
+import { authenticateConnector as authenticateEdcsConnector, issueConnector as issueEdcsConnector, listConnectors as listEdcsConnectors, recordHeartbeat as recordEdcsConnectorHeartbeat, revokeConnector as revokeEdcsConnector, rotateConnector as rotateEdcsConnector, syncFile as syncEdcsFile, syncRegister as syncEdcsRegister } from "./edcs-connector-service.mjs";
 
 const root = process.cwd();
 const port = Number(process.env.VFIRM_API_PORT ?? 3091);
@@ -3182,6 +3183,13 @@ const routes = new Map([
   ["POST /edcs/connection", saveEdcsConnectionRoute],
   ["POST /edcs/register-imports", importEdcsRegisterRoute],
   ["POST /edcs/conflicts/resolve", resolveEdcsConflictRoute],
+  // CE-S6 (ADR-101): connector agent. Owner routes (issue/rotate/revoke) and connector-token routes.
+  ["POST /edcs/connectors", issueEdcsConnectorRoute],
+  ["POST /edcs/connectors/rotate", rotateEdcsConnectorRoute],
+  ["POST /edcs/connectors/revoke", revokeEdcsConnectorRoute],
+  ["POST /edcs/connector/heartbeat", edcsConnectorHeartbeatRoute],
+  ["POST /edcs/sync", edcsConnectorSyncRoute],
+  ["POST /edcs/sync/file", edcsConnectorFileRoute],
   ["POST /edcs/transactions/link-counterparty", linkEdcsCounterpartyRoute],
   // CE-S5 (ADR-099): Delegation of Authority (preview/import: owner; check: any signed-in member).
   ["POST /edcs/delegation/preview", previewEdcsDelegationRoute],
@@ -3584,6 +3592,70 @@ async function linkEdcsFileRoute(req, url) {
   return linked;
 }
 
+// CE-S6 (ADR-101): connectors. Registering, rotating and revoking need a signed-in firm owner (checked in
+// edcs-connector-service.mjs). The connector's own calls carry no user: they are authenticated by the
+// connector token (x-vfirm-connector-token), which resolves to exactly one firm.
+async function issueEdcsConnectorRoute(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "name"]);
+  const { actor } = edcsScope(req, body, "register a BizKick connector");
+  return issueEdcsConnector({ body, actor });
+}
+
+async function rotateEdcsConnectorRoute(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "connector_id"]);
+  const { actor } = edcsScope(req, body, "rotate a BizKick connector token");
+  return rotateEdcsConnector({ body, actor });
+}
+
+async function revokeEdcsConnectorRoute(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "connector_id"]);
+  const { actor } = edcsScope(req, body, "revoke a BizKick connector");
+  return revokeEdcsConnector({ body, actor });
+}
+
+const connectorFromRequest = (req) => authenticateEdcsConnector(headerValue(req, "x-vfirm-connector-token"));
+
+async function edcsConnectorHeartbeatRoute(body, req = null) {
+  const connector = await connectorFromRequest(req);
+  return recordEdcsConnectorHeartbeat({ connector, body });
+}
+
+async function edcsConnectorSyncRoute(body, req = null) {
+  const connector = await connectorFromRequest(req);
+  const result = await syncEdcsRegister({ connector, body });
+  // Same as an uploaded register: rules run after a completed delivery (a rules failure never fails it).
+  if (!result.duplicate_delivery && result.run?.status === "COMPLETED") {
+    const scope = { tenant_id: connector.tenant_id, firm_id: connector.firm_id };
+    Object.assign(result, await evaluateAutomationAfter({ scope, trigger: "IMPORT", actor: systemActor(scope.tenant_id, scope.firm_id), deps: automationDeps }));
+  }
+  return result;
+}
+
+async function edcsConnectorFileRoute(body, req = null) {
+  const connector = await connectorFromRequest(req);
+  const scope = { tenant_id: connector.tenant_id, firm_id: connector.firm_id };
+  const filename = sanitizeFilename(String(body?.filename ?? ""));
+  // Bytes are validated like any upload (allowed type, size cap); a metadata-only delivery has none.
+  const withBytes = typeof body?.content_base64 === "string" && body.content_base64.length > 0;
+  const mime_type = withBytes ? resolveAllowedMimeType(filename, body.mime_type || "") : (body?.mime_type ?? null);
+  if (withBytes && Math.floor(body.content_base64.length * 3 / 4) > fileMaxBytes()) {
+    const error = new Error("File is larger than the upload limit.");
+    error.status = 413;
+    error.code = "FILE_TOO_LARGE";
+    throw error;
+  }
+  const linked = await syncEdcsFile({
+    connector, body: { ...body, filename, mime_type },
+    storeBytes: async ({ file_id, buffer: bytes, mime_type: type }) => {
+      const storage_key = storageKeyFor({ tenant_id: scope.tenant_id, firm_id: scope.firm_id, file_id });
+      await fileStorage.put(storage_key, bytes, type);
+      return { storage_backend: fileStorage.backend, storage_key };
+    }
+  });
+  if (["LINKED", "REVISED", "ATTACHED"].includes(linked.outcome)) Object.assign(linked, await evaluateAutomationAfter({ scope, trigger: "FILE", actor: systemActor(scope.tenant_id, scope.firm_id), deps: automationDeps }));
+  return linked;
+}
+
 async function reserveEdcsNumberRoute(body, req = null) {
   requireFields(body, ["tenant_id", "firm_id"]);
   const { actor } = edcsScope(req, body, "reserve a transaction number");
@@ -3629,7 +3701,7 @@ async function linkEdcsCounterpartyRoute(body, req = null) {
 // GET /edcs/connection | /edcs/transactions[/<id>] | /edcs/sync-runs[/<id>] | /edcs/conflicts
 // (?tenant_id=&firm_id= required; transactions also take type, status, alert, flag, search, as_of).
 async function readEdcsRoute(req, url) {
-  const match = url.pathname.match(/^\/edcs\/(connection|transactions|sync-runs|conflicts|chains|documents|signals|numbers|delegation)(?:\/([^/]+))?$/);
+  const match = url.pathname.match(/^\/edcs\/(connection|transactions|sync-runs|conflicts|chains|documents|signals|numbers|delegation|connectors)(?:\/([^/]+))?$/);
   if (!match) return null;
   const [, kind, rawId] = match;
   const { scope } = edcsScope(req, { tenant_id: url.searchParams.get("tenant_id"), firm_id: url.searchParams.get("firm_id") }, "read BizKick data");
@@ -3640,6 +3712,7 @@ async function readEdcsRoute(req, url) {
   if (kind === "signals" && !id) return readEdcsSignals({ scope });
   if (kind === "delegation" && !id) return readEdcsDelegation(scope, { version: url.searchParams.get("version") });
   if (kind === "numbers" && !id) return listEdcsNumbers({ scope, params: url.searchParams });
+  if (kind === "connectors" && !id) return listEdcsConnectors({ scope });
   if (kind === "documents" && id) return readEdcsDocuments({ scope, transactionId: id });
   if (kind === "transactions") return id ? readEdcsTransaction({ scope, transactionId: id, params: url.searchParams }) : listEdcsTransactions({ scope, params: url.searchParams });
   if (kind === "sync-runs") return id ? readEdcsSyncRun({ scope, runId: id }) : listEdcsSyncRuns({ scope });
@@ -3817,7 +3890,11 @@ const server = createServer(async (req, res) => {
     { const fileDownload = req.method === "GET" ? url.pathname.match(/^\/files\/([^/]+)\/download$/) : null; if (fileDownload) return await downloadFirmFile(req, res, url, decodeURIComponent(fileDownload[1])); }
     { const edcsRead = req.method === "GET" && url.pathname.startsWith("/edcs/") ? await readEdcsRoute(req, url) : null; if (edcsRead) return sendJson(req, res, 200, { ok: true, data: edcsRead }); }
     if (req.method === "GET" && url.pathname === "/mvp/store") {
-      const storeData = await readStore();
+      // CE-H1 (ADR-100): ?tenant_id=<id> returns that tenant's records only (the ledgers -- event_log,
+      // audit_events, policy_decisions -- are left out: no console page reads them from here). Without it the
+      // response is the whole-database dump it always was (boot identity resolution, dev/test scripts).
+      const scopedTenant = url.searchParams.get("tenant_id");
+      const storeData = scopedTenant ? await readStore(scopedTenant, { ledger: false }) : await readStore();
       // Phase 5, slice 5a (2026-09-30): attach server-computed display_status /
       // display_status_label to each AWIA workdesk item in the response only -- new objects,
       // never mutating storeData.awia_staff_workdesk_items in place, so this can't leak into

@@ -280,6 +280,7 @@ async function mountHistory(root) {
     { label: "#", key: "run_number" },
     { label: "When", render: (r) => escapeHtml(dt(r.started_at)) },
     { label: "Status", render: (r) => pill(r.status, r.status === "COMPLETED" ? "moss" : "rose") },
+    { label: "Source", render: (r) => r.source_kind === "CONNECTOR" ? `Connector <strong>${escapeHtml(r.connector_name ?? "")}</strong>` : "Upload" },
     { label: "Rows", render: (r) => String(r.rows_total ?? 0) },
     { label: "Created / Updated / Revised", render: (r) => `${r.counts?.CREATED ?? 0} / ${r.counts?.UPDATED ?? 0} / ${r.counts?.REVISED ?? 0}` },
     { label: "Conflicts / Rejected / Missing", render: (r) => `${r.counts?.CONFLICT ?? 0} / ${r.counts?.REJECTED ?? 0} / ${r.counts?.ROW_MISSING ?? 0}` },
@@ -550,7 +551,61 @@ async function mountDelegation(root) {
   render();
 }
 
+// ---------------- connector (CE-S6) ----------------
+
+const HEALTH_TEXT = { OK: ["Healthy", "moss"], ERRORS: ["Has errors", "amber"], STALE: ["Not heard from", "rose"], NEVER_SEEN: ["Never connected", "default"], REVOKED: ["Revoked", "rose"] };
+const healthPill = (health) => { const [text, tone] = HEALTH_TEXT[health] ?? [health, "default"]; return pill(text, tone); };
+
+async function mountConnector(root) {
+  let data;
+  try { data = await api.listEdcsConnectors(); } catch (err) { root.innerHTML = errorBox(err, "BizKick connectors"); return; }
+  const connectors = data.connectors ?? [];
+  root.innerHTML = GOLDEN_RULE
+    + panel("Connectors", connectors.length ? table([
+      { label: "Connector", render: (c) => `<strong>${escapeHtml(c.name)}</strong><div class="field-note">Topology ${escapeHtml(c.topology)} · token ${escapeHtml(c.token_prefix ?? "")}…${c.host ? ` · ${escapeHtml(c.host)}` : ""}${c.agent_version ? ` · v${escapeHtml(c.agent_version)}` : ""}</div>` },
+      { label: "Health", render: (c) => healthPill(c.health) + (c.status === "REVOKED" && c.refused_count ? `<div class="field-note">${c.refused_count} refused attempt(s)</div>` : "") },
+      { label: "Last seen", render: (c) => escapeHtml(dt(c.last_seen_at)) },
+      { label: "Last sync", render: (c) => c.last_run_number ? `#${c.last_run_number} ${escapeHtml(c.last_run_status ?? "")}<div class="field-note">${escapeHtml(dt(c.last_sync_at))}</div>` : "—" },
+      { label: "Waiting to send", render: (c) => String(c.queue_length ?? 0) },
+      { label: "Errors", render: (c) => c.last_error ? `<span class="field-note">${escapeHtml(c.last_error)}</span>` : (c.error_count ? `${c.error_count} earlier` : "None") },
+      { label: "", render: (c) => c.status === "REVOKED" ? "" : `<div style="white-space:nowrap"><button class="btn btn-sm bk-con-rotate" data-id="${escapeHtml(c.id)}" type="button">New token</button> <button class="btn btn-sm bk-con-revoke" data-id="${escapeHtml(c.id)}" type="button">Revoke</button></div>` }
+    ], connectors, (c) => c.id) : `<p class="field-note">No connector yet. Register one, then install the program on the PC that holds BizKick.</p>`)
+    + `<div id="bkConMsg" style="min-height:1.2em"></div><div id="bkConToken"></div>`
+    + panel("Register a connector", `<div class="form-grid">
+        <label class="field"><span>Name</span><input id="bkConName" type="text" maxlength="80" placeholder="Office PC" /></label>
+        <label class="field"><span>Where is BizKick?</span><select id="bkConTopology"><option value="A">On the PC the connector runs on</option><option value="C">On a shared folder (network path)</option></select></label>
+      </div><div class="form-actions"><button class="btn btn-primary" id="bkConIssue" type="button">Register connector</button></div>`);
+  const msg = root.querySelector("#bkConMsg");
+  const guard = (fn) => async (event) => { msg.textContent = "Working…"; try { await fn(event); msg.textContent = ""; } catch (err) { msg.textContent = err.message; } };
+  const tokenPanel = (heading, result) => panel(heading, `<p class="field-note">${escapeHtml(result.token_notice ?? "")}</p><p><code id="bkConTokenValue" style="user-select:all">${escapeHtml(result.token)}</code></p>`);
+  // Two clicks, no pop-up: the first arms the button, the second does it.
+  const confirmed = (button, text) => {
+    if (button.dataset.armed) return true;
+    button.dataset.armed = "1";
+    button.textContent = text;
+    msg.textContent = "Click the button again to confirm.";
+    return false;
+  };
+  root.querySelector("#bkConIssue").addEventListener("click", guard(async () => {
+    const result = await api.issueEdcsConnector({ name: root.querySelector("#bkConName").value, topology: root.querySelector("#bkConTopology").value });
+    await mountConnector(root);
+    root.querySelector("#bkConToken").innerHTML = tokenPanel("Connector registered — copy its token now", result);
+  }));
+  for (const b of root.querySelectorAll(".bk-con-rotate")) b.addEventListener("click", guard(async () => {
+    if (!confirmed(b, "Confirm: new token (the old one stops working now)")) return;
+    const result = await api.rotateEdcsConnector({ connector_id: b.dataset.id });
+    await mountConnector(root);
+    root.querySelector("#bkConToken").innerHTML = tokenPanel("New token — copy it now", result);
+  }));
+  for (const b of root.querySelectorAll(".bk-con-revoke")) b.addEventListener("click", guard(async () => {
+    if (!confirmed(b, "Confirm: revoke (cannot be undone)")) return;
+    await api.revokeEdcsConnector({ connector_id: b.dataset.id });
+    await mountConnector(root);
+  }));
+}
+
 export const BIZKICK_PAGES = {
+  "bizkick-connector": mountConnector,
   "bizkick-delegation": mountDelegation,
   "bizkick-numbers": mountNumbers,
   "bizkick-rules": mountRules,

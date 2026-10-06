@@ -55,7 +55,7 @@ async function audit(scope, actor, events) {
   if (!events.length) return;
   await withStore((store) => {
     for (const event of events) appendEventAndAudit(store, { actor, tenant_id: scope.tenant_id, firm_id: scope.firm_id, ...event });
-  });
+  }, { tenantId: scope.tenant_id, ledger: false }); // CE-H1: append-only, so no whole-database or ledger load
 }
 
 function checkRequestType(requestTypeId) {
@@ -164,7 +164,7 @@ async function buildContext(scope, asOf) {
     if (!previous || revision.seq > previous.seq) latestRevision.set(revision.transaction_id, { seq: revision.seq, revision: revision.revision, kind: revision.kind, created_at: revision.created_at });
   }
   // Document register state of each transaction: its primary file and attached supporting files.
-  const store = await readStore(scope.tenant_id);
+  const store = await readStore(scope.tenant_id, { ledger: false });
   const inScope = (record) => record.tenant_id === scope.tenant_id && record.firm_id === scope.firm_id;
   const files = new Map();
   const fileById = new Map((store.file_objects ?? []).filter(inScope).map((file) => [file.id, file]));

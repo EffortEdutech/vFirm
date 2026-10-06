@@ -1,0 +1,982 @@
+{
+  "measured_at": "2026-10-06T05:01:20.104Z",
+  "volume": {
+    "firms": 5,
+    "rows_per_firm": 2000,
+    "revisions": 3
+  },
+  "import_ms": [
+    {
+      "firm": "CE-H1 Firm 1791262880382-1",
+      "file": "register_1_500_r0.csv",
+      "rows": 500,
+      "ms": 540,
+      "counts": {
+        "CREATED": 500,
+        "UPDATED": 0,
+        "REVISED": 0,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 0
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-1",
+      "file": "register_501_1000_r0.csv",
+      "rows": 500,
+      "ms": 879,
+      "counts": {
+        "CREATED": 500,
+        "UPDATED": 0,
+        "REVISED": 0,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 500
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-1",
+      "file": "register_1001_1500_r0.csv",
+      "rows": 500,
+      "ms": 977,
+      "counts": {
+        "CREATED": 500,
+        "UPDATED": 0,
+        "REVISED": 0,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1000
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-1",
+      "file": "register_1501_2000_r0.csv",
+      "rows": 500,
+      "ms": 983,
+      "counts": {
+        "CREATED": 500,
+        "UPDATED": 0,
+        "REVISED": 0,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1500
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-1",
+      "file": "register_1_500_r1.csv",
+      "rows": 500,
+      "ms": 1403,
+      "counts": {
+        "CREATED": 0,
+        "UPDATED": 0,
+        "REVISED": 500,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1500
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-1",
+      "file": "register_501_1000_r1.csv",
+      "rows": 500,
+      "ms": 1466,
+      "counts": {
+        "CREATED": 0,
+        "UPDATED": 0,
+        "REVISED": 500,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1500
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-1",
+      "file": "register_1001_1500_r1.csv",
+      "rows": 500,
+      "ms": 1624,
+      "counts": {
+        "CREATED": 0,
+        "UPDATED": 0,
+        "REVISED": 500,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1500
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-1",
+      "file": "register_1501_2000_r1.csv",
+      "rows": 500,
+      "ms": 1871,
+      "counts": {
+        "CREATED": 0,
+        "UPDATED": 0,
+        "REVISED": 500,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1500
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-1",
+      "file": "register_1_500_r2.csv",
+      "rows": 500,
+      "ms": 1821,
+      "counts": {
+        "CREATED": 0,
+        "UPDATED": 0,
+        "REVISED": 500,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1500
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-1",
+      "file": "register_501_1000_r2.csv",
+      "rows": 500,
+      "ms": 1767,
+      "counts": {
+        "CREATED": 0,
+        "UPDATED": 0,
+        "REVISED": 500,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1500
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-1",
+      "file": "register_1001_1500_r2.csv",
+      "rows": 500,
+      "ms": 2061,
+      "counts": {
+        "CREATED": 0,
+        "UPDATED": 0,
+        "REVISED": 500,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1500
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-1",
+      "file": "register_1501_2000_r2.csv",
+      "rows": 500,
+      "ms": 1994,
+      "counts": {
+        "CREATED": 0,
+        "UPDATED": 0,
+        "REVISED": 500,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1500
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-2",
+      "file": "register_1_500_r0.csv",
+      "rows": 500,
+      "ms": 863,
+      "counts": {
+        "CREATED": 500,
+        "UPDATED": 0,
+        "REVISED": 0,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 0
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-2",
+      "file": "register_501_1000_r0.csv",
+      "rows": 500,
+      "ms": 1206,
+      "counts": {
+        "CREATED": 500,
+        "UPDATED": 0,
+        "REVISED": 0,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 500
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-2",
+      "file": "register_1001_1500_r0.csv",
+      "rows": 500,
+      "ms": 1083,
+      "counts": {
+        "CREATED": 500,
+        "UPDATED": 0,
+        "REVISED": 0,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1000
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-2",
+      "file": "register_1501_2000_r0.csv",
+      "rows": 500,
+      "ms": 1478,
+      "counts": {
+        "CREATED": 500,
+        "UPDATED": 0,
+        "REVISED": 0,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1500
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-2",
+      "file": "register_1_500_r1.csv",
+      "rows": 500,
+      "ms": 2006,
+      "counts": {
+        "CREATED": 0,
+        "UPDATED": 0,
+        "REVISED": 500,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1500
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-2",
+      "file": "register_501_1000_r1.csv",
+      "rows": 500,
+      "ms": 1889,
+      "counts": {
+        "CREATED": 0,
+        "UPDATED": 0,
+        "REVISED": 500,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1500
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-2",
+      "file": "register_1001_1500_r1.csv",
+      "rows": 500,
+      "ms": 1774,
+      "counts": {
+        "CREATED": 0,
+        "UPDATED": 0,
+        "REVISED": 500,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1500
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-2",
+      "file": "register_1501_2000_r1.csv",
+      "rows": 500,
+      "ms": 2038,
+      "counts": {
+        "CREATED": 0,
+        "UPDATED": 0,
+        "REVISED": 500,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1500
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-2",
+      "file": "register_1_500_r2.csv",
+      "rows": 500,
+      "ms": 1991,
+      "counts": {
+        "CREATED": 0,
+        "UPDATED": 0,
+        "REVISED": 500,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1500
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-2",
+      "file": "register_501_1000_r2.csv",
+      "rows": 500,
+      "ms": 2327,
+      "counts": {
+        "CREATED": 0,
+        "UPDATED": 0,
+        "REVISED": 500,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1500
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-2",
+      "file": "register_1001_1500_r2.csv",
+      "rows": 500,
+      "ms": 2503,
+      "counts": {
+        "CREATED": 0,
+        "UPDATED": 0,
+        "REVISED": 500,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1500
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-2",
+      "file": "register_1501_2000_r2.csv",
+      "rows": 500,
+      "ms": 2475,
+      "counts": {
+        "CREATED": 0,
+        "UPDATED": 0,
+        "REVISED": 500,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1500
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-3",
+      "file": "register_1_500_r0.csv",
+      "rows": 500,
+      "ms": 1200,
+      "counts": {
+        "CREATED": 500,
+        "UPDATED": 0,
+        "REVISED": 0,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 0
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-3",
+      "file": "register_501_1000_r0.csv",
+      "rows": 500,
+      "ms": 1439,
+      "counts": {
+        "CREATED": 500,
+        "UPDATED": 0,
+        "REVISED": 0,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 500
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-3",
+      "file": "register_1001_1500_r0.csv",
+      "rows": 500,
+      "ms": 1591,
+      "counts": {
+        "CREATED": 500,
+        "UPDATED": 0,
+        "REVISED": 0,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1000
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-3",
+      "file": "register_1501_2000_r0.csv",
+      "rows": 500,
+      "ms": 1657,
+      "counts": {
+        "CREATED": 500,
+        "UPDATED": 0,
+        "REVISED": 0,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1500
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-3",
+      "file": "register_1_500_r1.csv",
+      "rows": 500,
+      "ms": 2186,
+      "counts": {
+        "CREATED": 0,
+        "UPDATED": 0,
+        "REVISED": 500,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1500
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-3",
+      "file": "register_501_1000_r1.csv",
+      "rows": 500,
+      "ms": 2007,
+      "counts": {
+        "CREATED": 0,
+        "UPDATED": 0,
+        "REVISED": 500,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1500
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-3",
+      "file": "register_1001_1500_r1.csv",
+      "rows": 500,
+      "ms": 2033,
+      "counts": {
+        "CREATED": 0,
+        "UPDATED": 0,
+        "REVISED": 500,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1500
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-3",
+      "file": "register_1501_2000_r1.csv",
+      "rows": 500,
+      "ms": 2330,
+      "counts": {
+        "CREATED": 0,
+        "UPDATED": 0,
+        "REVISED": 500,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1500
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-3",
+      "file": "register_1_500_r2.csv",
+      "rows": 500,
+      "ms": 2738,
+      "counts": {
+        "CREATED": 0,
+        "UPDATED": 0,
+        "REVISED": 500,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1500
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-3",
+      "file": "register_501_1000_r2.csv",
+      "rows": 500,
+      "ms": 2641,
+      "counts": {
+        "CREATED": 0,
+        "UPDATED": 0,
+        "REVISED": 500,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1500
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-3",
+      "file": "register_1001_1500_r2.csv",
+      "rows": 500,
+      "ms": 2683,
+      "counts": {
+        "CREATED": 0,
+        "UPDATED": 0,
+        "REVISED": 500,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1500
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-3",
+      "file": "register_1501_2000_r2.csv",
+      "rows": 500,
+      "ms": 2618,
+      "counts": {
+        "CREATED": 0,
+        "UPDATED": 0,
+        "REVISED": 500,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1500
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-4",
+      "file": "register_1_500_r0.csv",
+      "rows": 500,
+      "ms": 1380,
+      "counts": {
+        "CREATED": 500,
+        "UPDATED": 0,
+        "REVISED": 0,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 0
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-4",
+      "file": "register_501_1000_r0.csv",
+      "rows": 500,
+      "ms": 1954,
+      "counts": {
+        "CREATED": 500,
+        "UPDATED": 0,
+        "REVISED": 0,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 500
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-4",
+      "file": "register_1001_1500_r0.csv",
+      "rows": 500,
+      "ms": 1899,
+      "counts": {
+        "CREATED": 500,
+        "UPDATED": 0,
+        "REVISED": 0,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1000
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-4",
+      "file": "register_1501_2000_r0.csv",
+      "rows": 500,
+      "ms": 2141,
+      "counts": {
+        "CREATED": 500,
+        "UPDATED": 0,
+        "REVISED": 0,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1500
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-4",
+      "file": "register_1_500_r1.csv",
+      "rows": 500,
+      "ms": 2257,
+      "counts": {
+        "CREATED": 0,
+        "UPDATED": 0,
+        "REVISED": 500,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1500
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-4",
+      "file": "register_501_1000_r1.csv",
+      "rows": 500,
+      "ms": 2147,
+      "counts": {
+        "CREATED": 0,
+        "UPDATED": 0,
+        "REVISED": 500,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1500
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-4",
+      "file": "register_1001_1500_r1.csv",
+      "rows": 500,
+      "ms": 2429,
+      "counts": {
+        "CREATED": 0,
+        "UPDATED": 0,
+        "REVISED": 500,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1500
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-4",
+      "file": "register_1501_2000_r1.csv",
+      "rows": 500,
+      "ms": 2561,
+      "counts": {
+        "CREATED": 0,
+        "UPDATED": 0,
+        "REVISED": 500,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1500
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-4",
+      "file": "register_1_500_r2.csv",
+      "rows": 500,
+      "ms": 2776,
+      "counts": {
+        "CREATED": 0,
+        "UPDATED": 0,
+        "REVISED": 500,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1500
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-4",
+      "file": "register_501_1000_r2.csv",
+      "rows": 500,
+      "ms": 3031,
+      "counts": {
+        "CREATED": 0,
+        "UPDATED": 0,
+        "REVISED": 500,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1500
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-4",
+      "file": "register_1001_1500_r2.csv",
+      "rows": 500,
+      "ms": 2934,
+      "counts": {
+        "CREATED": 0,
+        "UPDATED": 0,
+        "REVISED": 500,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1500
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-4",
+      "file": "register_1501_2000_r2.csv",
+      "rows": 500,
+      "ms": 3101,
+      "counts": {
+        "CREATED": 0,
+        "UPDATED": 0,
+        "REVISED": 500,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1500
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-5",
+      "file": "register_1_500_r0.csv",
+      "rows": 500,
+      "ms": 1854,
+      "counts": {
+        "CREATED": 500,
+        "UPDATED": 0,
+        "REVISED": 0,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 0
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-5",
+      "file": "register_501_1000_r0.csv",
+      "rows": 500,
+      "ms": 2236,
+      "counts": {
+        "CREATED": 500,
+        "UPDATED": 0,
+        "REVISED": 0,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 500
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-5",
+      "file": "register_1001_1500_r0.csv",
+      "rows": 500,
+      "ms": 2174,
+      "counts": {
+        "CREATED": 500,
+        "UPDATED": 0,
+        "REVISED": 0,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1000
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-5",
+      "file": "register_1501_2000_r0.csv",
+      "rows": 500,
+      "ms": 2193,
+      "counts": {
+        "CREATED": 500,
+        "UPDATED": 0,
+        "REVISED": 0,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1500
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-5",
+      "file": "register_1_500_r1.csv",
+      "rows": 500,
+      "ms": 2545,
+      "counts": {
+        "CREATED": 0,
+        "UPDATED": 0,
+        "REVISED": 500,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1500
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-5",
+      "file": "register_501_1000_r1.csv",
+      "rows": 500,
+      "ms": 2823,
+      "counts": {
+        "CREATED": 0,
+        "UPDATED": 0,
+        "REVISED": 500,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1500
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-5",
+      "file": "register_1001_1500_r1.csv",
+      "rows": 500,
+      "ms": 2907,
+      "counts": {
+        "CREATED": 0,
+        "UPDATED": 0,
+        "REVISED": 500,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1500
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-5",
+      "file": "register_1501_2000_r1.csv",
+      "rows": 500,
+      "ms": 2707,
+      "counts": {
+        "CREATED": 0,
+        "UPDATED": 0,
+        "REVISED": 500,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1500
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-5",
+      "file": "register_1_500_r2.csv",
+      "rows": 500,
+      "ms": 2892,
+      "counts": {
+        "CREATED": 0,
+        "UPDATED": 0,
+        "REVISED": 500,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1500
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-5",
+      "file": "register_501_1000_r2.csv",
+      "rows": 500,
+      "ms": 3316,
+      "counts": {
+        "CREATED": 0,
+        "UPDATED": 0,
+        "REVISED": 500,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1500
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-5",
+      "file": "register_1001_1500_r2.csv",
+      "rows": 500,
+      "ms": 3227,
+      "counts": {
+        "CREATED": 0,
+        "UPDATED": 0,
+        "REVISED": 500,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1500
+      }
+    },
+    {
+      "firm": "CE-H1 Firm 1791262880382-5",
+      "file": "register_1501_2000_r2.csv",
+      "rows": 500,
+      "ms": 3348,
+      "counts": {
+        "CREATED": 0,
+        "UPDATED": 0,
+        "REVISED": 500,
+        "UNCHANGED": 0,
+        "REJECTED": 0,
+        "CONFLICT": 0,
+        "ROW_MISSING": 1500
+      }
+    }
+  ],
+  "reads": {
+    "edcs_transactions_list": {
+      "median_ms": 67,
+      "max_ms": 84
+    },
+    "edcs_transaction_detail": {
+      "median_ms": 932,
+      "max_ms": 1078
+    },
+    "edcs_signals": {
+      "median_ms": 23,
+      "max_ms": 61
+    },
+    "edcs_numbers": {
+      "median_ms": 22,
+      "max_ms": 23
+    },
+    "edcs_chains": {
+      "median_ms": 31,
+      "max_ms": 37
+    },
+    "edcs_sync_runs": {
+      "median_ms": 1,
+      "max_ms": 2
+    },
+    "mvp_store_unscoped": {
+      "median_ms": 3867,
+      "max_ms": 3949
+    },
+    "mvp_store_scoped": {
+      "median_ms": 3841,
+      "max_ms": 3984
+    },
+    "work_request_create": {
+      "median_ms": 1580,
+      "max_ms": 1851
+    }
+  },
+  "budgets": {
+    "import_500_rows": 5000,
+    "edcs_transactions_list": 500,
+    "edcs_transaction_detail": 300,
+    "edcs_signals": 500,
+    "edcs_numbers": 500,
+    "edcs_chains": 800,
+    "edcs_sync_runs": 300,
+    "mvp_store_scoped": 1500,
+    "work_request_create": 1000
+  },
+  "over_budget": [
+    {
+      "key": "edcs_transaction_detail",
+      "value": 932,
+      "budget": 300
+    },
+    {
+      "key": "mvp_store_scoped",
+      "value": 3841,
+      "budget": 1500
+    },
+    {
+      "key": "work_request_create",
+      "value": 1580,
+      "budget": 1000
+    }
+  ],
+  "import_summary": {
+    "files": 60,
+    "slowest_500_row_ms": 3348,
+    "median_ms": 2061
+  },
+  "within_budget": false
+}

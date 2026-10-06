@@ -18,7 +18,7 @@ import { isPostgresStore, readStore, withStore } from "./store.mjs";
 import { query, setTenantContext, withClient } from "./repositories/shared/db.mjs";
 
 // CE-S3 (ADR-097, migration 0051) adds the two automation tables to the same repository.
-export const EDCS_COLLECTIONS = ["edcs_connections", "edcs_transactions", "edcs_transaction_revisions", "edcs_sync_runs", "edcs_sync_events", "automation_rules", "automation_rule_runs", "edcs_number_reservations", "approval_policies"];
+export const EDCS_COLLECTIONS = ["edcs_connections", "edcs_transactions", "edcs_transaction_revisions", "edcs_sync_runs", "edcs_sync_events", "automation_rules", "automation_rule_runs", "edcs_number_reservations", "approval_policies", "edcs_connectors"];
 
 // The natural key inside (tenant, firm) of each collection.
 const naturalKey = {
@@ -33,7 +33,9 @@ const naturalKey = {
   // CE-S4: company | type | year | sequence (the unique index in 0052 mirrors it)
   edcs_number_reservations: (record) => record.key ?? record.id,
   // CE-S5: one immutable row per policy version (the unique index in 0053 mirrors it)
-  approval_policies: (record) => String(record.version)
+  approval_policies: (record) => String(record.version),
+  // CE-S6: one row per registered connector (the token hash index in 0054 is global and unique)
+  edcs_connectors: (record) => record.id
 };
 
 // A claimed occurrence that failed may be claimed again, up to this many attempts in total.
@@ -56,8 +58,22 @@ function jsonUpsert(store, scope, collection, record) {
   else store[collection].push(record);
 }
 
+// CE-H1: a targeted read -- `key` matches the natural key, `where` matches fields of the record. The JSON
+// store filters in memory (it is a dev/test store); Postgres uses the natural-key and *_c indexes.
+async function jsonReadWhere(scope, collection, { key = null, where = {} } = {}) {
+  return (await jsonRead(scope, collection)).filter((record) =>
+    (key === null || naturalKey[collection](record) === key)
+    && Object.entries(where).every(([field, value]) => record[field] === value));
+}
+
 const jsonImpl = {
   read: jsonRead,
+  readWhere: jsonReadWhere,
+  // CE-S6: authentication has only the token, so this lookup is across all tenants (dev/test store).
+  async findConnectorByTokenHash(hash) {
+    const store = await readStore();
+    return (store.edcs_connectors ?? []).find((record) => record.token_hash === hash) ?? null;
+  },
   async commit(scope, batch) {
     await withStore((store) => {
       for (const collection of EDCS_COLLECTIONS) for (const record of batch[collection] ?? []) jsonUpsert(store, scope, collection, record);
@@ -127,8 +143,28 @@ async function pgRead(scope, collection) {
   return rows.map((row) => row.record);
 }
 
+// Filter columns that have a generated *_c column and an index (migrations 0050-0053).
+const INDEXED_FIELDS = { transaction_id: "transaction_id_c", run_id: "run_id_c" };
+
+async function pgReadWhere(scope, collection, { key = null, where = {} } = {}) {
+  const params = [scope.tenant_id, scope.firm_id];
+  const clauses = ["tenant_id = $1", "firm_id = $2"];
+  if (key !== null) { params.push(key); clauses.push(`natural_key = $${params.length}`); }
+  for (const [field, value] of Object.entries(where)) {
+    params.push(value);
+    clauses.push(INDEXED_FIELDS[field] ? `${INDEXED_FIELDS[field]} = $${params.length}` : `record->>'${field.replace(/[^a-z_]/gi, "")}' = $${params.length}`);
+  }
+  const { rows } = await query(`select record from ${collection} where ${clauses.join(" and ")} order by natural_key`, params);
+  return rows.map((row) => row.record);
+}
+
 const pgImpl = {
   read: pgRead,
+  readWhere: pgReadWhere,
+  async findConnectorByTokenHash(hash) {
+    const { rows } = await query(`select record from edcs_connectors where token_hash_c = $1`, [hash]);
+    return rows[0]?.record ?? null;
+  },
   async commit(scope, batch) {
     await withClient(async (client) => {
       await client.query("begin");
@@ -289,22 +325,23 @@ export const edcsRepository = {
     return impl().read(scope, "edcs_transactions");
   },
   async getTransaction(scope, transactionId) {
-    return (await impl().read(scope, "edcs_transactions")).find((record) => record.transaction_id === transactionId) ?? null;
+    return (await impl().readWhere(scope, "edcs_transactions", { key: transactionId }))[0] ?? null;
   },
   async listRevisions(scope, transactionId) {
-    return (await impl().read(scope, "edcs_transaction_revisions"))
-      .filter((record) => !transactionId || record.transaction_id === transactionId)
+    return (await impl().readWhere(scope, "edcs_transaction_revisions", { where: transactionId ? { transaction_id: transactionId } : {} }))
       .sort((a, b) => a.seq - b.seq);
   },
   async listRuns(scope) {
     return (await impl().read(scope, "edcs_sync_runs")).sort((a, b) => b.run_number - a.run_number);
   },
   async getRun(scope, runId) {
-    return (await impl().read(scope, "edcs_sync_runs")).find((record) => record.id === runId) ?? null;
+    return (await impl().readWhere(scope, "edcs_sync_runs", { key: runId }))[0] ?? null;
   },
   async listEvents(scope, { run_id = null, transaction_id = null } = {}) {
-    return (await impl().read(scope, "edcs_sync_events"))
-      .filter((record) => (!run_id || record.run_id === run_id) && (!transaction_id || record.transaction_id === transaction_id))
+    const where = {};
+    if (run_id) where.run_id = run_id;
+    if (transaction_id) where.transaction_id = transaction_id;
+    return (await impl().readWhere(scope, "edcs_sync_events", { where }))
       .sort((a, b) => (a.run_number - b.run_number) || ((a.row_number ?? 0) - (b.row_number ?? 0)) || String(a.at).localeCompare(String(b.at)));
   },
   // CE-S3: automation rules, their occurrences (dedupe) and evaluations.
@@ -351,9 +388,20 @@ export const edcsRepository = {
     return impl().commit(scope, batch);
   },
   // Every EDCS collection for one firm (tenant export package).
+  // CE-S6: connector rows; the token hash never leaves the repository except to the authenticator.
+  async listConnectors(scope) {
+    return (await impl().read(scope, "edcs_connectors")).sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
+  },
+  async getConnector(scope, connectorId) {
+    return (await impl().readWhere(scope, "edcs_connectors", { key: connectorId }))[0] ?? null;
+  },
+  async findConnectorByTokenHash(hash) {
+    return impl().findConnectorByTokenHash(hash);
+  },
   async exportCollections(scope) {
     const out = {};
     for (const collection of EDCS_COLLECTIONS) out[collection] = await impl().read(scope, collection);
+    out.edcs_connectors = out.edcs_connectors.map(({ token_hash, ...rest }) => rest); // never export a token hash
     return out;
   }
 };

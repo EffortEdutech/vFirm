@@ -221,6 +221,31 @@ export function readRegisterFile({ filename = "", mime_type = "", buffer }) {
 
 const toRaw = (cells) => Object.fromEntries(REGISTER_COLUMNS.map((c, i) => [c.col, clean(cells[i])]));
 
+// CE-S6 (ADR-101): what the connector needs to send a delta instead of a whole file.
+// A row's digest is a fingerprint of its cleaned cells in the columns the engine reads (every column that maps
+// to a field). The BizKick-computed columns -- Days to Expiry, Alert, Duplicate Check -- are left out: they
+// change with the calendar, not with the transaction, and would make every row look changed every day. The
+// connector keeps the last digest it sent per row and sends a row only when its digest changes. (vFirm's own
+// row_fingerprint, over the governed fields, is still computed server-side by the same engine.)
+export function registerRowDigest(cells) {
+  return createHash("sha256").update(JSON.stringify(REGISTER_COLUMNS.map((c, i) => (c.field ? clean(cells[i]) : null)))).digest("hex");
+}
+
+// The Transaction ID a row stands for, exactly as the engine's identity stage composes it, or null when the
+// row's identity is unusable (it will be rejected). `ignored` marks a blank row (B, C and D all empty).
+export function registerRowIdentity(cells, companyCode) {
+  const raw = toRaw(cells);
+  if (raw.B === "" && raw.C === "" && raw.D === "") return { ignored: true, transaction_id: null };
+  const year = wholeNumberText(raw.C);
+  const sequence = wholeNumberText(raw.D);
+  const yearOk = year !== null && /^\d{4}$/.test(year);
+  const sequenceOk = sequence !== null && sequence.length >= 1 && sequence.length <= 4;
+  if (raw.A !== companyCode || !EDCS_DOCUMENT_TYPES[raw.B] || !yearOk || !sequenceOk) return { ignored: false, transaction_id: null };
+  const id = composeTransactionId(raw.A, raw.B, year, sequence);
+  if (raw.E !== "" && !raw.E.startsWith("#") && raw.E !== id) return { ignored: false, transaction_id: null };
+  return { ignored: false, transaction_id: id };
+}
+
 function rawSnapshot(raw) {
   return Object.fromEntries(REGISTER_COLUMNS.filter((c) => c.field).map((c) => [c.field, raw[c.col] === "" ? null : raw[c.col]]));
 }
@@ -228,8 +253,11 @@ function rawSnapshot(raw) {
 // ---- the row engine ----
 
 // existing: Map<transaction_id, record> of what vFirm already holds for this firm.
+// context (CE-S6, optional): { present: [[transaction_id, row_number], ...] } -- every identity-valid row of the
+// whole file. When given, `rows` is only the DELTA (the rows that changed); duplicates, related-ID warnings and
+// ROW_MISSING are judged against the whole file, and IDs already flagged missing are not re-reported.
 // Returns { results, missing, counts, ignored_rows }.
-export function processRegisterRows({ rows, connection, existing = new Map() }) {
+export function processRegisterRows({ rows, connection, existing = new Map(), context = null }) {
   const companyCode = connection.company_code;
   const staged = [];
   const ignored = [];
@@ -280,17 +308,18 @@ export function processRegisterRows({ rows, connection, existing = new Map() }) 
 
   // Stage 3: duplicates -- the same composed ID on more than one identity-valid row.
   const idRows = new Map();
-  for (const entry of staged) if (entry.identity_ok) idRows.set(entry.transaction_id, [...(idRows.get(entry.transaction_id) ?? []), entry]);
+  if (context?.present) for (const [id, row_number] of context.present) idRows.set(id, [...(idRows.get(id) ?? []), { row_number }]);
+  else for (const entry of staged) if (entry.identity_ok) idRows.set(entry.transaction_id, [...(idRows.get(entry.transaction_id) ?? []), entry]);
   const duplicateIds = new Set([...idRows.entries()].filter(([, list]) => list.length > 1).map(([id]) => id));
   for (const entry of staged) {
     if (entry.identity_ok && duplicateIds.has(entry.transaction_id)) {
       entry.duplicate = true;
-      if (!entry.outcome) { entry.outcome = "REJECTED"; entry.reasons.push("DUPLICATE_ID_IN_FILE"); entry.reason_details.push(`also on rows ${idRows.get(entry.transaction_id).filter((e) => e !== entry).map((e) => e.row_number).join(", ")}`); }
+      if (!entry.outcome) { entry.outcome = "REJECTED"; entry.reasons.push("DUPLICATE_ID_IN_FILE"); entry.reason_details.push(`also on rows ${idRows.get(entry.transaction_id).filter((e) => e.row_number !== entry.row_number).map((e) => e.row_number).join(", ")}`); }
     }
   }
 
   // Stage 4: compare accepted rows with the governed record.
-  const presentIds = new Set(staged.filter((entry) => entry.identity_ok).map((entry) => entry.transaction_id));
+  const presentIds = context?.present ? new Set(context.present.map(([id]) => id)) : new Set(staged.filter((entry) => entry.identity_ok).map((entry) => entry.transaction_id));
   for (const entry of staged) {
     const record = entry.identity_ok ? existing.get(entry.transaction_id) : null;
     entry.had_existing = Boolean(record);
@@ -321,7 +350,7 @@ export function processRegisterRows({ rows, connection, existing = new Map() }) 
   }
 
   // Stage 5: IDs held by vFirm that this file no longer carries.
-  const missing = [...existing.keys()].filter((id) => !presentIds.has(id)).sort();
+  const missing = [...existing.keys()].filter((id) => !presentIds.has(id) && !(context && existing.get(id)?.flags?.row_missing)).sort();
 
   const results = staged.map((entry) => ({
     row_number: entry.row_number,
