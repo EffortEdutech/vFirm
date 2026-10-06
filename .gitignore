@@ -1,4 +1,4 @@
-﻿node_modules/
+node_modules/
 .pnpm-store/
 dist/
 build/
@@ -24,3 +24,6 @@ graphify-out/
 data/files/
 
 node_modules_artifact/
+
+# Claude session outputs (scratch copies, never commit)
+Claude outputs/
