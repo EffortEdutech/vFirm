@@ -115,6 +115,7 @@ async function request(path, options = {}) {
     const err = new Error(message);
     err.status = res.status;
     err.code = payload?.error?.code;
+    err.details = payload?.error?.details;
     throw err;
   }
   const data = payload?.data ?? payload;
@@ -245,6 +246,10 @@ export const api = {
   listEdcsSyncRuns: () => request(withScope("/edcs/sync-runs"), { skipCache: true }),
   getEdcsSyncRun: (id) => request(withScope(`/edcs/sync-runs/${encodeURIComponent(id)}`), { skipCache: true }),
   getEdcsChains: () => request(withScope("/edcs/chains"), { skipCache: true }),
+  // CE-S5: Delegation of Authority.
+  getEdcsDelegation: (version = "") => request(withScope(`/edcs/delegation${version ? `?version=${encodeURIComponent(version)}` : ""}`), { skipCache: true }),
+  previewEdcsDelegation: (body) => request("/edcs/delegation/preview", { method: "POST", body }),
+  importEdcsDelegation: (body) => request("/edcs/delegation/import", { method: "POST", body }),
   // CE-S4: Number Authority.
   listEdcsNumbers: (params = "") => request(withScope(`/edcs/numbers${params ? `?${params}` : ""}`), { skipCache: true }),
   reserveEdcsNumber: (body) => request("/edcs/numbers/reserve", { method: "POST", body }),

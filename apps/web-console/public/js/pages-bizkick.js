@@ -440,7 +440,118 @@ async function mountRules(root) {
   }));
 }
 
+// ---------------- approval limits / delegation of authority (CE-S5) ----------------
+
+const LIMIT_FIELD_TEXT = { MONEY: (n) => `RM ${Number(n).toLocaleString("en-US")}`, PERCENT: (n) => `${n}%` };
+const limitText = (row, tier) => LIMIT_FIELD_TEXT[row.kind](row[tier].limit);
+const mappingText = (entry) => [entry.owner ? "the firm owner" : null, ...(entry.roles ?? [])].filter(Boolean).join(", ") || "—";
+
+function policyView(policy) {
+  const labels = Object.values(policy.label_map ?? {});
+  return panel(`Approval policy v${policy.version} — ${escapeHtml(policy.status === "ACTIVE" ? "in force" : "replaced")}`, `
+    <p class="field-note">From ${escapeHtml(policy.source_filename ?? "a workbook")}, imported ${escapeHtml(dt(policy.imported_at))}.${policy.superseded_by_version ? ` Replaced by v${policy.superseded_by_version}.` : ""}</p>
+    <div style="overflow-x:auto">${table([
+      { label: "Transaction type", render: (r) => escapeHtml(r.transaction_type) },
+      { label: "Tier 1 up to", render: (r) => escapeHtml(limitText(r, "tier1")) },
+      { label: "Tier 1 approver", render: (r) => escapeHtml(r.tier1.approver) },
+      { label: "Tier 2 up to", render: (r) => escapeHtml(limitText(r, "tier2")) },
+      { label: "Tier 2 approver", render: (r) => escapeHtml(r.tier2.approver) },
+      { label: "Above", render: (r) => escapeHtml(r.above_approver) },
+      { label: "Enforced", render: (r) => (r.kind === "PERCENT" ? pill("recorded only", "default") : pill("yes", "moss")) }
+    ], policy.limits, (r) => r.key)}</div>`)
+    + panel("Who holds each approver label", table([{ label: "BizKick label", render: (e) => escapeHtml(e.label) }, { label: "In vFirm", render: (e) => escapeHtml(mappingText(e)) }], labels, (e) => e.label))
+    + panel("Document types under a limit", Object.keys(policy.document_types ?? {}).length
+      ? table([{ label: "Document", render: (r) => `<code>${escapeHtml(r[0])}</code>` }, { label: "Limit row", render: (r) => escapeHtml(r[1]) }], Object.entries(policy.document_types), (r) => r[0])
+      : `<p class="field-note">No document type is mapped to a limit, so nothing is enforced yet.</p>`)
+    + ((policy.rejected_limits?.length ?? 0) + (policy.rejected_matrix?.length ?? 0) ? panel("Rows that were not used", table([{ label: "Row", key: "row_number" }, { label: "Name", render: (r) => escapeHtml(r.name ?? "—") }, { label: "Why", render: (r) => escapeHtml((r.reason_details ?? []).join("; ")) }], [...(policy.rejected_limits ?? []), ...(policy.rejected_matrix ?? [])], (r) => `${r.row_number}-${r.name}`)) : "");
+}
+
+async function mountDelegation(root) {
+  let data;
+  const load = async (version = "") => {
+    try { data = await api.getEdcsDelegation(version); } catch (err) { root.innerHTML = errorBox(err, "the approval limits"); return false; }
+    return true;
+  };
+  if (!(await load())) return;
+  let shown = data.selected;
+  const render = () => {
+    root.innerHTML = GOLDEN_RULE
+      + panel("How this works", `<p>Upload your BizKick Master Control Workbook (BK-SYS-003). vFirm reads the <strong>Approval Limits</strong> and <strong>Responsibility Matrix</strong> sheets, you say who holds each approver label and which documents the limits cover, and from then on a draft raised from a transaction can only be approved by someone with the right level. You are never blocked: the firm owner can always approve. Work that did not come from BizKick is not affected.</p>`)
+      + (shown ? policyView(shown) : empty("No approval limits imported yet."))
+      + panel(data.active ? "Update from a new workbook" : "Import your approval limits", `
+        <input id="bkDelFile" type="file" accept=".xlsx" />
+        <button class="btn btn-primary" id="bkDelPreview" type="button">Read workbook</button>
+        <div id="bkDelMsg" style="min-height:1.2em"></div><div id="bkDelPreviewBox"></div>`)
+      + (data.versions.length ? panel("Versions", table([
+        { label: "Version", render: (v) => `v${v.version}` }, { label: "Status", render: (v) => pill(v.status === "ACTIVE" ? "In force" : "Replaced", v.status === "ACTIVE" ? "moss" : "default") },
+        { label: "From", render: (v) => escapeHtml(v.source_filename ?? "—") }, { label: "Imported", render: (v) => escapeHtml(dt(v.imported_at)) },
+        { label: "Changes", render: (v) => escapeHtml(v.change_summary ? `${v.change_summary.counts.added} added, ${v.change_summary.counts.changed} changed, ${v.change_summary.counts.removed} removed` : "—") },
+        { label: "", render: (v) => `<button class="btn btn-sm bk-del-view" data-version="${v.version}" type="button">View</button>` }
+      ], data.versions, (v) => String(v.version))) : "");
+    for (const button of root.querySelectorAll(".bk-del-view")) button.addEventListener("click", async () => {
+      if (await load(button.dataset.version)) { shown = data.selected; render(); }
+    });
+    const msg = root.querySelector("#bkDelMsg");
+    root.querySelector("#bkDelPreview").addEventListener("click", async () => {
+      const file = root.querySelector("#bkDelFile").files[0];
+      if (!file) { msg.textContent = "Choose the workbook first."; return; }
+      msg.textContent = "Uploading and reading the workbook…";
+      try {
+        const uploaded = await api.uploadFile(file, { classification: "CLIENT_CONFIDENTIAL", purpose: "WORK_INPUT" });
+        const preview = await api.previewEdcsDelegation({ file_id: uploaded.id });
+        msg.textContent = "";
+        drawPreview(uploaded.id, preview);
+      } catch (err) { msg.textContent = err.message; }
+    });
+  };
+  const drawPreview = (fileId, preview) => {
+    const box = root.querySelector("#bkDelPreviewBox");
+    const typeOptions = (current) => ["", ...preview.mappable_transaction_types].map((name) => `<option value="${escapeHtml(name)}" ${name === (current ?? "") ? "selected" : ""}>${name ? escapeHtml(name) : "(no limit)"}</option>`).join("");
+    box.innerHTML = `<h4>Step 1 — who holds each approver label?</h4>
+      <p class="field-note">Type the role codes your people have in vFirm, separated by commas (for example FINANCE_MANAGER). Tick “firm owner” where the label means you.</p>
+      <div style="overflow-x:auto">${table([
+        { label: "BizKick label", render: (e) => escapeHtml(e.label) },
+        { label: "Used for", render: (e) => escapeHtml(e.used_in.map((u) => `${u.transaction_type} T${u.tier}`).join(", ")) },
+        { label: "Firm owner", render: (e) => `<input type="checkbox" class="bk-del-owner" data-label="${escapeHtml(e.label)}" ${e.suggested.owner ? "checked" : ""} />` },
+        { label: "Roles", render: (e) => `<input class="bk-del-roles" data-label="${escapeHtml(e.label)}" value="${escapeHtml((e.suggested.roles ?? []).join(", "))}" placeholder="e.g. FINANCE_MANAGER" style="width:100%" />` }
+      ], preview.approver_labels, (e) => e.key)}</div>
+      <h4>Step 2 — which documents does each limit cover?</h4>
+      <p class="field-note">Only amounts in RM can be checked. A document in another currency always needs the top level. Percentage limits are recorded but not enforced.</p>
+      ${preview.mappable_transaction_types.length ? `<div style="overflow-x:auto">${table([
+        { label: "Document", render: (r) => `<code>${escapeHtml(r.document_type)}</code>` },
+        { label: "Limit row", render: (r) => `<select class="bk-del-type" data-type="${escapeHtml(r.document_type)}">${typeOptions(r.suggested)}</select>` }
+      ], preview.document_types, (r) => r.document_type)}</div>` : `<p class="field-note">This workbook has no amount limits to apply.</p>`}
+      ${(preview.limits.rejected.length + preview.responsibilities.rejected.length) ? `<div class="error-box"><strong>${preview.limits.rejected.length + preview.responsibilities.rejected.length} row(s) cannot be used and will be left out:</strong><br>${[...preview.limits.rejected, ...preview.responsibilities.rejected].map((r) => `Row ${r.row_number} (${escapeHtml(r.name ?? "blank")}): ${escapeHtml((r.reason_details ?? []).join("; "))}`).join("<br>")}</div>` : ""}
+      <p><button class="btn btn-primary" id="bkDelImport" type="button">Confirm and import</button> <span id="bkDelImportMsg"></span></p>`;
+    box.querySelector("#bkDelImport").addEventListener("click", async () => {
+      const out = box.querySelector("#bkDelImportMsg");
+      const label_map = {};
+      for (const entry of preview.approver_labels) {
+        const owner = box.querySelector(`.bk-del-owner[data-label="${CSS.escape(entry.label)}"]`)?.checked === true;
+        const roles = (box.querySelector(`.bk-del-roles[data-label="${CSS.escape(entry.label)}"]`)?.value ?? "").split(",").map((r) => r.trim()).filter(Boolean);
+        label_map[entry.label] = { owner, roles };
+      }
+      const document_types = {};
+      for (const select of box.querySelectorAll(".bk-del-type")) if (select.value) document_types[select.dataset.type] = select.value;
+      out.textContent = "Importing…";
+      try {
+        const result = await api.importEdcsDelegation({ file_id: fileId, label_map, document_types });
+        if (result.outcome === "NO_CHANGE") { out.textContent = result.message; return; }
+        await load();
+        shown = data.selected;
+        render();
+        root.querySelector("#bkDelMsg").textContent = `Imported as version ${result.policy.version}: ${result.counts.added} added, ${result.counts.changed} changed, ${result.counts.removed} removed.`;
+      } catch (err) {
+        const details = err.details?.errors ?? err.payload?.error?.details?.errors;
+        out.textContent = details ? `${err.message} ${details.map((d) => d.detail).join(" ")}` : err.message;
+      }
+    });
+  };
+  render();
+}
+
 export const BIZKICK_PAGES = {
+  "bizkick-delegation": mountDelegation,
   "bizkick-numbers": mountNumbers,
   "bizkick-rules": mountRules,
   "bizkick-connection": mountConnection,

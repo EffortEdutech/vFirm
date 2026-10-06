@@ -169,6 +169,7 @@
                     "check:ce:s2-file-linking":     "node scripts/smoke-ce-s2-file-linking.mjs",
                     "check:ce:s3-register-rules":  "node scripts/smoke-ce-s3-register-rules.mjs",
                     "check:ce:s4-number-authority":  "node scripts/smoke-ce-s4-number-authority.mjs",
+                    "check:ce:s5-delegation-of-authority": "node scripts/smoke-ce-s5-delegation-of-authority.mjs",
                     "dev:web-console":  "node apps/web-console/src/server.mjs",
                     "check:post-hm-s4:mvp-store-scoping-fix":  "node scripts/smoke-post-hm-s4-mvp-store-tenant-scoping-fix.mjs",
                     "check:post-hm-s4:my-team-retire-worker":  "node scripts/smoke-post-hm-s4-my-team-retire-worker.mjs",

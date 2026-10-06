@@ -25,7 +25,8 @@ import { chainFlagsFor } from "../../../packages/core-domain/src/edcs-chains.mjs
 import { buildRequestFields, matchRule, occurrenceNaturalKey, RULE_TEMPLATES, templateById, validateRuleDefinition } from "../../../packages/core-domain/src/edcs-rules.mjs";
 import { resolveWorkRequestType } from "../../../packages/core-domain/src/awia-work-request-types.mjs";
 
-const OWNER_ROLES = ["principal", "PILOT_PRINCIPAL", "FIRM_PRINCIPAL", "ADMIN"];
+
+import { isFirmOwner } from "./edcs-owner.mjs";
 
 function httpError(status, code, message) {
   const error = new Error(message);
@@ -35,7 +36,7 @@ function httpError(status, code, message) {
 }
 
 function requireOwner(actor, action) {
-  if (actor?.actor_type !== "HUMAN" || !OWNER_ROLES.includes(actor?.role ?? "principal")) {
+  if (!isFirmOwner(actor)) {
     throw httpError(403, "EDCS_OWNER_REQUIRED", `${action} requires the firm owner.`);
   }
 }

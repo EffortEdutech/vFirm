@@ -257,10 +257,12 @@ Scope:
 
 Acceptance checks (`npm run check:ce:s5-delegation-of-authority`):
 
-- [ ] Import of the fixture workbook creates the policy; re-import with changes creates a new version.
-- [ ] Draft above Tier 1 refused for a Tier-1-only reviewer and allowed for the Tier 2 role; both audited.
-- [ ] Non-EDCS work unaffected.
-- [ ] Class A still requires Class A approval regardless of tier.
+- [x] Import of the fixture workbook creates the policy; re-import with changes creates a new version.
+- [x] Draft above Tier 1 refused for a Tier-1-only reviewer and allowed for the Tier 2 role; both audited.
+- [x] Non-EDCS work unaffected.
+- [x] Class A still requires Class A approval regardless of tier.
+
+CE-S5 evidence (2026-10-06): `npm run check:ce:s5-delegation-of-authority` passes on the JSON store and on a scratch Postgres (migrations 0001-0053). It proves: first import creates policy v1, the same workbook and mapping adds nothing, a changed workbook creates v2 (v1 SUPERSEDED, exactly one ACTIVE, the Purchases limit change listed); a RM 5,400 purchase order is refused for a Procurement-Manager-only reviewer with a message naming Finance Manager and Tier 2, and allowed for the Finance Manager role and the owner; both outcomes are audited (`edcs.delegation_denied`, `edcs.delegation_allowed`); a USD purchase order goes to the top tier; work that is not EDCS-linked or whose document type has no limit is unaffected; a Class A draft is still refused without Class A approval even within tier. The regression set (W1 to W4, hiring, work-assignment, workdesk-archive, HM-S4 items 2 to 7, CE-S0 to CE-S4) passes; a browser click-through (preview, incomplete-mapping message, import v1, update to v2, view old version, bad-rows list, missing-sheet message) ran with no unexpected console errors. Decisions taken: limits are inclusive (RM 5,000 is Tier 1); foreign-currency amounts go to the top tier (vFirm does not convert); percentage rows are recorded but not enforced; a higher-tier approver also covers lower tiers; the firm owner always passes; the owner confirms each label-to-role and document-type-to-limit mapping on every import; a bare number below 1 in a limit cell is rejected as ambiguous. Side change: the shared owner-role check now accepts the production role `OWNER` (the earlier EDCS lists did not), and API errors may carry a `details` object.
 
 ### CE-H1 — Scale hardening (prerequisite for connectors)
 
@@ -468,7 +470,7 @@ Acceptance checks (`npm run check:vi:s6-einvoice-readiness`):
 - [ ] 0050 `edcs_connections`, `edcs_transactions`, `edcs_transaction_revisions`, `edcs_sync_runs`, `edcs_sync_events`
 - [ ] 0051 `automation_rules`, `automation_rule_runs`
 - [x] 0052 `edcs_number_reservations` (unique per firm/code/type/year/sequence) (CE-S4)
-- [ ] 0053 `approval_policies`
+- [x] 0053 `approval_policies` (CE-S5)
 - [ ] 0054 `edcs_connector_tokens`, `edcs_connector_heartbeats`
 - [ ] 0055 `firm_briefs`, `evidence_passports`, `trust_ladder_states`
 
@@ -478,7 +480,7 @@ Acceptance checks (`npm run check:vi:s6-einvoice-readiness`):
 - [x] File matching / linking endpoints (CE-S2): `POST /edcs/files/upload`, `GET /edcs/chains`, `GET /edcs/documents/<id>`
 - [x] `/automation/rules` CRUD + dry-run; `/automation/tick` (service token) (CE-S3)
 - [x] `/edcs/numbers/reserve`, void, list (CE-S4)
-- [ ] `/edcs/approval-policy/import`, role mapping
+- [x] `/edcs/delegation` read, preview, import (label and document-type mapping), check (CE-S5; the plan's name was `/edcs/approval-policy/import`)
 - [ ] `/edcs/sync` (connector); token issue/rotate/revoke; heartbeat
 - [ ] Graph adapter connect/disconnect
 - [ ] Template drafting endpoints (CE-S8)
@@ -509,7 +511,7 @@ Acceptance checks (`npm run check:vi:s6-einvoice-readiness`):
 - [ ] `check:ce:s2-file-linking`
 - [ ] `check:ce:s3-register-rules`
 - [x] `check:ce:s4-number-authority` (CE-S4)
-- [ ] `check:ce:s5-delegation-of-authority`
+- [x] `check:ce:s5-delegation-of-authority` (CE-S5)
 - [ ] CE-H1 measurements
 - [ ] `check:ce:s6-connector`
 - [ ] CE-S7 Graph test

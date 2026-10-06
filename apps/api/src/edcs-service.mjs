@@ -22,7 +22,8 @@ import { buildTransactionChains, chainForTransaction, extractTransactionId, revi
 import { TabularReadError } from "../../../packages/core-domain/src/tabular-file-reader.mjs";
 import { DEFAULT_STALE_DAYS, buildReservation, crossCheckRows, sequenceHeads, staleReservations, validateReserveRequest } from "../../../packages/core-domain/src/edcs-numbers.mjs";
 
-const OWNER_ROLES = ["principal", "PILOT_PRINCIPAL", "FIRM_PRINCIPAL", "ADMIN"];
+
+import { isFirmOwner } from "./edcs-owner.mjs";
 
 function httpError(status, code, message) {
   const error = new Error(message);
@@ -32,7 +33,7 @@ function httpError(status, code, message) {
 }
 
 function requireOwner(actor, action) {
-  if (actor?.actor_type !== "HUMAN" || !OWNER_ROLES.includes(actor?.role ?? "principal")) {
+  if (!isFirmOwner(actor)) {
     throw httpError(403, "EDCS_OWNER_REQUIRED", `${action} requires the firm owner.`);
   }
 }

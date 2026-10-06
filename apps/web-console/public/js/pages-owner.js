@@ -726,7 +726,10 @@ export async function mountWorkdesk(root) {
         <button class="btn btn-ghost btn-sm" type="button" data-wd="review" data-decision="REJECTED" data-draft-id="${escapeHtml(draft.id)}">Reject</button></div>
         <label class="wd-notes">Notes<input type="text" data-notes-for="${escapeHtml(draft.id)}" placeholder="Required when requesting a revision"></label>`;
     }
-    return `<div class="wd-actions"><button class="btn btn-primary btn-sm" type="button" data-wd="review" data-decision="APPROVED_FOR_CLIENT_DRAFT" data-draft-id="${escapeHtml(draft.id)}">Approve</button>
+    const limit = draft.delegation_requirement?.governed
+      ? `<p class="field-note">Approval limit (policy v${escapeHtml(String(draft.delegation_requirement.policy_version))}): Tier ${escapeHtml(String(draft.delegation_requirement.tier))}, ${escapeHtml(draft.delegation_requirement.band)} — needs ${escapeHtml(draft.delegation_requirement.approver_label)}.</p>`
+      : "";
+    return `${limit}<div class="wd-actions"><button class="btn btn-primary btn-sm" type="button" data-wd="review" data-decision="APPROVED_FOR_CLIENT_DRAFT" data-draft-id="${escapeHtml(draft.id)}">Approve</button>
       <button class="btn btn-ghost btn-sm" type="button" data-wd="review" data-decision="REVISION_REQUIRED" data-draft-id="${escapeHtml(draft.id)}">Request revision</button>
       <button class="btn btn-ghost btn-sm" type="button" data-wd="review" data-decision="REJECTED" data-draft-id="${escapeHtml(draft.id)}">Reject</button></div>
       <label class="wd-notes">Notes<input type="text" data-notes-for="${escapeHtml(draft.id)}" placeholder="Required when requesting a revision"></label>`;

@@ -56,3 +56,15 @@ it. Do not change it without regenerating `expected_outcomes.json`.
   LibreOffice 24.2 the NUMBER DESK suggested sequence evaluates to 1. Excel was not verified. This
   is why vFirm is the number authority (D3).
 - **32 type codes.** LISTS holds 32 document type codes, not 34.
+
+## Delegation of Authority variants (CE-S5)
+
+`build_delegation_variants.py` makes four variants of the baseline Master Control Workbook (it needs
+`openpyxl`; run it with no arguments from this folder):
+
+- `NEX_BK-SYS-003_approval_limits_changed.xlsx`: Purchases Tier 1 limit 5000 becomes 8000 (a re-import is a new version).
+- `NEX_BK-SYS-003_approval_limits_bad_rows.xlsx`: four unusable rows added (unreadable limit, Tier 2 below Tier 1, duplicate type, ambiguous 0.05).
+- `NEX_BK-SYS-003_no_approval_limits_sheet.xlsx`: the Approval Limits sheet removed (whole-file rejection).
+- `NEX_BK-SYS-003_header_changed.xlsx`: a column heading renamed (STRUCTURE_CHANGED).
+
+In the baseline, Discounts uses text percentages (`5%`, `10%`); they are imported but not enforced.

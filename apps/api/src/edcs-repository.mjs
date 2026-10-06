@@ -18,7 +18,7 @@ import { isPostgresStore, readStore, withStore } from "./store.mjs";
 import { query, setTenantContext, withClient } from "./repositories/shared/db.mjs";
 
 // CE-S3 (ADR-097, migration 0051) adds the two automation tables to the same repository.
-export const EDCS_COLLECTIONS = ["edcs_connections", "edcs_transactions", "edcs_transaction_revisions", "edcs_sync_runs", "edcs_sync_events", "automation_rules", "automation_rule_runs", "edcs_number_reservations"];
+export const EDCS_COLLECTIONS = ["edcs_connections", "edcs_transactions", "edcs_transaction_revisions", "edcs_sync_runs", "edcs_sync_events", "automation_rules", "automation_rule_runs", "edcs_number_reservations", "approval_policies"];
 
 // The natural key inside (tenant, firm) of each collection.
 const naturalKey = {
@@ -31,7 +31,9 @@ const naturalKey = {
   // An occurrence's key is rule | transaction | occurrence key (the dedupe key); an evaluation's is its id.
   automation_rule_runs: (record) => record.key ?? record.id,
   // CE-S4: company | type | year | sequence (the unique index in 0052 mirrors it)
-  edcs_number_reservations: (record) => record.key ?? record.id
+  edcs_number_reservations: (record) => record.key ?? record.id,
+  // CE-S5: one immutable row per policy version (the unique index in 0053 mirrors it)
+  approval_policies: (record) => String(record.version)
 };
 
 // A claimed occurrence that failed may be claimed again, up to this many attempts in total.
@@ -79,6 +81,21 @@ const jsonImpl = {
       const record = build({ sequence: highest + 1 });
       if (record) store.edcs_number_reservations.push(record);
       return record;
+    });
+  },
+  // CE-S5: add the next policy version and supersede the active one, atomically. `expected` is the active
+  // version the caller based its work on (0 for none); `build(previous)` returns { superseded, record }.
+  // Returns { conflict: true } when another import got there first.
+  async savePolicyVersion(scope, expected, build) {
+    return withStore((store) => {
+      store.approval_policies ??= [];
+      const mine = store.approval_policies.filter(inScope(scope));
+      const previous = mine.find((item) => item.status === "ACTIVE") ?? null;
+      if ((previous?.version ?? 0) !== expected) return { conflict: true };
+      const built = build(previous, Math.max(0, ...mine.map((item) => item.version)) + 1);
+      if (built.superseded) jsonUpsert(store, scope, "approval_policies", built.superseded);
+      jsonUpsert(store, scope, "approval_policies", built.record);
+      return { conflict: false, record: built.record };
     });
   },
   // Atomically take an occurrence (the dedupe record). Returns the stored record when this caller won
@@ -182,6 +199,49 @@ const pgImpl = {
     }
     return null;
   },
+  // CE-S5: same contract as the JSON impl. A per-firm advisory lock queues concurrent imports; the unique
+  // indexes in 0053 (version, one ACTIVE) are the backstop. The superseded row is written before the new one.
+  async savePolicyVersion(scope, expected, build) {
+    return withClient(async (client) => {
+      await client.query("begin");
+      try {
+        await setTenantContext(client, scope.tenant_id);
+        await query(`select pg_advisory_xact_lock(hashtext($1))`, [`${scope.firm_id}|approval_policy`], client);
+        const { rows } = await query(
+          `select record, (select coalesce(max(version_c), 0) from approval_policies where tenant_id = $1 and firm_id = $2) as highest
+           from approval_policies where tenant_id = $1 and firm_id = $2 and status_c = 'ACTIVE'`,
+          [scope.tenant_id, scope.firm_id],
+          client
+        );
+        const previous = rows[0]?.record ?? null;
+        if ((previous?.version ?? 0) !== expected) { await client.query("rollback"); return { conflict: true }; }
+        let highest = Number(rows[0]?.highest ?? 0);
+        if (!rows.length) {
+          const all = await query(`select coalesce(max(version_c), 0) as highest from approval_policies where tenant_id = $1 and firm_id = $2`, [scope.tenant_id, scope.firm_id], client);
+          highest = Number(all.rows[0].highest);
+        }
+        const built = build(previous, highest + 1);
+        if (built.superseded) {
+          await query(
+            `update approval_policies set record = $3::jsonb, updated_at = now() where tenant_id = $1 and firm_id = $2 and natural_key = $4`,
+            [scope.tenant_id, scope.firm_id, JSON.stringify(built.superseded), naturalKey.approval_policies(built.superseded)],
+            client
+          );
+        }
+        await query(
+          `insert into approval_policies (id, natural_key, tenant_id, firm_id, record, created_at, updated_at)
+           values ($1::uuid, $2, $3::uuid, $4::uuid, $5::jsonb, now(), now())`,
+          [built.record.id, naturalKey.approval_policies(built.record), scope.tenant_id, scope.firm_id, JSON.stringify(built.record)],
+          client
+        );
+        await client.query("commit");
+        return { conflict: false, record: built.record };
+      } catch (error) {
+        await client.query("rollback");
+        throw error;
+      }
+    });
+  },
   // Atomic claim in one statement pair: insert-if-absent, else retake an ERROR row that has attempts
   // left (the where clause makes the retake atomic too). Returns the record or null.
   async claim(scope, record) {
@@ -272,6 +332,19 @@ export const edcsRepository = {
   },
   async reserveNumber(scope, key, build) {
     return impl().reserveNumber(scope, key, build);
+  },
+  // CE-S5: the Delegation of Authority (immutable versions, one ACTIVE).
+  async listPolicies(scope) {
+    return (await impl().read(scope, "approval_policies")).sort((a, b) => b.version - a.version);
+  },
+  async getActivePolicy(scope) {
+    return (await impl().read(scope, "approval_policies")).find((record) => record.status === "ACTIVE") ?? null;
+  },
+  async getPolicy(scope, version) {
+    return (await impl().read(scope, "approval_policies")).find((record) => record.version === Number(version)) ?? null;
+  },
+  async savePolicyVersion(scope, expected, build) {
+    return impl().savePolicyVersion(scope, expected, build);
   },
   // One atomic write. `batch` maps a collection name to the records to insert-or-replace.
   async commit(scope, batch) {

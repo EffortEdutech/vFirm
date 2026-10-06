@@ -39,6 +39,7 @@ export const OWNER_NAV = [
       { id: "bizkick-conflicts", label: "Conflicts", icon: "⚑" },
       { id: "bizkick-numbers", label: "Number Desk", icon: "#" },
       { id: "bizkick-rules", label: "Rules", icon: "⚙" },
+      { id: "bizkick-delegation", label: "Approval limits", icon: "⚖" },
     ],
   },
   {
@@ -98,6 +99,7 @@ export const PAGE_META = {
   "bizkick-conflicts": { eyebrow: "BizKick", title: "Conflicts", desc: "Rows where BizKick and vFirm disagree. You decide which stands." },
   "bizkick-numbers": { eyebrow: "BizKick", title: "Number Desk", desc: "Reserve the next transaction number here, so two people never get the same one." },
   "bizkick-rules": { eyebrow: "BizKick", title: "Rules", desc: "Let the register raise work for your team. Every rule starts off, and you preview it before turning it on." },
+  "bizkick-delegation": { eyebrow: "BizKick", title: "Approval limits", desc: "Your BizKick approval limits decide who may approve work raised from a transaction. You confirm every mapping." },
   "firm-settings": { eyebrow: "Firm", title: "Firm Settings", desc: "Profile, workspace and governance settings." },
 
   "admin-firms": { eyebrow: "Platform", title: "Firms & Tenants", desc: "Every firm running on the platform." },

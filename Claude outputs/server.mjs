@@ -1,6 +1,5 @@
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
-import { timingSafeEqual } from "node:crypto";
 import { join } from "node:path";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
@@ -9,7 +8,7 @@ import { apiContracts } from "../../../packages/core-domain/src/api-contracts.mj
 import { formworkServicePack } from "../../../packages/service-packs/src/formwork.mjs";
 import { buildAwiaStaffDepartmentDashboard } from "../../../packages/core-domain/src/awia-virtual-staff-department-dashboard.mjs";
 import { buildAwiaFirmPayrollSummary } from "../../../packages/core-domain/src/awia-virtual-staff-payroll.mjs";
-import { acceptProposalRecord, approveProposalRecord, createClientRecord, completeTaskRecord, createDeliverableDraftRecord, createEvidenceBundleRecord, createFirmRecord, createIntakeSessionRecord, createInvoiceRecord, createMarketplaceListingRecord, updateMarketplaceListingStatusRecord, createDirectoryReviewBoardDecisionRecord, createPrivateDirectoryEnquiryRecord, createDirectoryEnquiryCollaborationRequestRecord, createQualificationRenewalReviewRecord, createCapacityOfferRecord, createCollaborationRequestRecord, createObservatorySnapshotRecord, createPolicyDecisionRecord, createProposalRecord, createTenantRecord, findValidProfessionalAuthority, invitePilotUserRecord, activatePilotUserRecord, revokePilotUserRecord, suspendPilotUserRecord, createSupportCaseRecord, updateSupportCaseRecord, createPilotIncidentRecord, updatePilotIncidentRecord, createPilotFeedbackRecord, createPilotAcceptanceReviewRecord, createPilotImprovementItemRecord, updatePilotImprovementItemRecord, createPilotReportPackRecord, createStakeholderReviewBoardRecord, createStakeholderReviewDecisionRecord, createPilotExpansionCohortRecord, updatePilotExpansionCohortRecord, activatePrivatePilotCohortRecord, createTenantOnboardingPlanRecord, updateTenantOnboardingPlanRecord, createReleaseCandidateGateRecord, createTenantPilotControlRecord, recordTenantUsageEventRecord, createBillingReadinessReviewRecord, createPaymentProviderConfigRecord, createSubscriptionPackageRecord, createCommercialLaunchControlRecord, issueDeliverableRecord, issueInvoiceRecord, produceTaskOutputRecord, provisionWorkerInstanceRecord, recordPaymentStatusRecord, requestToolInvocationRecord, reviewDeliverableRecord, activateWorkerInstanceRecord, assignTaskToWorkerRecord, startTaskRecord, getStoreInfo, newId, now, openProjectDeliveryRecord, provisionAwiaVirtualStaffPilotRecord, updateAwiaVirtualStaffLifecycleRecord, evaluateAwiaVirtualStaffTaskReadinessRecord, assignAwiaVirtualStaffTaskRecord, produceAwiaStaffOutputDraftRecord, prepareAwiaSkillRunRecord, recordAwiaSkillRunIssueRecord, updateWorkRequestInputsRecord, postWorkdeskItemMessageRecord, registerFileDocumentRecord, reviseFileDocumentRecord, reviewAwiaStaffOutputDraftRecord, decideAwiaStaffClassAApprovalRecord, prepareAwiaClientDeliveryDraftRecord, markAwiaClientDeliveryDraftSentRecord, archiveAwiaStaffWorkdeskItemRecord, appendAwiaStaffMemoryEntryRecord, openAwiaStaffConversationThreadRecord, postAwiaStaffConversationMessageRecord, updateAwiaStaffSeatBillingStatusRecord, provisionAwiaVirtualStaffFromTemplateRecord, readAwiaStaffTemplateCatalogueRecord, assignAwiaFirmPackageRecord, readAwiaFirmPackageAssignmentRecord, hireAwiaFirmWorkerRecord, purgeTestFirmRecord, readStore, requireFields, systemActor, withStore, computeWorkdeskItemStatus, computeWorkdeskItemStatusLabel } from "./store.mjs";
+import { acceptProposalRecord, approveProposalRecord, createClientRecord, completeTaskRecord, createDeliverableDraftRecord, createEvidenceBundleRecord, createFirmRecord, createIntakeSessionRecord, createInvoiceRecord, createMarketplaceListingRecord, updateMarketplaceListingStatusRecord, createDirectoryReviewBoardDecisionRecord, createPrivateDirectoryEnquiryRecord, createDirectoryEnquiryCollaborationRequestRecord, createQualificationRenewalReviewRecord, createCapacityOfferRecord, createCollaborationRequestRecord, createObservatorySnapshotRecord, createPolicyDecisionRecord, createProposalRecord, createTenantRecord, findValidProfessionalAuthority, invitePilotUserRecord, activatePilotUserRecord, revokePilotUserRecord, suspendPilotUserRecord, createSupportCaseRecord, updateSupportCaseRecord, createPilotIncidentRecord, updatePilotIncidentRecord, createPilotFeedbackRecord, createPilotAcceptanceReviewRecord, createPilotImprovementItemRecord, updatePilotImprovementItemRecord, createPilotReportPackRecord, createStakeholderReviewBoardRecord, createStakeholderReviewDecisionRecord, createPilotExpansionCohortRecord, updatePilotExpansionCohortRecord, activatePrivatePilotCohortRecord, createTenantOnboardingPlanRecord, updateTenantOnboardingPlanRecord, createReleaseCandidateGateRecord, createTenantPilotControlRecord, recordTenantUsageEventRecord, createBillingReadinessReviewRecord, createPaymentProviderConfigRecord, createSubscriptionPackageRecord, createCommercialLaunchControlRecord, issueDeliverableRecord, issueInvoiceRecord, produceTaskOutputRecord, provisionWorkerInstanceRecord, recordPaymentStatusRecord, requestToolInvocationRecord, reviewDeliverableRecord, activateWorkerInstanceRecord, assignTaskToWorkerRecord, startTaskRecord, getStoreInfo, newId, now, openProjectDeliveryRecord, provisionAwiaVirtualStaffPilotRecord, updateAwiaVirtualStaffLifecycleRecord, evaluateAwiaVirtualStaffTaskReadinessRecord, assignAwiaVirtualStaffTaskRecord, produceAwiaStaffOutputDraftRecord, reviewAwiaStaffOutputDraftRecord, decideAwiaStaffClassAApprovalRecord, prepareAwiaClientDeliveryDraftRecord, markAwiaClientDeliveryDraftSentRecord, archiveAwiaStaffWorkdeskItemRecord, appendAwiaStaffMemoryEntryRecord, openAwiaStaffConversationThreadRecord, postAwiaStaffConversationMessageRecord, updateAwiaStaffSeatBillingStatusRecord, provisionAwiaVirtualStaffFromTemplateRecord, readAwiaStaffTemplateCatalogueRecord, assignAwiaFirmPackageRecord, readAwiaFirmPackageAssignmentRecord, hireAwiaFirmWorkerRecord, purgeTestFirmRecord, readStore, requireFields, systemActor, withStore } from "./store.mjs";
 import { createFrontDeskEnquiryRecord, qualifyFrontDeskEnquiryRecord, createClientCommunicationDraftRecord, handoffFrontDeskEnquiryRecord } from "./store.mjs";
 import { bindAdministrationSkillsRecord, createCorrespondenceRecord, registerDocumentRecord, addDocumentRevisionRecord, createAdministrativeDeadlineRecord, completeAdministrativeDeadlineRecord, createTransmittalDraftRecord } from "./store.mjs";
 import { bindCommercialSkillsRecord, createSalesPipelineRecord, updateSalesPipelineRecord, dispatchProposalRecord, createExpenseRecord, approveExpenseRecord, createReceivableFollowUpRecord, readCashSnapshot } from "./store.mjs";
@@ -18,17 +17,6 @@ import { createNetworkProfessionalProfileRecord, createNetworkFirmProfileRecord,
 import { createNetworkConflictCheckRecord, createNetworkQualificationGateRecord, createSpecialistInvitationRecord } from "./store.mjs";
 import { createCollaborationWorkspaceRecord, grantCollaborationWorkspaceParticipantRecord, revokeCollaborationWorkspaceParticipantRecord, addCollaborationWorkspaceEvidenceRecord, createResponsibilityMatrixRecord, createSpecialistAssignmentRecord, transitionSpecialistAssignmentRecord } from "./store.mjs";
 import { addFirmMemberRecord } from "./store.mjs";
-// ADR-089 W1 (B1): firm file storage.
-import { registerFileObjectRecord, recordFileDownloadRecord, newUuid, isPostgresStore } from "./store.mjs";
-// ADR-090 W2: owner work requests (front door) + internal work completion.
-import { createWorkRequestRecord, prepareWorkRequestAssignment, recordWorkRequestAssignmentRecord, cancelWorkRequestRecord, addWorkRequestFilesRecord, completeAwiaInternalWorkdeskItemRecord } from "./store.mjs";
-import { listWorkRequestTypes } from "../../../packages/core-domain/src/awia-work-request-types.mjs";
-import { runSkill, SkillInputError } from "../../../packages/core-domain/src/awia-skill-runner.mjs";
-import { createFileStorage, fileMaxBytes, sanitizeFilename, resolveAllowedMimeType, sha256Hex, storageKeyFor, FILE_CLASSIFICATIONS } from "./file-storage.mjs";
-// CE-S1 (ADR-095): Connected EDCS -- BizKick register import and sync ledger.
-import { annotateDraftRequirement, checkDraftApproval, enforceDraftApproval, importDelegation as importEdcsDelegation, previewDelegation as previewEdcsDelegation, readDelegation as readEdcsDelegation } from "./edcs-delegation-service.mjs";
-import { EDCS_COLLECTIONS, listNumbers as listEdcsNumbers, reserveNumber as reserveEdcsNumber, voidNumber as voidEdcsNumber, linkEdcsFile, listEdcsChains, readEdcsDocuments, importRegister as importEdcsRegister, linkCounterparty as linkEdcsCounterparty, listConflicts as listEdcsConflicts, listSyncRuns as listEdcsSyncRuns, listTransactions as listEdcsTransactions, readConnection as readEdcsConnection, readEdcsExportCollections, readSyncRun as readEdcsSyncRun, readTransaction as readEdcsTransaction, resolveConflict as resolveEdcsConflict, saveConnection as saveEdcsConnection } from "./edcs-service.mjs";
-import { createRule as createAutomationRule, dryRunRule as dryRunAutomationRule, evaluateAfter as evaluateAutomationAfter, evaluateNow as evaluateAutomationNow, listRuleActivity as listAutomationRuleActivity, listRules as listAutomationRules, readSignals as readEdcsSignals, setRuleEnabled as setAutomationRuleEnabled, tick as tickAutomation, updateRule as updateAutomationRule } from "./edcs-automation-service.mjs";
 
 const root = process.cwd();
 const port = Number(process.env.VFIRM_API_PORT ?? 3091);
@@ -47,7 +35,6 @@ const supabaseJwks = SUPABASE_URL ? createRemoteJWKSet(new URL(`${SUPABASE_URL}/
 const supabaseAdmin = SUPABASE_URL && process.env.VFIRM_SUPABASE_SERVICE_ROLE_KEY
   ? createSupabaseClient(SUPABASE_URL, process.env.VFIRM_SUPABASE_SERVICE_ROLE_KEY, { auth: { autoRefreshToken: false, persistSession: false } })
   : null;
-const fileStorage = createFileStorage({ supabaseAdmin, root });
 const readCollections = new Map([
   ["tenants", "tenants"],
   ["persons", "persons"],
@@ -116,8 +103,6 @@ const readCollections = new Map([
   ["awia-staff-output-drafts", "awia_staff_output_drafts"],
   ["awia-staff-output-reviews", "awia_staff_output_reviews"],
   ["awia-client-delivery-drafts", "awia_client_delivery_drafts"],
-  ["file-objects", "file_objects"],
-  ["work-requests", "work_requests"],
   ["awia-staff-memory-entries", "awia_staff_memory_entries"],
   ["awia-staff-conversation-threads", "awia_staff_conversation_threads"],
   ["awia-staff-conversation-messages", "awia_staff_conversation_messages"],
@@ -360,14 +345,23 @@ function requireHumanOperationalAuthority(actor, label) {
 }
 
 function actorFromBody(body, req = null, tenant_id = null, firm_id = null) {
-  // Regression fix (2026-09-30): this used to read `body.actor ?? devActorFromHeaders(...) ?? systemActor(...)`
-  // -- a client-supplied `body.actor` was trusted ahead of any server-verified identity, letting an
-  // unauthenticated caller fully impersonate any real actor by ID (the exact write-side identity-theft
-  // gap this project's Phase 1 review was supposed to have closed on 2026-09-24; re-auditing this function
-  // directly on 2026-09-30 found it was still present in the delivered file). `body.actor` is no longer a
-  // trusted input anywhere: the only sources of identity here are a real verified request (Supabase JWT or
-  // dev-header, via devActorFromHeaders) or the synthetic system actor fallback.
-  const actor = devActorFromHeaders(req, tenant_id, firm_id) ?? systemActor(tenant_id, firm_id);
+  // HM-S7 Phase 1 (2026-09-24): `body.actor` used to be trusted outright, and
+  // an absent actor silently became a fully-privileged SYSTEM actor scoped to
+  // whatever tenant_id/firm_id the caller put in the request body. That let
+  // an unauthenticated caller both impersonate any real actor_id (by putting
+  // it in body.actor) and, failing that, mint a SYSTEM actor for itself --
+  // confirmed live against a disposable database: a zero-auth POST /clients
+  // request created a real record under an impersonated real actor_id.
+  // A client-supplied `actor` object is never trustworthy on its own -- it
+  // must come from something the server itself verified. devActorFromHeaders
+  // already does that: it returns the Supabase-JWT-verified actor when a
+  // bearer token was presented (rejecting an invalid/expired token outright,
+  // never falling through to headers in that case), or the internal dev-auth
+  // header identity used by our own web console and smoke tests. If neither
+  // yields an actor, this is a genuinely unauthenticated request and must be
+  // rejected, not silently upgraded to SYSTEM.
+  const actor = devActorFromHeaders(req, tenant_id, firm_id);
+  if (!actor) unauthenticated("Authentication required to perform this command.");
   assertActorScope(actor, { tenant_id, firm_id }, "command");
   return actor;
 }
@@ -391,6 +385,22 @@ function forbidden(message) {
   const error = new Error(message);
   error.status = 403;
   error.code = "TENANT_ACCESS_DENIED";
+  throw error;
+}
+
+// HM-S7 Phase 0 (2026-09-24, architecture review item A.1 -- the review's
+// highest-severity finding): a request with no resolved actor at all (no
+// verified Supabase bearer token, no x-vfirm-actor-id dev header) must be
+// rejected outright, not silently waved through. Every real caller already
+// sends one or the other -- confirmed by reading every smoke-test script
+// that hits an assertActorScope-protected endpoint (all attach
+// x-vfirm-actor-id) and the one script with no HTTP calls at all
+// (smoke-web-navigation-renderers.mjs, static file assertions only) -- so
+// this closes a real gap without breaking any exercised path.
+function unauthenticated(message) {
+  const error = new Error(message);
+  error.status = 401;
+  error.code = "AUTHENTICATION_REQUIRED";
   throw error;
 }
 
@@ -482,15 +492,49 @@ function readMEGovernanceLock() {
   return { ...marketplaceGovernancePolicy, checks, recommendation: "ME_S1_LOCKED_READY_FOR_ME_S2_DECISION", next_step: "Product owner must explicitly authorize ME-S2 before qualified directory implementation." };
 }
 function assertActorScope(actor, recordOrQuery, label = "resource") {
-  if (!actor) return;
+  // HM-S7 Phase 0: was `if (!actor) return;` -- an unauthenticated request
+  // (no verified Supabase token, no dev header) silently skipped every
+  // tenant/firm check instead of being rejected. That degraded this from a
+  // real gate to a no-op under the ordinary condition of a missing header.
+  // Fail closed: no actor is always a hard authentication failure here, not
+  // "nothing to check."
+  if (!actor) unauthenticated(`Authentication required to access ${label}.`);
   const tenant_id = recordOrQuery?.tenant_id;
   const firm_id = recordOrQuery?.firm_id;
+  // HM-S7 Phase 1 (2026-09-24, finding A.2 -- attempted and reverted): tried
+  // making this "if either side is falsy, no check happens" condition
+  // strict (require both present and equal whenever the actor has that
+  // field). That broke a widespread, legitimate call pattern: readResource()
+  // and similar generic-collection reads call this with tenant_id/firm_id
+  // taken straight from optional query params, relying on it only as an
+  // "if the caller explicitly asked for a specific tenant/firm, it must
+  // match" check -- the real per-record enforcement for those call sites
+  // happens afterward in applyActorScope(), which already fails closed.
+  // Confirmed live: smoke-stage11-external-auth-pilot-users.mjs's
+  // `GET /pilot-users` (correctly authenticated, no query params) started
+  // failing with a false-positive TENANT_ACCESS_DENIED. This function is
+  // asked to serve two different roles from different call sites -- a
+  // strict pre-check for handlers with no later per-record filter (fixed
+  // directly at the handler instead, this same phase: readDashboardSummary,
+  // readAwiaStaffDepartmentDashboard, readAwiaStaffPayrollSummary,
+  // readAwiaFirmPackageAssignment, produceTaskOutput,
+  // requestToolInvocation), and an optional identity-confirmation check for
+  // handlers with a later per-record filter (readResource and its kin) --
+  // and can't safely be tightened as one shared function without splitting
+  // those roles apart first. Left as a named, tracked Phase 4 item rather
+  // than papered over.
   if (actor.tenant_id && tenant_id && String(actor.tenant_id) !== String(tenant_id)) forbidden(`Actor cannot read ${label} outside tenant ${actor.tenant_id}.`);
   if (actor.firm_id && firm_id && String(actor.firm_id) !== String(firm_id)) forbidden(`Actor cannot read ${label} outside firm ${actor.firm_id}.`);
 }
 
 function applyActorScope(records, actor) {
-  if (!actor) return records;
+  // HM-S7 Phase 0: was `if (!actor) return records;` -- returned every
+  // record, completely unfiltered, to an unauthenticated caller. In
+  // practice assertActorScope() above now always runs first on every
+  // existing call site and throws before this is reached with a null
+  // actor, but this is fixed too as defense-in-depth for any future direct
+  // caller: no actor means no records, never "everything."
+  if (!actor) return [];
   return records.filter((record) => {
     if (actor.tenant_id && record?.tenant_id && String(record.tenant_id) !== String(actor.tenant_id)) return false;
     const scopedFirmIds = [record?.firm_id, record?.requesting_firm_id, record?.provider_firm_id, record?.accountable_firm_id].filter(Boolean).map(String);
@@ -499,6 +543,19 @@ function applyActorScope(records, actor) {
   });
 }
 
+// HM-S7 Phase 0 (2026-09-24, follow-on to the fail-open fix above): a small,
+// explicit allowlist of collections that are genuinely global reference/
+// catalog data -- confirmed by reading their own table definitions
+// (readRelationalStore, store.mjs) -- with NO tenant_id/firm_id column on
+// any record at all, so there is nothing tenant-specific for an
+// unauthenticated caller to leak by reading them. This exists specifically
+// so "browse available worker roles / service packs before signing up" can
+// stay a real pre-login product experience without reopening the actual
+// vulnerability (scoped business data readable with zero identity). Every
+// other collection still requires a real actor, exactly as fixed above --
+// adding a name here is a deliberate, reviewed exception, not a default.
+const GLOBAL_REFERENCE_COLLECTIONS = new Set(["worker_templates", "service_packs", "service_skus"]);
+
 async function readResource(req, url) {
   const match = url.pathname.match(/^\/([^/]+)(?:\/([^/]+))?$/);
   if (!match) return null;
@@ -506,22 +563,19 @@ async function readResource(req, url) {
   const collection = readCollections.get(slug);
   if (!collection) return null;
   const actor = devActorFromHeaders(req);
-  // ADR-089 W1: uploaded-file metadata (filenames, hashes) is never listed to an anonymous caller.
-  if (collection === "file_objects" && !actor) {
-    const error = new Error("A signed-in user is required to list files.");
-    error.status = 401;
-    error.code = "AUTH_REQUIRED";
-    throw error;
+  const isGlobalReference = GLOBAL_REFERENCE_COLLECTIONS.has(collection);
+  if (!isGlobalReference) {
+    assertActorScope(actor, { tenant_id: url.searchParams.get("tenant_id"), firm_id: url.searchParams.get("firm_id") }, collection);
   }
-  assertActorScope(actor, { tenant_id: url.searchParams.get("tenant_id"), firm_id: url.searchParams.get("firm_id") }, collection);
   const store = await readStore();
   const records = Array.isArray(store[collection]) ? store[collection] : [];
   if (id) {
     const record = requireRecord(store, collection, id);
-    assertActorScope(actor, record, collection);
+    if (!isGlobalReference) assertActorScope(actor, record, collection);
     return { status: 200, body: { ok: true, data: record } };
   }
-  return { status: 200, body: { ok: true, data: applyActorScope(applyReadFilters(records, url), actor) } };
+  const filtered = applyReadFilters(records, url);
+  return { status: 200, body: { ok: true, data: isGlobalReference ? filtered : applyActorScope(filtered, actor) } };
 }
 
 function applyReadFilters(records, url) {
@@ -687,9 +741,22 @@ async function readActiveWorkspaceSummary(req, url) {
     boundaries: ["no_public_marketplace", "no_live_matching", "no_ranking", "no_capacity_allocation", "no_vf24_publication", "no_pricing_intelligence", "no_autonomous_award", "no_autonomous_regulated_approval", "no_live_payment_movement"]
   };
 }
-async function readDashboardSummary(url) {
+async function readDashboardSummary(req, url) {
+  // HM-S7 Phase 1 (2026-09-24, finding A.3 -- scattered scoping): this
+  // handler only ever took `url`, never `req`, so it structurally could not
+  // check who was asking. applyReadFilters() only filters by whatever query
+  // params are explicitly present -- an unauthenticated caller who simply
+  // omitted tenant_id/firm_id (or supplied someone else's) got
+  // platform-wide counts across every tenant. Fixed by requiring a real
+  // actor and forcing the scope to that actor's own tenant/firm, ignoring
+  // whatever the caller passed in the query string.
+  const actor = devActorFromHeaders(req);
+  if (!actor) unauthenticated("Authentication required to access dashboard summary.");
+  const scopedUrl = new URL(url.toString());
+  if (actor.tenant_id) scopedUrl.searchParams.set("tenant_id", actor.tenant_id); else scopedUrl.searchParams.delete("tenant_id");
+  if (actor.firm_id) scopedUrl.searchParams.set("firm_id", actor.firm_id); else scopedUrl.searchParams.delete("firm_id");
   const store = await readStore();
-  const filtered = Object.fromEntries([...readCollections.values()].map((collection) => [collection, applyReadFilters(Array.isArray(store[collection]) ? store[collection] : [], url)]));
+  const filtered = Object.fromEntries([...readCollections.values()].map((collection) => [collection, applyReadFilters(Array.isArray(store[collection]) ? store[collection] : [], scopedUrl)]));
   const counts = {
     tenants: filtered.tenants.length,
     firms: filtered.firms.length,
@@ -846,7 +913,6 @@ const tenantExportCollections = [
   "worker_instances", "task_outputs", "tool_invocations", "pilot_handoff_records", "pilot_users", "support_cases", "pilot_incidents", "pilot_feedback", "pilot_acceptance_reviews", "pilot_improvement_items", "pilot_report_packs", "stakeholder_review_boards", "stakeholder_review_decisions",
   "tenant_pilot_controls", "tenant_usage_events", "billing_readiness_reviews", "payment_provider_configs", "subscription_packages", "commercial_launch_controls", "factory_firm_blueprints", "factory_provisioning_runs", "provisioned_firm_instances", "factory_worker_bindings", "pack_compatibility_checks", "pack_binding_certifications", "service_activation_records", "policy_decisions",
   "awia_virtual_staff_provisioning_runs", "awia_virtual_staff_seats", "awia_virtual_staff_members", "awia_staff_role_assignments", "awia_staff_package_bindings", "awia_staff_lifecycle_events", "awia_staff_authority_decisions", "awia_staff_evidence_packs", "awia_staff_task_readiness_records", "awia_staff_workdesk_items", "awia_staff_output_drafts", "awia_staff_output_reviews", "awia_client_delivery_drafts", "awia_staff_memory_entries", "awia_staff_conversation_threads", "awia_staff_conversation_messages", "awia_staff_seat_billing_events", "awia_firm_package_assignments",
-  "file_objects", "work_requests",
   "event_log", "audit_events"
 ];
 
@@ -871,10 +937,7 @@ async function readTenantExportPackage(req, url) {
   requireFields({ tenant_id: tenantId }, ["tenant_id"]);
   assertActorScope(actor, { tenant_id: tenantId, firm_id: firmId }, "tenant export package");
   const store = await readStore();
-  // CE-S1 (ADR-095): the EDCS collections live in their own tables on Postgres (not in the whole
-  // store), so they come from the EDCS repository, firm-scoped. Without a firm scope they are listed empty.
-  const edcsRecords = firmId ? await readEdcsExportCollections({ tenant_id: tenantId, firm_id: firmId }) : Object.fromEntries(EDCS_COLLECTIONS.map((collection) => [collection, []]));
-  const records = { ...Object.fromEntries(tenantExportCollections.map((collection) => [collection, tenantExportRecords(store, collection, tenantId, firmId)])), ...edcsRecords };
+  const records = Object.fromEntries(tenantExportCollections.map((collection) => [collection, tenantExportRecords(store, collection, tenantId, firmId)]));
   const counts = Object.fromEntries(Object.entries(records).map(([collection, rows]) => [collection, rows.length]));
   return {
     package_type: "tenant_business_records_export",
@@ -906,10 +969,6 @@ async function readDataExportManifest(req, url) {
     const scoped = tenantExportRecords(store, collection, tenantId);
     return [collection, scoped.length];
   }));
-  // CE-S1 (ADR-095): EDCS collection counts, firm-scoped (needs ?firm_id=).
-  const manifestFirmId = url.searchParams.get("firm_id");
-  const edcsExport = tenantId && manifestFirmId ? await readEdcsExportCollections({ tenant_id: tenantId, firm_id: manifestFirmId }) : {};
-  for (const collection of EDCS_COLLECTIONS) counts[collection] = (edcsExport[collection] ?? []).length;
   return {
     manifest_type: "tenant_export_manifest",
     tenant_id: tenantId ?? null,
@@ -1282,9 +1341,14 @@ async function approveProposal(body, req = null) {
   return approveProposalRecord({ ...body, authority_id: authorityCheck.professional_authority?.id ?? body.authority_id, approver_professional_id: authorityCheck.professional_profile?.id ?? body.approver_professional_id }, actor, policyDecision ?? decision);
 }
 
-async function acceptProposal(body) {
+async function acceptProposal(body, req = null) {
+  // HM-S7 Phase 1 (2026-09-24): this handler never declared/forwarded `req`,
+  // so actorFromBody could never see a real header- or token-verified actor
+  // here -- it only "worked" via the body.actor/systemActor fallback Phase 1
+  // just closed. Every other handler in this file already forwards req the
+  // same way; this one was the one outlier.
   requireFields(body, ["tenant_id", "firm_id", "proposal_id", "project_name"]);
-  const actor = actorFromBody(body, null, body.tenant_id, body.firm_id);
+  const actor = actorFromBody(body, req, body.tenant_id, body.firm_id);
   const { proposal, engagement } = await acceptProposalRecord(body, actor);
   const delivery = await openProjectDeliveryRecord({ ...body, proposal, engagement }, actor, formworkServicePack.validators);
   return { proposal, engagement, ...delivery };
@@ -1947,12 +2011,6 @@ async function purgeTestFirm(body, req = null) {
     error.code = "TEST_FIRM_PURGE_LOCKED";
     throw error;
   }
-  // Auth gap closed (2026-09-30, finding C.6): this had no actor check of any kind when the env flag
-  // was set -- only the flag plus the target firm's name matching a test-firm pattern
-  // (assertPurgeableTestFirmName, inside purgeTestFirmRecord) stood between an unauthenticated caller
-  // and permanently deleting a firm. Now requires a real, server-verified human actor.
-  const actor = actorFromBody(body, req, body.tenant_id, body.firm_id);
-  requireHumanOperationalAuthority(actor, "Test-firm purge (POST /internal/purge-test-firm)");
   return purgeTestFirmRecord(body);
 }
 
@@ -1988,8 +2046,7 @@ async function evaluateAwiaVirtualStaffTaskReadiness(body, req = null) {
 
 
 async function assignAwiaVirtualStaffTask(body, req = null) {
-  // ADR-090 W2 (D2): INTERNAL firm work has no client; every other risk class still requires one.
-  requireFields(body, body.risk_class === "INTERNAL" ? ["tenant_id", "firm_id", "staff_code", "task_id", "tool"] : ["tenant_id", "firm_id", "staff_code", "task_id", "tool", "client_id"]);
+  requireFields(body, ["tenant_id", "firm_id", "staff_code", "task_id", "tool", "client_id"]);
   const actor = actorFromBody(body, req, body.tenant_id, body.firm_id);
   return assignAwiaVirtualStaffTaskRecord(body, actor);
 }
@@ -1998,28 +2055,12 @@ async function assignAwiaVirtualStaffTask(body, req = null) {
 async function produceAwiaStaffOutputDraft(body, req = null) {
   requireFields(body, ["tenant_id", "firm_id", "workdesk_item_id"]);
   const actor = actorFromBody(body, req, body.tenant_id, body.firm_id);
-  return annotateProducedDraft(await produceAwiaStaffOutputDraftRecord(body, actor), actor);
-}
-
-// CE-S5: record the approval tier on an EDCS-linked draft. Never fails the draft: the tier is also
-// recomputed at review time, which is where it is enforced.
-async function annotateProducedDraft(result, actor) {
-  try {
-    const draft = result?.output_draft;
-    if (!draft) return result;
-    const note = await annotateDraftRequirement({ scope: { tenant_id: draft.tenant_id, firm_id: draft.firm_id }, actor, output_draft_id: draft.id });
-    if (note) draft.delegation_requirement = note;
-  } catch (error) {
-    console.error("delegation annotate failed:", error?.message ?? error);
-  }
-  return result;
+  return produceAwiaStaffOutputDraftRecord(body, actor);
 }
 
 async function reviewAwiaStaffOutputDraft(body, req = null) {
   requireFields(body, ["tenant_id", "firm_id", "output_draft_id", "review_decision"]);
   const actor = actorFromBody(body, req, body.tenant_id, body.firm_id);
-  // CE-S5: an EDCS-linked draft above the reviewer's tier cannot go to client-draft (409 names the approver).
-  await enforceDraftApproval({ scope: { tenant_id: body.tenant_id, firm_id: body.firm_id }, actor, output_draft_id: body.output_draft_id, review_decision: body.review_decision });
   return reviewAwiaStaffOutputDraftRecord(body, actor);
 }
 
@@ -2084,9 +2125,16 @@ async function assignAwiaFirmPackage(body, req = null) {
   return assignAwiaFirmPackageRecord(body, actor);
 }
 
-async function readAwiaFirmPackageAssignment(url) {
-  const tenantId = url.searchParams.get("tenant_id");
-  const firmId = url.searchParams.get("firm_id");
+async function readAwiaFirmPackageAssignment(req, url) {
+  // HM-S7 Phase 1 (2026-09-24, finding A.3): previously took no actor at
+  // all and passed the caller-supplied tenant_id/firm_id straight through --
+  // anyone who knew (or guessed) another firm's ids could read its package
+  // assignment. Fixed by requiring a real actor and forcing scope to that
+  // actor's own tenant/firm.
+  const actor = devActorFromHeaders(req);
+  if (!actor) unauthenticated("Authentication required to access AWIA firm package assignment.");
+  const tenantId = actor.tenant_id ?? url.searchParams.get("tenant_id");
+  const firmId = actor.firm_id ?? url.searchParams.get("firm_id");
   return readAwiaFirmPackageAssignmentRecord(tenantId, firmId);
 }
 
@@ -2114,8 +2162,17 @@ async function assignTaskToWorker(body, req = null) {
   return assignTaskToWorkerRecord(body, actor);
 }
 
-async function produceTaskOutput(body) {
+async function produceTaskOutput(body, req = null) {
+  // HM-S7 Phase 1 (2026-09-24, finding A.3): this handler had no auth check
+  // of any kind -- any caller who knew a worker_instance_id + tenant_id +
+  // firm_id (all plain, leakable UUIDs) could submit task output as that AI
+  // worker with zero authentication. The recorded actor stays the AI
+  // worker's own synthetic actor (that attribution is correct and
+  // unaffected); what's fixed is requiring a real, verified supervising
+  // caller (dev header or Supabase session) to be allowed to trigger this
+  // at all.
   requireFields(body, ["tenant_id", "firm_id", "task_id", "worker_instance_id"]);
+  actorFromBody(body, req, body.tenant_id, body.firm_id);
   const store = await readStore();
   const worker = (store.worker_instances ?? []).find((record) => record.id === body.worker_instance_id && record.tenant_id === body.tenant_id && record.firm_id === body.firm_id);
   if (!worker) { const error = new Error(`worker_instances record not found: ${body.worker_instance_id}`); error.status = 404; error.code = "NOT_FOUND"; throw error; }
@@ -2127,8 +2184,11 @@ async function produceTaskOutput(body) {
   return produceTaskOutputRecord(body, policyDecision ?? decision);
 }
 
-async function requestToolInvocation(body) {
+async function requestToolInvocation(body, req = null) {
+  // HM-S7 Phase 1 (2026-09-24, finding A.3): same gap as produceTaskOutput
+  // above -- fixed the same way.
   requireFields(body, ["tenant_id", "firm_id", "worker_instance_id", "tool_name"]);
+  actorFromBody(body, req, body.tenant_id, body.firm_id);
   const store = await readStore();
   const worker = (store.worker_instances ?? []).find((record) => record.id === body.worker_instance_id && record.tenant_id === body.tenant_id && record.firm_id === body.firm_id);
   if (!worker) { const error = new Error(`worker_instances record not found: ${body.worker_instance_id}`); error.status = 404; error.code = "NOT_FOUND"; throw error; }
@@ -2229,10 +2289,17 @@ function buildQuotationOperationsSummary(store, tenantId, firmId) {
   };
 }
 
-async function readAwiaStaffDepartmentDashboard(url) {
+async function readAwiaStaffDepartmentDashboard(req, url) {
+  // HM-S7 Phase 1 (2026-09-24, finding A.3): same class of gap as
+  // readDashboardSummary -- only took `url`, and an absent tenantId/firmId
+  // meant the `!tenantId`/`!firmId` filter conditions below were simply
+  // true, returning every firm's AWIA staff data platform-wide. Fixed by
+  // requiring a real actor and forcing scope to that actor's own tenant/firm.
+  const actor = devActorFromHeaders(req);
+  if (!actor) unauthenticated("Authentication required to access AWIA staff department dashboard.");
   const store = await readStore();
-  const tenantId = url.searchParams.get("tenant_id");
-  const firmId = url.searchParams.get("firm_id");
+  const tenantId = actor.tenant_id ?? null;
+  const firmId = actor.firm_id ?? null;
   const scoped = (collection) => (Array.isArray(store[collection]) ? store[collection] : []).filter((record) => (!tenantId || record.tenant_id === tenantId || record.organization_id === tenantId) && (!firmId || record.firm_id === firmId));
   return buildAwiaStaffDepartmentDashboard({
     members: scoped("awia_virtual_staff_members"),
@@ -2243,10 +2310,14 @@ async function readAwiaStaffDepartmentDashboard(url) {
   });
 }
 
-async function readAwiaStaffPayrollSummary(url) {
+async function readAwiaStaffPayrollSummary(req, url) {
+  // HM-S7 Phase 1 (2026-09-24, finding A.3): same gap as
+  // readAwiaStaffDepartmentDashboard above -- fixed the same way.
+  const actor = devActorFromHeaders(req);
+  if (!actor) unauthenticated("Authentication required to access AWIA staff payroll summary.");
   const store = await readStore();
-  const tenantId = url.searchParams.get("tenant_id");
-  const firmId = url.searchParams.get("firm_id");
+  const tenantId = actor.tenant_id ?? null;
+  const firmId = actor.firm_id ?? null;
   const scoped = (collection) => (Array.isArray(store[collection]) ? store[collection] : []).filter((record) => (!tenantId || record.tenant_id === tenantId || record.organization_id === tenantId) && (!firmId || record.firm_id === firmId));
   return buildAwiaFirmPayrollSummary({
     seats: scoped("awia_virtual_staff_seats"),
@@ -3168,34 +3239,6 @@ const routes = new Map([
   ["POST /awia/virtual-staff/client-delivery-draft", prepareAwiaClientDeliveryDraft],
   ["POST /awia/virtual-staff/client-delivery-draft/mark-sent", markAwiaClientDeliveryDraftSent],
   ["POST /awia/virtual-staff/workdesk-item/archive", archiveAwiaStaffWorkdeskItem],
-  ["POST /awia/virtual-staff/workdesk-item/complete-internal", completeAwiaInternalWorkdeskItem],
-  ["POST /work-requests", createWorkRequest],
-  ["POST /work-requests/assign", assignWorkRequest],
-  ["POST /work-requests/cancel", cancelWorkRequest],
-  ["POST /work-requests/add-files", addWorkRequestFiles],
-  ["POST /work-requests/update-inputs", updateWorkRequestInputs],
-  ["POST /awia/virtual-staff/workdesk-item/run-skill", runAwiaWorkdeskSkill],
-  ["POST /awia/virtual-staff/workdesk-item/message", postWorkdeskItemMessage],
-  ["POST /documents", registerFileDocument],
-  ["POST /documents/revise", reviseFileDocument],
-  // CE-S1 (ADR-095): Connected EDCS (owner only; see edcs-service.mjs).
-  ["POST /edcs/connection", saveEdcsConnectionRoute],
-  ["POST /edcs/register-imports", importEdcsRegisterRoute],
-  ["POST /edcs/conflicts/resolve", resolveEdcsConflictRoute],
-  ["POST /edcs/transactions/link-counterparty", linkEdcsCounterpartyRoute],
-  // CE-S5 (ADR-099): Delegation of Authority (preview/import: owner; check: any signed-in member).
-  ["POST /edcs/delegation/preview", previewEdcsDelegationRoute],
-  ["POST /edcs/delegation/import", importEdcsDelegationRoute],
-  ["POST /edcs/delegation/check", checkEdcsDelegationRoute],
-  // CE-S4 (ADR-098): Number Authority (reserve: any signed-in member; void: owner).
-  ["POST /edcs/numbers/reserve", reserveEdcsNumberRoute],
-  ["POST /edcs/numbers/void", voidEdcsNumberRoute],
-  // CE-S3 (ADR-097): register-driven work rules (owner only; see edcs-automation-service.mjs).
-  ["POST /automation/rules", createAutomationRuleRoute],
-  ["POST /automation/rules/update", updateAutomationRuleRoute],
-  ["POST /automation/rules/enable", enableAutomationRuleRoute],
-  ["POST /automation/rules/dry-run", dryRunAutomationRuleRoute],
-  ["POST /automation/evaluate", evaluateAutomationRoute],
   ["POST /awia/virtual-staff/memory/append", appendAwiaStaffMemoryEntry],
   ["POST /awia/virtual-staff/conversation/open", openAwiaStaffConversationThread],
   ["POST /awia/virtual-staff/conversation/message", postAwiaStaffConversationMessage],
@@ -3287,464 +3330,6 @@ const routes = new Map([
   ["POST /mvp/demo-loop", createDemoLoop]
 ]);
 
-// ADR-089 W1 (B1, 2026-09-30): firm file upload/download.
-// Upload is a raw-binary POST (the file bytes ARE the body, no multipart parsing needed):
-//   POST /files/upload?tenant_id=&firm_id=&filename=&classification=&purpose=
-//   content-type: <the file's MIME type>
-// Download streams the bytes back only to a verified actor in the owning tenant/firm:
-//   GET /files/<id>/download?tenant_id=&firm_id=
-// Both require a real identity (Supabase JWT or dev headers) -- unlike command routes there is
-// no system-actor fallback, so an anonymous caller can never read or write firm files.
-function requireVerifiedActor(req, tenant_id, firm_id, label) {
-  const actor = devActorFromHeaders(req, tenant_id, firm_id);
-  if (!actor) {
-    const error = new Error(`A signed-in user is required to ${label}.`);
-    error.status = 401;
-    error.code = "AUTH_REQUIRED";
-    throw error;
-  }
-  assertActorScope(actor, { tenant_id, firm_id }, label);
-  if (!actor.tenant_id || !actor.firm_id) forbidden(`Actor must be scoped to a tenant and firm to ${label}.`);
-  return actor;
-}
-
-async function readBinaryBody(req, maxBytes) {
-  const declared = Number(req.headers["content-length"] ?? 0);
-  if (declared > maxBytes) {
-    const error = new Error(`File exceeds the ${Math.round(maxBytes / 1048576)} MB limit.`);
-    error.status = 413;
-    error.code = "FILE_TOO_LARGE";
-    throw error;
-  }
-  const chunks = [];
-  let total = 0;
-  for await (const chunk of req) {
-    total += chunk.length;
-    if (total > maxBytes) {
-      const error = new Error(`File exceeds the ${Math.round(maxBytes / 1048576)} MB limit.`);
-      error.status = 413;
-      error.code = "FILE_TOO_LARGE";
-      throw error;
-    }
-    chunks.push(chunk);
-  }
-  return Buffer.concat(chunks);
-}
-
-async function uploadFirmFile(req, url) {
-  const tenant_id = url.searchParams.get("tenant_id");
-  const firm_id = url.searchParams.get("firm_id");
-  requireFields({ tenant_id, firm_id, filename: url.searchParams.get("filename") }, ["tenant_id", "firm_id", "filename"]);
-  const actor = requireVerifiedActor(req, tenant_id, firm_id, "upload files");
-  const filename = sanitizeFilename(url.searchParams.get("filename"));
-  const mime_type = resolveAllowedMimeType(filename, req.headers["content-type"]);
-  const classification = url.searchParams.get("classification") ?? "CLIENT_CONFIDENTIAL";
-  if (!FILE_CLASSIFICATIONS.includes(classification)) {
-    const error = new Error(`Unknown file classification: ${classification}`);
-    error.status = 400;
-    error.code = "VALIDATION_ERROR";
-    throw error;
-  }
-  const buffer = await readBinaryBody(req, fileMaxBytes());
-  if (buffer.length === 0) {
-    const error = new Error("Uploaded file is empty.");
-    error.status = 400;
-    error.code = "VALIDATION_ERROR";
-    throw error;
-  }
-  const file_id = isPostgresStore() ? newUuid() : newId("file");
-  const storage_key = storageKeyFor({ tenant_id, firm_id, file_id });
-  // Bytes first, record second: a file_objects row never points at bytes that failed to store.
-  await fileStorage.put(storage_key, buffer, mime_type);
-  return registerFileObjectRecord({
-    tenant_id,
-    firm_id,
-    file_id,
-    filename,
-    mime_type,
-    size_bytes: buffer.length,
-    sha256: sha256Hex(buffer),
-    storage_backend: fileStorage.backend,
-    storage_key,
-    classification,
-    purpose: url.searchParams.get("purpose") ?? "WORK_INPUT"
-  }, actor);
-}
-
-async function downloadFirmFile(req, res, url, fileId) {
-  const tenant_id = url.searchParams.get("tenant_id");
-  const firm_id = url.searchParams.get("firm_id");
-  requireFields({ tenant_id, firm_id }, ["tenant_id", "firm_id"]);
-  const actor = requireVerifiedActor(req, tenant_id, firm_id, "download files");
-  const record = await recordFileDownloadRecord({ tenant_id, firm_id, file_id: fileId }, actor);
-  const buffer = await fileStorage.get(record.storage_key);
-  if (sha256Hex(buffer) !== record.sha256) {
-    const error = new Error("Stored file failed its integrity check (SHA-256 mismatch).");
-    error.status = 500;
-    error.code = "FILE_INTEGRITY_ERROR";
-    throw error;
-  }
-  res.writeHead(200, {
-    "content-type": record.mime_type,
-    "content-length": String(buffer.length),
-    // ASCII fallback + RFC 5987 UTF-8 form, so non-Latin filenames (e.g. Malay/Arabic) never
-    // produce an invalid header.
-    "content-disposition": `attachment; filename="${record.filename.replace(/[^\x20-\x7e]/g, "_").replace(/["\\]/g, "_")}"; filename*=UTF-8''${encodeURIComponent(record.filename)}`,
-    "x-vfirm-file-sha256": record.sha256,
-    "cache-control": "no-store",
-    ...corsHeaders(req)
-  });
-  res.end(buffer);
-}
-
-// ADR-090 W2 (B2, 2026-10-01): owner work requests -- the firm's front door. See
-// createWorkRequestRecord / prepareWorkRequestAssignment in store.mjs. Assignment always runs
-// through assignAwiaVirtualStaffTaskRecord (authority gate, position/skill scope, Class A), and a
-// refusal is recorded on the request, which stays in the Inbox.
-async function runWorkRequestAssignment(body, actor) {
-  const { assignment } = await prepareWorkRequestAssignment(body);
-  try {
-    const result = await assignAwiaVirtualStaffTaskRecord(assignment, actor);
-    const workRequest = await recordWorkRequestAssignmentRecord(body, actor, { workdesk_item_id: result.workdesk_item.id });
-    return { work_request: workRequest, workdesk_item: result.workdesk_item, readiness: result.readiness };
-  } catch (error) {
-    await recordWorkRequestAssignmentRecord(body, actor, { error: error instanceof Error ? error.message : String(error) }).catch(() => {});
-    throw error;
-  }
-}
-
-async function createWorkRequest(body, req = null) {
-  requireFields(body, ["tenant_id", "firm_id", "title", "request_type_id"]);
-  const actor = actorFromBody(body, req, body.tenant_id, body.firm_id);
-  const workRequest = await createWorkRequestRecord(body, actor);
-  // Decision D3: the owner may assign straight away ("assign now"); otherwise it waits in the Inbox.
-  if (!body.assign_to_staff_code) return { work_request: workRequest, workdesk_item: null, assignment_error: null };
-  try {
-    const assigned = await runWorkRequestAssignment({ tenant_id: body.tenant_id, firm_id: body.firm_id, work_request_id: workRequest.id, staff_code: body.assign_to_staff_code }, actor);
-    return { ...assigned, assignment_error: null };
-  } catch (error) {
-    const current = (await readStore()).work_requests.find((record) => record.id === workRequest.id) ?? workRequest;
-    return { work_request: current, workdesk_item: null, assignment_error: error instanceof Error ? error.message : String(error) };
-  }
-}
-
-async function assignWorkRequest(body, req = null) {
-  requireFields(body, ["tenant_id", "firm_id", "work_request_id", "staff_code"]);
-  const actor = actorFromBody(body, req, body.tenant_id, body.firm_id);
-  return runWorkRequestAssignment(body, actor);
-}
-
-async function cancelWorkRequest(body, req = null) {
-  requireFields(body, ["tenant_id", "firm_id", "work_request_id"]);
-  return cancelWorkRequestRecord(body, actorFromBody(body, req, body.tenant_id, body.firm_id));
-}
-
-async function addWorkRequestFiles(body, req = null) {
-  requireFields(body, ["tenant_id", "firm_id", "work_request_id", "file_ids"]);
-  return addWorkRequestFilesRecord(body, actorFromBody(body, req, body.tenant_id, body.firm_id));
-}
-
-// CE-S1 (ADR-095, 2026-10-05): Connected EDCS -- the BizKick register import and sync ledger.
-// Reads need a verified member of the firm; every write needs the firm owner (enforced in
-// edcs-service.mjs). There is no system-actor fallback: scope always comes from a verified identity
-// that must match the tenant/firm in the request.
-function edcsScope(req, source, label) {
-  const tenant_id = source.tenant_id ?? null;
-  const firm_id = source.firm_id ?? null;
-  requireFields({ tenant_id, firm_id }, ["tenant_id", "firm_id"]);
-  const actor = requireVerifiedActor(req, tenant_id, firm_id, label);
-  return { actor, scope: { tenant_id, firm_id } };
-}
-
-async function readEdcsFileBytes(record) {
-  const buffer = await fileStorage.get(record.storage_key);
-  if (sha256Hex(buffer) !== record.sha256) {
-    const error = new Error("Stored file failed its integrity check (SHA-256 mismatch).");
-    error.status = 500;
-    error.code = "FILE_INTEGRITY_ERROR";
-    throw error;
-  }
-  return buffer;
-}
-
-async function saveEdcsConnectionRoute(body, req = null) {
-  requireFields(body, ["tenant_id", "firm_id", "company_code"]);
-  const { actor } = edcsScope(req, body, "set up the BizKick connection");
-  return saveEdcsConnection({ body, actor });
-}
-
-// CE-S3: what a rule needs from the governed W2 path, handed to the service so it never imports this file.
-const automationDeps = {
-  createWorkRequest: (body, actor) => createWorkRequestRecord(body, actor),
-  assignWorkRequest: (body, actor) => runWorkRequestAssignment(body, actor)
-};
-
-async function importEdcsRegisterRoute(body, req = null) {
-  requireFields(body, ["tenant_id", "firm_id", "file_id"]);
-  const { actor, scope } = edcsScope(req, body, "import a BizKick register");
-  const result = await importEdcsRegister({ body, actor, readFileBytes: readEdcsFileBytes });
-  // Rules run after a completed import; a rules failure never fails the import (it is reported alongside).
-  if (result.run?.status === "COMPLETED") Object.assign(result, await evaluateAutomationAfter({ scope, trigger: "IMPORT", actor, deps: automationDeps }));
-  return result;
-}
-
-async function createAutomationRuleRoute(body, req = null) {
-  requireFields(body, ["tenant_id", "firm_id"]);
-  const { actor } = edcsScope(req, body, "create a BizKick rule");
-  return createAutomationRule({ body, actor });
-}
-
-async function updateAutomationRuleRoute(body, req = null) {
-  requireFields(body, ["tenant_id", "firm_id", "rule_id"]);
-  const { actor } = edcsScope(req, body, "edit a BizKick rule");
-  return updateAutomationRule({ body, actor });
-}
-
-async function enableAutomationRuleRoute(body, req = null) {
-  requireFields(body, ["tenant_id", "firm_id", "rule_id"]);
-  const { actor } = edcsScope(req, body, "turn a BizKick rule on or off");
-  return setAutomationRuleEnabled({ body, actor });
-}
-
-async function dryRunAutomationRuleRoute(body, req = null) {
-  requireFields(body, ["tenant_id", "firm_id", "rule_id"]);
-  const { actor } = edcsScope(req, body, "preview a BizKick rule");
-  return dryRunAutomationRule({ body, actor });
-}
-
-async function evaluateAutomationRoute(body, req = null) {
-  requireFields(body, ["tenant_id", "firm_id"]);
-  const { actor } = edcsScope(req, body, "run BizKick rules");
-  return evaluateAutomationNow({ body, actor, deps: automationDeps });
-}
-
-// POST /automation/tick: the scheduled evaluation. No user is signed in, so it is guarded by a service
-// token (env VFIRM_SERVICE_TOKEN) in the x-vfirm-service-token header, compared in constant time. With
-// no token configured the endpoint refuses everything. It visits every firm that has an enabled rule,
-// each on its own, and each rule runs as its owner. Optional body {tenant_id, firm_id} limits it to one firm.
-async function automationTickRoute(req, url) {
-  const configured = process.env.VFIRM_SERVICE_TOKEN;
-  if (!configured) {
-    const error = new Error("The automation tick is not configured on this server (VFIRM_SERVICE_TOKEN is not set).");
-    error.status = 503;
-    error.code = "SERVICE_TOKEN_NOT_CONFIGURED";
-    throw error;
-  }
-  const given = String(headerValue(req, "x-vfirm-service-token") ?? "");
-  const same = given.length > 0 && timingSafeEqual(Buffer.from(sha256Hex(Buffer.from(given)), "hex"), Buffer.from(sha256Hex(Buffer.from(configured)), "hex"));
-  if (!same) {
-    const error = new Error("A valid service token is required for the automation tick.");
-    error.status = 401;
-    error.code = "SERVICE_TOKEN_REQUIRED";
-    throw error;
-  }
-  const tenant_id = url.searchParams.get("tenant_id");
-  const firm_id = url.searchParams.get("firm_id");
-  return tickAutomation({ deps: automationDeps, scope: tenant_id && firm_id ? { tenant_id, firm_id } : null });
-}
-
-// GET /automation/rules | /automation/rules/<id>/activity | /automation/activity (read: any verified member).
-async function readAutomationRoute(req, url) {
-  const match = url.pathname.match(/^\/automation\/(rules|activity)(?:\/([^/]+)\/activity)?$/);
-  if (!match) return null;
-  const { scope } = edcsScope(req, { tenant_id: url.searchParams.get("tenant_id"), firm_id: url.searchParams.get("firm_id") }, "read BizKick rules");
-  if (match[1] === "rules" && !match[2]) return listAutomationRules({ scope });
-  if (match[1] === "rules" && match[2]) return listAutomationRuleActivity({ scope, ruleId: decodeURIComponent(match[2]) });
-  if (match[1] === "activity") return listAutomationRuleActivity({ scope, ruleId: null });
-  return null;
-}
-
-// CE-S2 (ADR-096): POST /edcs/files/upload?tenant_id=&firm_id=&filename=[&transaction_id=] (raw binary body).
-// One call = one file. The owner's file is matched to a transaction by the ID in its name (or the
-// manual transaction_id) and filed in the document register; HR/Legal types keep only metadata.
-async function linkEdcsFileRoute(req, url) {
-  const tenant_id = url.searchParams.get("tenant_id");
-  const firm_id = url.searchParams.get("firm_id");
-  requireFields({ tenant_id, firm_id, filename: url.searchParams.get("filename") }, ["tenant_id", "firm_id", "filename"]);
-  const { actor, scope } = edcsScope(req, { tenant_id, firm_id }, "link a file to a BizKick transaction");
-  const filename = sanitizeFilename(url.searchParams.get("filename"));
-  const mime_type = resolveAllowedMimeType(filename, req.headers["content-type"]);
-  const buffer = await readBinaryBody(req, fileMaxBytes());
-  if (buffer.length === 0) {
-    const error = new Error("Uploaded file is empty.");
-    error.status = 400;
-    error.code = "VALIDATION_ERROR";
-    throw error;
-  }
-  const linked = await linkEdcsFile({
-    scope, actor, filename, mime_type, buffer, transaction_id: url.searchParams.get("transaction_id"), role: url.searchParams.get("role") || "PRIMARY",
-    storeBytes: async ({ file_id, buffer: bytes, mime_type: type }) => {
-      const storage_key = storageKeyFor({ tenant_id, firm_id, file_id });
-      await fileStorage.put(storage_key, bytes, type);
-      return { storage_backend: fileStorage.backend, storage_key };
-    }
-  });
-  // A newly filed file can complete a rule's condition (for example a bank statement arriving).
-  if (["LINKED", "REVISED", "ATTACHED"].includes(linked.outcome)) Object.assign(linked, await evaluateAutomationAfter({ scope, trigger: "FILE", actor, deps: automationDeps }));
-  return linked;
-}
-
-async function reserveEdcsNumberRoute(body, req = null) {
-  requireFields(body, ["tenant_id", "firm_id"]);
-  const { actor } = edcsScope(req, body, "reserve a transaction number");
-  return reserveEdcsNumber({ body, actor });
-}
-
-async function voidEdcsNumberRoute(body, req = null) {
-  requireFields(body, ["tenant_id", "firm_id"]);
-  const { actor } = edcsScope(req, body, "void a transaction number");
-  return voidEdcsNumber({ body, actor });
-}
-
-async function previewEdcsDelegationRoute(body, req = null) {
-  requireFields(body, ["tenant_id", "firm_id", "file_id"]);
-  const { actor } = edcsScope(req, body, "read the Delegation of Authority workbook");
-  return previewEdcsDelegation({ body, actor, readFileBytes: readEdcsFileBytes });
-}
-
-async function importEdcsDelegationRoute(body, req = null) {
-  requireFields(body, ["tenant_id", "firm_id", "file_id", "label_map"]);
-  const { actor } = edcsScope(req, body, "import the Delegation of Authority");
-  return importEdcsDelegation({ body, actor, readFileBytes: readEdcsFileBytes });
-}
-
-async function checkEdcsDelegationRoute(body, req = null) {
-  requireFields(body, ["tenant_id", "firm_id", "output_draft_id"]);
-  const { actor, scope } = edcsScope(req, body, "check an approval limit");
-  return checkDraftApproval({ scope, actor, output_draft_id: body.output_draft_id });
-}
-
-async function resolveEdcsConflictRoute(body, req = null) {
-  requireFields(body, ["tenant_id", "firm_id", "transaction_id", "choose"]);
-  const { actor } = edcsScope(req, body, "resolve a BizKick conflict");
-  return resolveEdcsConflict({ body, actor });
-}
-
-async function linkEdcsCounterpartyRoute(body, req = null) {
-  requireFields(body, ["tenant_id", "firm_id", "transaction_id", "link_type"]);
-  const { actor } = edcsScope(req, body, "link a BizKick counterparty");
-  return linkEdcsCounterparty({ body, actor });
-}
-
-// GET /edcs/connection | /edcs/transactions[/<id>] | /edcs/sync-runs[/<id>] | /edcs/conflicts
-// (?tenant_id=&firm_id= required; transactions also take type, status, alert, flag, search, as_of).
-async function readEdcsRoute(req, url) {
-  const match = url.pathname.match(/^\/edcs\/(connection|transactions|sync-runs|conflicts|chains|documents|signals|numbers|delegation)(?:\/([^/]+))?$/);
-  if (!match) return null;
-  const [, kind, rawId] = match;
-  const { scope } = edcsScope(req, { tenant_id: url.searchParams.get("tenant_id"), firm_id: url.searchParams.get("firm_id") }, "read BizKick data");
-  const id = rawId ? decodeURIComponent(rawId) : null;
-  if (kind === "connection" && !id) return readEdcsConnection(scope);
-  if (kind === "conflicts" && !id) return listEdcsConflicts({ scope });
-  if (kind === "chains" && !id) return listEdcsChains({ scope });
-  if (kind === "signals" && !id) return readEdcsSignals({ scope });
-  if (kind === "delegation" && !id) return readEdcsDelegation(scope, { version: url.searchParams.get("version") });
-  if (kind === "numbers" && !id) return listEdcsNumbers({ scope, params: url.searchParams });
-  if (kind === "documents" && id) return readEdcsDocuments({ scope, transactionId: id });
-  if (kind === "transactions") return id ? readEdcsTransaction({ scope, transactionId: id, params: url.searchParams }) : listEdcsTransactions({ scope, params: url.searchParams });
-  if (kind === "sync-runs") return id ? readEdcsSyncRun({ scope, runId: id }) : listEdcsSyncRuns({ scope });
-  return null;
-}
-
-// ADR-093 W4 (B6, F3): item thread messages and document register filing from uploaded files.
-async function postWorkdeskItemMessage(body, req = null) {
-  requireFields(body, ["tenant_id", "firm_id", "workdesk_item_id"]);
-  return postWorkdeskItemMessageRecord(body, actorFromBody(body, req, body.tenant_id, body.firm_id));
-}
-
-async function registerFileDocument(body, req = null) {
-  requireFields(body, ["tenant_id", "firm_id", "file_id"]);
-  return registerFileDocumentRecord(body, actorFromBody(body, req, body.tenant_id, body.firm_id));
-}
-
-async function reviseFileDocument(body, req = null) {
-  requireFields(body, ["tenant_id", "firm_id", "document_register_entry_id", "file_id"]);
-  return reviseFileDocumentRecord(body, actorFromBody(body, req, body.tenant_id, body.firm_id));
-}
-
-async function updateWorkRequestInputs(body, req = null) {
-  requireFields(body, ["tenant_id", "firm_id", "work_request_id"]);
-  return updateWorkRequestInputsRecord(body, actorFromBody(body, req, body.tenant_id, body.firm_id));
-}
-
-// ADR-092 W3 (B4, 2026-10-01): the worker runs its skill over the owner's inputs.
-//   POST /awia/virtual-staff/workdesk-item/run-skill { tenant_id, firm_id, workdesk_item_id }
-// 1. prepareAwiaSkillRunRecord checks the item (Pending), worker (ACTIVE), request type (has a
-//    deterministic module) and that every input file is this tenant/firm's.
-// 2. The input bytes are read from firm storage and re-verified against their SHA-256.
-// 3. runSkill() (packages/core-domain/src/awia-skill-runner.mjs) produces the payload + a CSV.
-// 4. The CSV is stored as a WORK_OUTPUT file, then the draft goes through the UNCHANGED
-//    produceAwiaStaffOutputDraftRecord: draft only, human review, Class A gate, no final issue.
-// Missing inputs -> 422 SKILL_INPUT_REQUIRED with a plain-English list; the item stays Pending.
-const OUTPUT_CLASSIFICATION_RANK = ["FIRM_INTERNAL", "CLIENT_CONFIDENTIAL", "FINANCE_RESTRICTED", "HR_RESTRICTED"];
-const SKILL_OUTPUT_CLASSIFICATION = { "FAO-11": "FINANCE_RESTRICTED", "ARO-10": "HR_RESTRICTED" };
-
-async function runAwiaWorkdeskSkill(body, req = null) {
-  requireFields(body, ["tenant_id", "firm_id", "workdesk_item_id"]);
-  const actor = actorFromBody(body, req, body.tenant_id, body.firm_id);
-  const prep = await prepareAwiaSkillRunRecord(body);
-  const files = [];
-  for (const record of prep.files) {
-    const buffer = await fileStorage.get(record.storage_key);
-    if (sha256Hex(buffer) !== record.sha256) {
-      const error = new Error(`Input file ${record.filename} failed its integrity check (SHA-256 mismatch).`);
-      error.status = 500;
-      error.code = "FILE_INTEGRITY_ERROR";
-      throw error;
-    }
-    files.push({ id: record.id, filename: record.filename, mime_type: record.mime_type, sha256: record.sha256, buffer });
-  }
-  let result;
-  try {
-    result = runSkill(prep.skill_id, { title: prep.request.title, instructions: prep.request.instructions ?? "", form_inputs: prep.request.form_inputs ?? {}, file_roles: prep.request.file_roles ?? {}, files });
-  } catch (error) {
-    if (error instanceof SkillInputError) {
-      await recordAwiaSkillRunIssueRecord(body, actor, error.message).catch(() => {});
-      const failure = new Error(error.message);
-      failure.status = 422;
-      failure.code = error.code;
-      throw failure;
-    }
-    throw error;
-  }
-  // The output is at least as sensitive as the most sensitive input (and finance/HR skills are
-  // restricted by default).
-  const ranks = [prep.request.risk_class === "INTERNAL" ? "FIRM_INTERNAL" : "CLIENT_CONFIDENTIAL", SKILL_OUTPUT_CLASSIFICATION[prep.skill_id], ...prep.files.map((file) => file.classification)].filter(Boolean);
-  const classification = ranks.reduce((best, value) => (OUTPUT_CLASSIFICATION_RANK.indexOf(value) > OUTPUT_CLASSIFICATION_RANK.indexOf(best) ? value : best), "FIRM_INTERNAL");
-  const file_id = isPostgresStore() ? newUuid() : newId("file");
-  const storage_key = storageKeyFor({ tenant_id: body.tenant_id, firm_id: body.firm_id, file_id });
-  await fileStorage.put(storage_key, result.output_csv, "text/csv");
-  await registerFileObjectRecord({
-    tenant_id: body.tenant_id,
-    firm_id: body.firm_id,
-    file_id,
-    filename: result.output_filename,
-    mime_type: "text/csv",
-    size_bytes: result.output_csv.length,
-    sha256: sha256Hex(result.output_csv),
-    storage_backend: fileStorage.backend,
-    storage_key,
-    classification,
-    purpose: "WORK_OUTPUT",
-    linked_to: { type: "AwiaStaffWorkdeskItem", id: prep.item.id }
-  }, actor);
-  return annotateProducedDraft(await produceAwiaStaffOutputDraftRecord({
-    tenant_id: body.tenant_id,
-    firm_id: body.firm_id,
-    workdesk_item_id: prep.item.id,
-    output_title: result.output_title,
-    output_summary: result.output_summary,
-    output_payload: result.payload,
-    output_file_id: file_id,
-    generation: { method: "DETERMINISTIC_SKILL_MODULE", skill_id: result.skill_id, input_files: result.input_files, input_notes: result.input_notes, form_inputs_used: Object.keys(prep.request.form_inputs ?? {}), boundary: result.boundary, ran_at: new Date().toISOString() }
-  }, actor), actor);
-}
-
-async function completeAwiaInternalWorkdeskItem(body, req = null) {
-  requireFields(body, ["tenant_id", "firm_id", "workdesk_item_id"]);
-  return completeAwiaInternalWorkdeskItemRecord(body, actorFromBody(body, req, body.tenant_id, body.firm_id));
-}
-
 const server = createServer(async (req, res) => {
   try {
     if (req.method === "OPTIONS") {
@@ -3776,11 +3361,11 @@ const server = createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/data-protection/export-package") return sendJson(req, res, 200, { ok: true, data: await readTenantExportPackage(req, url) });
     if (req.method === "GET" && url.pathname === "/pilot/formwork") return sendJson(req, res, 200, { ok: true, data: readFormworkPilotPackage() });
     if (req.method === "GET" && url.pathname === "/workspace/active-summary") return sendJson(req, res, 200, { ok: true, data: await readActiveWorkspaceSummary(req, url) });
-    if (req.method === "GET" && url.pathname === "/dashboard/summary") return sendJson(req, res, 200, { ok: true, data: await readDashboardSummary(url) });
-    if (req.method === "GET" && url.pathname === "/awia/virtual-staff/department-dashboard") return sendJson(req, res, 200, { ok: true, data: await readAwiaStaffDepartmentDashboard(url) });
-    if (req.method === "GET" && url.pathname === "/awia/virtual-staff/payroll-summary") return sendJson(req, res, 200, { ok: true, data: await readAwiaStaffPayrollSummary(url) });
+    if (req.method === "GET" && url.pathname === "/dashboard/summary") return sendJson(req, res, 200, { ok: true, data: await readDashboardSummary(req, url) });
+    if (req.method === "GET" && url.pathname === "/awia/virtual-staff/department-dashboard") return sendJson(req, res, 200, { ok: true, data: await readAwiaStaffDepartmentDashboard(req, url) });
+    if (req.method === "GET" && url.pathname === "/awia/virtual-staff/payroll-summary") return sendJson(req, res, 200, { ok: true, data: await readAwiaStaffPayrollSummary(req, url) });
     if (req.method === "GET" && url.pathname === "/awia/virtual-staff/templates") return sendJson(req, res, 200, { ok: true, data: await readAwiaStaffTemplateCatalogueRecord() });
-    if (req.method === "GET" && url.pathname === "/ops/awia-package-assignment") return sendJson(req, res, 200, { ok: true, data: await readAwiaFirmPackageAssignment(url) });
+    if (req.method === "GET" && url.pathname === "/ops/awia-package-assignment") return sendJson(req, res, 200, { ok: true, data: await readAwiaFirmPackageAssignment(req, url) });
     if (req.method === "GET" && url.pathname === "/awia/virtual-staff/staging-readiness") return sendJson(req, res, 200, { ok: true, data: await readAwiaStagingReadiness() });
     if (req.method === "GET" && url.pathname === "/quotation-operations-summary") return sendJson(req, res, 200, { ok: true, data: await readQuotationOperationsSummary(req, url) });
     if (req.method === "GET" && url.pathname === "/auth/context") return sendJson(req, res, 200, { ok: true, data: await readAuthContext(req) });
@@ -3809,31 +3394,7 @@ const server = createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/service-packs/formwork") return sendJson(req, res, 200, { ok: true, data: { ...formworkServicePack, service_pack_record_id: FORMWORK_SERVICE_PACK_ID, service_sku_record_id: FORMWORK_SERVICE_SKU_ID } });
     if (req.method === "GET" && url.pathname === "/accounts/cash-snapshot") return sendJson(req, res, 200, { ok: true, data: await readAccountsCashSnapshot(req, url) });
     if (req.method === "GET" && url.pathname === "/database/schema") { const schema = await readFile(join(root, "infra/database/schema.sql"), "utf8"); return sendJson(req, res, 200, { ok: true, data: { path: "infra/database/schema.sql", bytes: schema.length } }); }
-    if (req.method === "GET" && url.pathname === "/work-requests/request-types") return sendJson(req, res, 200, { ok: true, data: listWorkRequestTypes() });
-    if (req.method === "POST" && url.pathname === "/automation/tick") return sendJson(req, res, 200, { ok: true, data: await automationTickRoute(req, url) });
-    { const automationRead = req.method === "GET" && url.pathname.startsWith("/automation/") ? await readAutomationRoute(req, url) : null; if (automationRead) return sendJson(req, res, 200, { ok: true, data: automationRead }); }
-    if (req.method === "POST" && url.pathname === "/edcs/files/upload") return sendJson(req, res, 201, { ok: true, data: await linkEdcsFileRoute(req, url) });
-    if (req.method === "POST" && url.pathname === "/files/upload") return sendJson(req, res, 201, { ok: true, data: await uploadFirmFile(req, url) });
-    { const fileDownload = req.method === "GET" ? url.pathname.match(/^\/files\/([^/]+)\/download$/) : null; if (fileDownload) return await downloadFirmFile(req, res, url, decodeURIComponent(fileDownload[1])); }
-    { const edcsRead = req.method === "GET" && url.pathname.startsWith("/edcs/") ? await readEdcsRoute(req, url) : null; if (edcsRead) return sendJson(req, res, 200, { ok: true, data: edcsRead }); }
-    if (req.method === "GET" && url.pathname === "/mvp/store") {
-      const storeData = await readStore();
-      // Phase 5, slice 5a (2026-09-30): attach server-computed display_status /
-      // display_status_label to each AWIA workdesk item in the response only -- new objects,
-      // never mutating storeData.awia_staff_workdesk_items in place, so this can't leak into
-      // any save/diff path (readStore() is a plain read; nothing downstream of this response
-      // writes storeData back).
-      const workdeskDrafts = storeData.awia_staff_output_drafts ?? [];
-      const workdeskDeliveries = storeData.awia_client_delivery_drafts ?? [];
-      const workdeskItems = Array.isArray(storeData.awia_staff_workdesk_items)
-        ? storeData.awia_staff_workdesk_items.map((item) => ({
-            ...item,
-            display_status: computeWorkdeskItemStatus(item, workdeskDrafts, workdeskDeliveries),
-            display_status_label: computeWorkdeskItemStatusLabel(item, workdeskDrafts),
-          }))
-        : storeData.awia_staff_workdesk_items;
-      return sendJson(req, res, 200, { ok: true, data: { ...storeData, awia_staff_workdesk_items: workdeskItems } });
-    }
+    if (req.method === "GET" && url.pathname === "/mvp/store") return sendJson(req, res, 200, { ok: true, data: await readStore() });
     if (req.method === "GET") { const resource = await readResource(req, url); if (resource) return sendJson(req, res, resource.status, resource.body); }
     if (req.method === "POST" && url.pathname === "/mvp/reset") {
       if (process.env.VFIRM_ALLOW_FULL_STORE_RESET !== "true") {
@@ -3842,34 +3403,13 @@ const server = createServer(async (req, res) => {
       const { resetStore } = await import("./store.mjs");
       return sendJson(req, res, 200, { ok: true, data: await resetStore() });
     }
-    if (req.method === "POST" && url.pathname === "/policy/evaluate") {
-      // Auth gap closed (2026-09-30, finding C.6): this had no actor check at all -- any caller could
-      // evaluate a policy decision and have it recorded under an arbitrary, attacker-chosen actor_id in
-      // `input.actor`. Resolves a real, server-verified actor the same way every other command route
-      // does, and uses it instead of whatever `input.actor` the caller supplied.
-      const input = await readJson(req);
-      const actor = actorFromBody(input, req, input.tenant_id ?? null, input.firm_id ?? null);
-      const scopedInput = { ...input, actor };
-      const decision = evaluatePolicy(scopedInput);
-      const policyDecision = await createPolicyDecisionRecord(scopedInput, decision);
-      return sendJson(req, res, 200, { ok: true, data: decision, policy_decision_id: policyDecision?.id ?? null, audit_event_id: null, correlation_id: input?.correlation_id ?? null });
-    }
+    if (req.method === "POST" && url.pathname === "/policy/evaluate") { const input = await readJson(req); const decision = evaluatePolicy(input); const policyDecision = await createPolicyDecisionRecord(input, decision); return sendJson(req, res, 200, { ok: true, data: decision, policy_decision_id: policyDecision?.id ?? null, audit_event_id: null, correlation_id: input?.correlation_id ?? null }); }
     const handler = routes.get(`${req.method} ${url.pathname}`);
     if (handler) return sendJson(req, res, 201, { ok: true, data: await handler(await readJson(req), req) });
     sendJson(req, res, 404, { ok: false, error: { code: "NOT_FOUND", message: "Route not found." } });
   } catch (error) {
-    sendJson(req, res, error.status ?? 500, { ok: false, error: { code: error.code ?? "INTERNAL_ERROR", message: error instanceof Error ? error.message : String(error), ...(error.details && typeof error.details === "object" ? { details: error.details } : {}) } });
+    sendJson(req, res, error.status ?? 500, { ok: false, error: { code: error.code ?? "INTERNAL_ERROR", message: error instanceof Error ? error.message : String(error) } });
   }
 });
 
 server.listen(port, () => console.log(`vFirm API listening on http://127.0.0.1:${port}`));
-
-// CE-S3 local development only: an in-process timer runs the same tick the production scheduler calls
-// over HTTP. Off unless VFIRM_AUTOMATION_TICK_MS is set (at least one minute).
-{
-  const tickMs = Number(process.env.VFIRM_AUTOMATION_TICK_MS ?? 0);
-  if (Number.isFinite(tickMs) && tickMs >= 60000) {
-    setInterval(() => { tickAutomation({ deps: automationDeps }).catch((error) => console.error("automation tick failed:", error instanceof Error ? error.message : error)); }, tickMs).unref();
-    console.log(`vFirm automation tick every ${Math.round(tickMs / 60000)} min (development timer)`);
-  }
-}

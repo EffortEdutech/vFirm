@@ -1,0 +1,16 @@
+-- HM-S6 Phase 2 item 3 (constraint/data-integrity review, 2026-09-24): real bug found and fixed.
+--
+-- createDirectoryEnquiryCollaborationRequestRecord() (apps/api/src/store.mjs) inserts a `metadata`
+-- value into collaboration_requests, but the live table (created by
+-- 0007_marketplace_network_layer.sql, never actually reconciled with the later dead redeclaration in
+-- 0026_remaining_relational_tables.sql) has no metadata column at all. Confirmed by reproducing the
+-- exact INSERT against a disposable database built from the real migration chain:
+--   ERROR: column "metadata" of relation "collaboration_requests" does not exist
+-- This is a live, reachable bug: any call to createDirectoryEnquiryCollaborationRequestRecord()
+-- against the Postgres backend fails outright. createCollaborationRequestRecord() (the OTHER function
+-- that writes this table) never included metadata in its insert, so it has always worked -- the two
+-- functions simply disagree about the table's shape.
+--
+-- Fix: add the missing column. `if not exists` makes this safe to run even if it's ever applied twice,
+-- and the default backfills existing rows with an empty object rather than leaving them null.
+alter table collaboration_requests add column if not exists metadata jsonb not null default '{}'::jsonb;
