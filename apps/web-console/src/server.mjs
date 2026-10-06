@@ -8,7 +8,7 @@ import { extname, join, normalize } from "node:path";
 
 const root = process.cwd();
 const publicDir = join(root, "apps/web-console/public");
-const port = Number(process.env.VFIRM_WEB_CONSOLE_PORT ?? 3092);
+const port = Number(process.env.VFIRM_WEB_CONSOLE_PORT ?? process.env.PORT ?? 3092); // PORT: hosting services set it
 const apiBase = process.env.VFIRM_API_BASE ?? "http://127.0.0.1:3091";
 
 // Phase 6 slice 6b: same shared identity-resolution module apps/web now

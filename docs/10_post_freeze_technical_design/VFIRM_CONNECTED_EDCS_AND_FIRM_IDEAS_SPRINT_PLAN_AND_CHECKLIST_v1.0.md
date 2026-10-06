@@ -279,7 +279,7 @@ Acceptance checks:
 - [x] Before/after measurements recorded against the agreed budgets.
 - [x] No functional regression (full regression set).
 
-CE-H1 evidence (2026-10-06): scratch Postgres, 5 firms x 2,000 rows x 3 revisions. Median ms before to after: scoped store read 3841 to 25, work request create 1580 to 19, transaction detail 932 to 107, slowest 500-row import 3348 to 1578; all budgets met. Regression set passes on JSON and Postgres 0001-0054 (ADR-100).
+CE-H1 evidence (2026-10-06): scratch Postgres, 5 firms x 2,000 rows x 3 revisions. Median ms before to after: scoped store read 3841 to 25, work request create 1580 to 19, transaction detail 932 to 107, slowest 500-row import 3348 to 1578; all budgets met. Regression set passes on JSON and Postgres 0001-0054 (ADR-100). Follow-up (ADR-102, 2026-10-06): GET /mvp/store is guarded on a production server; `npm run check:ce:h1-store-read-guard` passes.
 
 
 ### CE-S6 — Connector agent: local PC and NAS (Topology A/C)
@@ -302,7 +302,19 @@ Acceptance checks (`npm run check:ce:s6-connector` + manual Windows test):
 - [x] Connector never writes outside the outbox (file-system audit in the test).
 - [x] HR files: metadata only under the default policy.
 
-CE-S6 evidence (2026-10-06): `npm run check:ce:s6-connector` passes on the JSON store and on Postgres 0001-0054, including the packaged build. Manual Windows test pending with the owner (ADR-101).
+CE-S6 evidence (2026-10-06): `npm run check:ce:s6-connector` passes on the JSON store and on Postgres 0001-0054, including the packaged build. Manual Windows test: steps and a one-command local test kit are in `CE_S6_WINDOWS_MANUAL_TEST_v1.0.md` (ADR-101).
+
+Windows manual test result (2026-10-06, owner's Windows PC, throw-away local JSON API on 127.0.0.1:3091, run for the owner; temp kit and store deleted afterwards): **PASS on behaviour, all five checks.**
+
+| Check | Result |
+|---|---|
+| 1. One changed row gives one sync event with the right outcome | Pass: first sync created 6 rows; one changed amount produced exactly one new run, `CONFLICT: 1` |
+| 2. Network off, queued, delivered once after reconnect | Pass: change queued locally while the API was off, delivered once after restart, third run delivered nothing |
+| 3. Revoked token refused, shown as revoked | Pass: refused, connector showed `REVOKED`, refused attempt counted |
+| 4. No write inside BizKick | Pass: folder unchanged apart from the owner's own `register.csv` edits |
+| 5. HR file metadata only | Pass: `HR_RESTRICTED`, `METADATA_ONLY`, `content_stored: false` |
+
+Note: the run reported exit code 1 where the doc says 2 (offline) and 3 (revoked). The connector code returns 2 and 3 (reproduced: offline gives 2); a wrapper such as `npm run` or a test runner reports any non-zero code as 1. The doc now says to read `$LASTEXITCODE` from a direct `node` call. Optional: confirm once on Windows. The structured results (`waiting: true`, `fatal: CONNECTOR_REVOKED`) were correct. Production hosting steps (API host, service token, pg_cron): `CE_PRODUCTION_SETUP_GUIDE_v1.0.md`.
 
 
 ### CE-S7 — Cloud adapter: OneDrive/SharePoint (Topology B)
@@ -549,3 +561,9 @@ Acceptance checks (`npm run check:vi:s6-einvoice-readiness`):
 ## 9. Current next action
 
 Product owner: review this plan and the CE-S0 decisions, then say "Proceed CE-S0" to lock the contract, record ADR-094 and build the Nexa fixture pack.
+
+### Production-auth sprint (ADR-103, 2026-10-06)
+
+Owner decisions: host on Vercel (Singapore); run the production-auth sprint before real client data.
+Step 1 delivered: one request gate in front of every route on a production server (`request-auth-gate.mjs`), body scope check, dev-only routes closed. `npm run check:pa:request-gate` passes.
+Next steps (not started): (a) Vercel entry point for the API and the console, with pool settings for short-lived functions; (b) a real-token end-to-end check on the live host; (c) per-route role audit; (d) rate limiting.

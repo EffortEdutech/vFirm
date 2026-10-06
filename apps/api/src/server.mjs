@@ -10,6 +10,8 @@ import { formworkServicePack } from "../../../packages/service-packs/src/formwor
 import { buildAwiaStaffDepartmentDashboard } from "../../../packages/core-domain/src/awia-virtual-staff-department-dashboard.mjs";
 import { buildAwiaFirmPayrollSummary } from "../../../packages/core-domain/src/awia-virtual-staff-payroll.mjs";
 import { acceptProposalRecord, approveProposalRecord, createClientRecord, completeTaskRecord, createDeliverableDraftRecord, createEvidenceBundleRecord, createFirmRecord, createIntakeSessionRecord, createInvoiceRecord, createMarketplaceListingRecord, updateMarketplaceListingStatusRecord, createDirectoryReviewBoardDecisionRecord, createPrivateDirectoryEnquiryRecord, createDirectoryEnquiryCollaborationRequestRecord, createQualificationRenewalReviewRecord, createCapacityOfferRecord, createCollaborationRequestRecord, createObservatorySnapshotRecord, createPolicyDecisionRecord, createProposalRecord, createTenantRecord, findValidProfessionalAuthority, invitePilotUserRecord, activatePilotUserRecord, revokePilotUserRecord, suspendPilotUserRecord, createSupportCaseRecord, updateSupportCaseRecord, createPilotIncidentRecord, updatePilotIncidentRecord, createPilotFeedbackRecord, createPilotAcceptanceReviewRecord, createPilotImprovementItemRecord, updatePilotImprovementItemRecord, createPilotReportPackRecord, createStakeholderReviewBoardRecord, createStakeholderReviewDecisionRecord, createPilotExpansionCohortRecord, updatePilotExpansionCohortRecord, activatePrivatePilotCohortRecord, createTenantOnboardingPlanRecord, updateTenantOnboardingPlanRecord, createReleaseCandidateGateRecord, createTenantPilotControlRecord, recordTenantUsageEventRecord, createBillingReadinessReviewRecord, createPaymentProviderConfigRecord, createSubscriptionPackageRecord, createCommercialLaunchControlRecord, issueDeliverableRecord, issueInvoiceRecord, produceTaskOutputRecord, provisionWorkerInstanceRecord, recordPaymentStatusRecord, requestToolInvocationRecord, reviewDeliverableRecord, activateWorkerInstanceRecord, assignTaskToWorkerRecord, startTaskRecord, getStoreInfo, newId, now, openProjectDeliveryRecord, provisionAwiaVirtualStaffPilotRecord, updateAwiaVirtualStaffLifecycleRecord, evaluateAwiaVirtualStaffTaskReadinessRecord, assignAwiaVirtualStaffTaskRecord, produceAwiaStaffOutputDraftRecord, prepareAwiaSkillRunRecord, recordAwiaSkillRunIssueRecord, updateWorkRequestInputsRecord, postWorkdeskItemMessageRecord, registerFileDocumentRecord, reviseFileDocumentRecord, reviewAwiaStaffOutputDraftRecord, decideAwiaStaffClassAApprovalRecord, prepareAwiaClientDeliveryDraftRecord, markAwiaClientDeliveryDraftSentRecord, archiveAwiaStaffWorkdeskItemRecord, appendAwiaStaffMemoryEntryRecord, openAwiaStaffConversationThreadRecord, postAwiaStaffConversationMessageRecord, updateAwiaStaffSeatBillingStatusRecord, provisionAwiaVirtualStaffFromTemplateRecord, readAwiaStaffTemplateCatalogueRecord, assignAwiaFirmPackageRecord, readAwiaFirmPackageAssignmentRecord, hireAwiaFirmWorkerRecord, purgeTestFirmRecord, readStore, requireFields, systemActor, withStore, computeWorkdeskItemStatus, computeWorkdeskItemStatusLabel } from "./store.mjs";
+import { evaluateStoreReadAccess, storeAuthEnforced } from "./store-read-guard.mjs";
+import { evaluateRequestGate } from "./request-auth-gate.mjs";
 import { createFrontDeskEnquiryRecord, qualifyFrontDeskEnquiryRecord, createClientCommunicationDraftRecord, handoffFrontDeskEnquiryRecord } from "./store.mjs";
 import { bindAdministrationSkillsRecord, createCorrespondenceRecord, registerDocumentRecord, addDocumentRevisionRecord, createAdministrativeDeadlineRecord, completeAdministrativeDeadlineRecord, createTransmittalDraftRecord } from "./store.mjs";
 import { bindCommercialSkillsRecord, createSalesPipelineRecord, updateSalesPipelineRecord, dispatchProposalRecord, createExpenseRecord, approveExpenseRecord, createReceivableFollowUpRecord, readCashSnapshot } from "./store.mjs";
@@ -32,7 +34,7 @@ import { createRule as createAutomationRule, dryRunRule as dryRunAutomationRule,
 import { authenticateConnector as authenticateEdcsConnector, issueConnector as issueEdcsConnector, listConnectors as listEdcsConnectors, recordHeartbeat as recordEdcsConnectorHeartbeat, revokeConnector as revokeEdcsConnector, rotateConnector as rotateEdcsConnector, syncFile as syncEdcsFile, syncRegister as syncEdcsRegister } from "./edcs-connector-service.mjs";
 
 const root = process.cwd();
-const port = Number(process.env.VFIRM_API_PORT ?? 3091);
+const port = Number(process.env.VFIRM_API_PORT ?? process.env.PORT ?? 3091); // PORT: hosting services set it
 const FORMWORK_SERVICE_PACK_ID = "11111111-1111-4111-8111-111111111111";
 const FORMWORK_SERVICE_SKU_ID = "22222222-2222-4222-8222-222222222222";
 
@@ -205,7 +207,20 @@ async function readJson(req) {
   const chunks = [];
   for await (const chunk of req) chunks.push(chunk);
   const text = Buffer.concat(chunks).toString("utf8");
-  return text.trim() ? JSON.parse(text) : {};
+  const body = text.trim() ? JSON.parse(text) : {};
+  // ADR-103: on an enforced server a body may only name the signed-in user's own tenant and firm.
+  const scopeActor = req?.vfirmEnforced ? req.vfirmSupabaseAuth?.actor : null;
+  if (scopeActor && body && typeof body === "object") {
+    const wrongTenant = body.tenant_id && String(body.tenant_id) !== String(scopeActor.tenant_id);
+    const wrongFirm = body.firm_id && scopeActor.firm_id && String(body.firm_id) !== String(scopeActor.firm_id);
+    if (wrongTenant || wrongFirm) {
+      const error = new Error("The signed-in user cannot send data for another tenant or firm.");
+      error.status = 403;
+      error.code = "FORBIDDEN";
+      throw error;
+    }
+  }
+  return body;
 }
 
 function headerValue(req, name) {
@@ -3526,6 +3541,15 @@ async function evaluateAutomationRoute(body, req = null) {
   return evaluateAutomationNow({ body, actor, deps: automationDeps });
 }
 
+// True when the request carries the configured service token (constant-time compare). False when no token is
+// configured on this server, so an unconfigured server never matches an empty header.
+function serviceTokenMatches(req) {
+  const configured = process.env.VFIRM_SERVICE_TOKEN;
+  if (!configured) return false;
+  const given = String(headerValue(req, "x-vfirm-service-token") ?? "");
+  return given.length > 0 && timingSafeEqual(Buffer.from(sha256Hex(Buffer.from(given)), "hex"), Buffer.from(sha256Hex(Buffer.from(configured)), "hex"));
+}
+
 // POST /automation/tick: the scheduled evaluation. No user is signed in, so it is guarded by a service
 // token (env VFIRM_SERVICE_TOKEN) in the x-vfirm-service-token header, compared in constant time. With
 // no token configured the endpoint refuses everything. It visits every firm that has an enabled rule,
@@ -3834,6 +3858,19 @@ const server = createServer(async (req, res) => {
     if (bearerHeader && /^Bearer\s+/i.test(bearerHeader)) {
       req.vfirmSupabaseAuth = await resolveSupabaseAuth(bearerHeader.replace(/^Bearer\s+/i, "").trim());
     }
+    // ADR-103: one gate in front of every route on a production server (no-op on local JSON dev).
+    {
+      const gate = evaluateRequestGate({
+        enforced: storeAuthEnforced({ backend: getStoreInfo().backend, supabaseConfigured: Boolean(supabaseJwks) }),
+        method: req.method,
+        pathname: url.pathname,
+        auth: req.vfirmSupabaseAuth,
+        hasConnectorToken: Boolean(headerValue(req, "x-vfirm-connector-token")),
+        query: { tenant_id: url.searchParams.get("tenant_id"), firm_id: url.searchParams.get("firm_id") }
+      });
+      req.vfirmEnforced = storeAuthEnforced({ backend: getStoreInfo().backend, supabaseConfigured: Boolean(supabaseJwks) });
+      if (!gate.allow) return sendJson(req, res, gate.status, { ok: false, error: { code: gate.code, message: gate.message } });
+    }
     if (req.method === "GET" && url.pathname === "/auth/me") return sendJson(req, res, 200, { ok: true, data: await readAuthMe(req) });
     if (req.method === "GET" && url.pathname === "/health") return sendJson(req, res, 200, { ok: true, service: "vfirm-api", phase: "persistent-mvp-command-loop", ...getStoreInfo(), port_family: "309#", api_port: port });
     if (req.method === "GET" && url.pathname === "/contracts") return sendJson(req, res, 200, { ok: true, data: apiContracts });
@@ -3894,6 +3931,17 @@ const server = createServer(async (req, res) => {
       // audit_events, policy_decisions -- are left out: no console page reads them from here). Without it the
       // response is the whole-database dump it always was (boot identity resolution, dev/test scripts).
       const scopedTenant = url.searchParams.get("tenant_id");
+      // ADR-102: on a production server (Postgres + real Supabase JWT verification, or VFIRM_STORE_AUTH=required)
+      // a scoped read needs a verified Bearer actor of that tenant and the whole-database dump needs the service
+      // token. Local JSON dev and the smoke scripts are unchanged.
+      const storeAccess = evaluateStoreReadAccess({
+        enforced: storeAuthEnforced({ backend: getStoreInfo().backend, supabaseConfigured: Boolean(supabaseJwks) }),
+        tenantId: scopedTenant,
+        firmId: url.searchParams.get("firm_id"),
+        auth: req.vfirmSupabaseAuth,
+        serviceTokenOk: serviceTokenMatches(req)
+      });
+      if (!storeAccess.allow) return sendJson(req, res, storeAccess.status, { ok: false, error: { code: storeAccess.code, message: storeAccess.message } });
       const storeData = scopedTenant ? await readStore(scopedTenant, { ledger: false }) : await readStore();
       // Phase 5, slice 5a (2026-09-30): attach server-computed display_status /
       // display_status_label to each AWIA workdesk item in the response only -- new objects,

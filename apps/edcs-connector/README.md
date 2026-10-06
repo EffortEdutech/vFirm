@@ -71,3 +71,10 @@ connector is refused, stops sending, and shows as **Revoked** in the console; it
 From the repository: `npm --prefix apps/edcs-connector run package` writes a self-contained folder to
 `apps/edcs-connector/dist/vfirm-edcs-connector` (the shared reader files are copied in and the imports
 rewritten), ready to zip and copy to the PC.
+
+## Trying it on your own PC first
+
+`scripts/local-test-kit.mjs` (in the repository, not in the packaged folder) builds a throw-away test firm, a sample
+BizKick folder and a ready configuration against a vFirm API running on the same PC, and refuses any other address.
+The step-by-step test is `docs/10_post_freeze_technical_design/CE_S6_WINDOWS_MANUAL_TEST_v1.0.md`.
+Going live (API host, service token, schedule) is `CE_PRODUCTION_SETUP_GUIDE_v1.0.md` in the same folder.

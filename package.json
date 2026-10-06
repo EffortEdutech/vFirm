@@ -172,6 +172,8 @@
                     "check:ce:s5-delegation-of-authority": "node scripts/smoke-ce-s5-delegation-of-authority.mjs",
                     "check:ce:s6-connector":  "node scripts/smoke-ce-s6-connector.mjs",
                     "check:ce:h1-scoped-reads":  "node scripts/smoke-ce-h1-scoped-reads.mjs",
+                    "check:ce:h1-store-read-guard":  "node scripts/smoke-ce-h1-store-read-guard.mjs",
+                    "check:pa:request-gate":  "node scripts/smoke-pa-request-gate.mjs",
                     "measure:ce:h1-scale":  "node scripts/measure-ce-h1-scale.mjs",
                     "dev:web-console":  "node apps/web-console/src/server.mjs",
                     "check:post-hm-s4:mvp-store-scoping-fix":  "node scripts/smoke-post-hm-s4-mvp-store-tenant-scoping-fix.mjs",
