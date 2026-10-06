@@ -20,10 +20,22 @@ const alertPill = (alert) => pill(alert, ALERT_TONE[alert] ?? "default");
 const GOLDEN_RULE = `<p class="field-note">BizKick is the source, the Bridge is the contract, vFirm is the governed record. vFirm reads the register; it never edits BizKick files.</p>`;
 const dt = (value) => (value ? new Date(value).toLocaleString() : "—");
 
+const WARNING_TEXT = {
+  UNRESERVED: "number was not reserved on the Number Desk", VOIDED_NUMBER_USED: "this number was voided on the Number Desk",
+  RELATED_NOT_FOUND: "related transaction not in the register", CHAIN_MISSING_PREDECESSOR: "no purchase order linked"
+};
+function warningText(code) {
+  const [key, detail] = String(code).split(/:(.*)/s);
+  if (key === "RESERVED_FOR_DIFFERENT_COUNTERPARTY") return `reserved for a different counterparty (${detail})`;
+  return `${WARNING_TEXT[key] ?? key}${detail && WARNING_TEXT[key] ? ` (${detail})` : ""}`;
+}
+
 function reasonText(row) {
   const parts = [...(row.reasons ?? [])];
   const details = row.reason_details ?? [];
-  return parts.length ? `${parts.join(", ")}${details.length ? ` (${details.join("; ")})` : ""}` : "";
+  const text = parts.length ? `${parts.join(", ")}${details.length ? ` (${details.join("; ")})` : ""}` : "";
+  const warnings = (row.warnings ?? []).map(warningText);
+  return [text, warnings.length ? `Note: ${warnings.join("; ")}` : ""].filter(Boolean).join(" — ");
 }
 
 function runSummary(run) {
@@ -89,7 +101,7 @@ async function mountImport(root) {
       const result = await api.importEdcsRegister({ file_id: uploaded.id });
       msg.textContent = "";
       const run = result.run;
-      const attention = (result.rows ?? []).filter((r) => ["REJECTED", "CONFLICT", "ROW_MISSING"].includes(r.outcome));
+      const attention = (result.rows ?? []).filter((r) => ["REJECTED", "CONFLICT", "ROW_MISSING"].includes(r.outcome) || (r.warnings ?? []).some((w) => /^(UNRESERVED|VOIDED_NUMBER_USED|RESERVED_FOR_DIFFERENT_COUNTERPARTY)/.test(w)));
       root.querySelector("#bkImportResult").innerHTML = run.status === "REJECTED"
         ? `<div class="error-box"><strong>The whole file was rejected: ${escapeHtml(run.file_outcome?.reason ?? "")}.</strong><br>${escapeHtml(run.file_outcome?.detail ? `Problem near: ${run.file_outcome.detail}` : "")}<br>Nothing in vFirm was changed. The attempt is recorded in Sync history.</div>`
         : panel(`Import #${run.run_number} — ${escapeHtml(file.name)}`, runSummary(run) + (attention.length ? table(
@@ -315,6 +327,66 @@ async function mountConflicts(root) {
   for (const b of root.querySelectorAll(".bk-accept")) b.addEventListener("click", decide("ACCEPT_INCOMING"));
 }
 
+// ---------------- number desk (CE-S4) ----------------
+
+const NUMBER_TONE = { RESERVED: "amber", REGISTERED: "moss", VOID: "default" };
+
+async function mountNumbers(root) {
+  let data;
+  const draw = async (extra = "") => {
+    try { data = await api.listEdcsNumbers(extra); } catch (err) { root.innerHTML = errorBox(err, "the Number Desk"); return false; }
+    return true;
+  };
+  if (!(await draw())) return;
+  if (!data.connected) { root.innerHTML = GOLDEN_RULE + empty("Connect this firm to BizKick first (BizKick → Connection)."); return; }
+  const render = () => {
+    const year = new Date().getFullYear();
+    root.innerHTML = GOLDEN_RULE
+      + panel("Reserve a number", `
+        <form id="bkNumForm" class="form-grid" style="display:grid;gap:.75rem;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));padding:1rem">
+          <label style="display:grid;gap:.25rem">Document type <select id="bkNumType" style="width:100%">${data.types.map((t) => `<option value="${escapeHtml(t.code)}">${escapeHtml(t.code)} — ${escapeHtml(t.name)}</option>`).join("")}</select></label>
+          <label style="display:grid;gap:.25rem">Year <input id="bkNumYear" type="number" min="2000" max="2100" value="${year}" style="width:100%" /></label>
+          <label style="display:grid;gap:.25rem">Purpose <input id="bkNumPurpose" maxlength="200" placeholder="e.g. Quotation for Alpha Tech" style="width:100%" /></label>
+          <label style="display:grid;gap:.25rem">Counterparty (optional) <input id="bkNumCounterparty" maxlength="200" style="width:100%" /></label>
+          <label style="display:grid;gap:.25rem">Subject (optional) <input id="bkNumSubject" maxlength="300" style="width:100%" /></label>
+          <div class="form-actions"><button class="btn btn-primary" id="bkNumReserve" type="submit">Reserve next number</button></div>
+          <div id="bkNumMsg" style="min-height:1.2em"></div>
+        </form>
+        <p class="field-note">Numbers come from vFirm, one at a time, for everyone in the firm. A number that is cancelled is never given out again. Use the number as the document's ID in BizKick.</p>`)
+      + statRow([{ value: data.counts.RESERVED, label: "Reserved" }, { value: data.counts.REGISTERED, label: "In the register" }, { value: data.counts.VOID, label: "Voided" }])
+      + (data.stale.length ? panel(`Reserved, not in the register after ${data.stale_days} days`, `<div style="overflow-x:auto">` + table([
+        { label: "Number", render: (r) => `<code>${escapeHtml(r.transaction_id)}</code>` }, { label: "Purpose", render: (r) => escapeHtml(r.purpose) }, { label: "Reserved", render: (r) => escapeHtml(dt(r.reserved_at)) },
+        { label: "", render: (r) => `<button class="btn btn-sm bk-num-void" data-id="${escapeHtml(r.transaction_id)}" type="button">Void</button>` }
+      ], data.stale, (r) => r.id) + `</div>`) : "")
+      + panel("Reservations", data.reservations.length ? `<div style="overflow-x:auto">` + table([
+        { label: "Number", render: (r) => `<code>${escapeHtml(r.transaction_id)}</code> <button class="btn btn-sm bk-num-copy" data-id="${escapeHtml(r.transaction_id)}" type="button">Copy</button>` },
+        { label: "Status", render: (r) => pill(r.status === "REGISTERED" ? "In the register" : r.status === "VOID" ? "Voided" : "Reserved", NUMBER_TONE[r.status] ?? "default") },
+        { label: "Purpose", render: (r) => escapeHtml(r.purpose) + (r.status === "VOID" && r.void_reason ? ` <span class="field-note">(${escapeHtml(r.void_reason)})</span>` : "") },
+        { label: "Counterparty", render: (r) => escapeHtml(r.counterparty ?? "—") },
+        { label: "Reserved", render: (r) => escapeHtml(dt(r.reserved_at)) },
+        { label: "", render: (r) => r.status === "RESERVED" ? `<button class="btn btn-sm bk-num-void" data-id="${escapeHtml(r.transaction_id)}" type="button">Void</button>` : "" }
+      ], data.reservations, (r) => r.id) + `</div>` : `<p class="field-note">No numbers reserved yet.</p>`)
+      + (data.heads.length ? panel("Next numbers", table([{ label: "Type", key: "document_type" }, { label: "Year", key: "year" }, { label: "Last used", render: (h) => String(h.last) }, { label: "Next", render: (h) => h.next ? `<code>${escapeHtml(h.next)}</code>` : "Used up" }], data.heads, (h) => `${h.document_type}-${h.year}`)) : "");
+    const msg = root.querySelector("#bkNumMsg");
+    root.querySelector("#bkNumForm").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      msg.textContent = "Reserving…";
+      try {
+        const result = await api.reserveEdcsNumber({ document_type: root.querySelector("#bkNumType").value, year: Number(root.querySelector("#bkNumYear").value), purpose: root.querySelector("#bkNumPurpose").value, counterparty: root.querySelector("#bkNumCounterparty").value, subject: root.querySelector("#bkNumSubject").value });
+        await draw(); render();
+        root.querySelector("#bkNumMsg").textContent = `Reserved ${result.reservation.transaction_id}.`;
+      } catch (err) { msg.textContent = err.message; }
+    });
+    for (const button of root.querySelectorAll(".bk-num-copy")) button.addEventListener("click", async () => { try { await navigator.clipboard.writeText(button.dataset.id); button.textContent = "Copied"; } catch { button.textContent = "Select and copy"; } });
+    for (const button of root.querySelectorAll(".bk-num-void")) button.addEventListener("click", async () => {
+      const reason = window.prompt(`Why void ${button.dataset.id}? It will never be given out again.`);
+      if (!reason) return;
+      try { await api.voidEdcsNumber({ transaction_id: button.dataset.id, reason }); await draw(); render(); } catch (err) { msg.textContent = err.message; }
+    });
+  };
+  render();
+}
+
 // ---------------- rules (CE-S3) ----------------
 
 const RULE_STATUS_TEXT = { CREATED: "Request raised", ERROR: "Failed", CLAIMED: "In progress" };
@@ -369,6 +441,7 @@ async function mountRules(root) {
 }
 
 export const BIZKICK_PAGES = {
+  "bizkick-numbers": mountNumbers,
   "bizkick-rules": mountRules,
   "bizkick-connection": mountConnection,
   "bizkick-import": mountImport,

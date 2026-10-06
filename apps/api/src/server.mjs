@@ -26,7 +26,7 @@ import { listWorkRequestTypes } from "../../../packages/core-domain/src/awia-wor
 import { runSkill, SkillInputError } from "../../../packages/core-domain/src/awia-skill-runner.mjs";
 import { createFileStorage, fileMaxBytes, sanitizeFilename, resolveAllowedMimeType, sha256Hex, storageKeyFor, FILE_CLASSIFICATIONS } from "./file-storage.mjs";
 // CE-S1 (ADR-095): Connected EDCS -- BizKick register import and sync ledger.
-import { EDCS_COLLECTIONS, linkEdcsFile, listEdcsChains, readEdcsDocuments, importRegister as importEdcsRegister, linkCounterparty as linkEdcsCounterparty, listConflicts as listEdcsConflicts, listSyncRuns as listEdcsSyncRuns, listTransactions as listEdcsTransactions, readConnection as readEdcsConnection, readEdcsExportCollections, readSyncRun as readEdcsSyncRun, readTransaction as readEdcsTransaction, resolveConflict as resolveEdcsConflict, saveConnection as saveEdcsConnection } from "./edcs-service.mjs";
+import { EDCS_COLLECTIONS, listNumbers as listEdcsNumbers, reserveNumber as reserveEdcsNumber, voidNumber as voidEdcsNumber, linkEdcsFile, listEdcsChains, readEdcsDocuments, importRegister as importEdcsRegister, linkCounterparty as linkEdcsCounterparty, listConflicts as listEdcsConflicts, listSyncRuns as listEdcsSyncRuns, listTransactions as listEdcsTransactions, readConnection as readEdcsConnection, readEdcsExportCollections, readSyncRun as readEdcsSyncRun, readTransaction as readEdcsTransaction, resolveConflict as resolveEdcsConflict, saveConnection as saveEdcsConnection } from "./edcs-service.mjs";
 import { createRule as createAutomationRule, dryRunRule as dryRunAutomationRule, evaluateAfter as evaluateAutomationAfter, evaluateNow as evaluateAutomationNow, listRuleActivity as listAutomationRuleActivity, listRules as listAutomationRules, readSignals as readEdcsSignals, setRuleEnabled as setAutomationRuleEnabled, tick as tickAutomation, updateRule as updateAutomationRule } from "./edcs-automation-service.mjs";
 
 const root = process.cwd();
@@ -3166,6 +3166,9 @@ const routes = new Map([
   ["POST /edcs/register-imports", importEdcsRegisterRoute],
   ["POST /edcs/conflicts/resolve", resolveEdcsConflictRoute],
   ["POST /edcs/transactions/link-counterparty", linkEdcsCounterpartyRoute],
+  // CE-S4 (ADR-098): Number Authority (reserve: any signed-in member; void: owner).
+  ["POST /edcs/numbers/reserve", reserveEdcsNumberRoute],
+  ["POST /edcs/numbers/void", voidEdcsNumberRoute],
   // CE-S3 (ADR-097): register-driven work rules (owner only; see edcs-automation-service.mjs).
   ["POST /automation/rules", createAutomationRuleRoute],
   ["POST /automation/rules/update", updateAutomationRuleRoute],
@@ -3560,6 +3563,18 @@ async function linkEdcsFileRoute(req, url) {
   return linked;
 }
 
+async function reserveEdcsNumberRoute(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id"]);
+  const { actor } = edcsScope(req, body, "reserve a transaction number");
+  return reserveEdcsNumber({ body, actor });
+}
+
+async function voidEdcsNumberRoute(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id"]);
+  const { actor } = edcsScope(req, body, "void a transaction number");
+  return voidEdcsNumber({ body, actor });
+}
+
 async function resolveEdcsConflictRoute(body, req = null) {
   requireFields(body, ["tenant_id", "firm_id", "transaction_id", "choose"]);
   const { actor } = edcsScope(req, body, "resolve a BizKick conflict");
@@ -3575,7 +3590,7 @@ async function linkEdcsCounterpartyRoute(body, req = null) {
 // GET /edcs/connection | /edcs/transactions[/<id>] | /edcs/sync-runs[/<id>] | /edcs/conflicts
 // (?tenant_id=&firm_id= required; transactions also take type, status, alert, flag, search, as_of).
 async function readEdcsRoute(req, url) {
-  const match = url.pathname.match(/^\/edcs\/(connection|transactions|sync-runs|conflicts|chains|documents|signals)(?:\/([^/]+))?$/);
+  const match = url.pathname.match(/^\/edcs\/(connection|transactions|sync-runs|conflicts|chains|documents|signals|numbers)(?:\/([^/]+))?$/);
   if (!match) return null;
   const [, kind, rawId] = match;
   const { scope } = edcsScope(req, { tenant_id: url.searchParams.get("tenant_id"), firm_id: url.searchParams.get("firm_id") }, "read BizKick data");
@@ -3584,6 +3599,7 @@ async function readEdcsRoute(req, url) {
   if (kind === "conflicts" && !id) return listEdcsConflicts({ scope });
   if (kind === "chains" && !id) return listEdcsChains({ scope });
   if (kind === "signals" && !id) return readEdcsSignals({ scope });
+  if (kind === "numbers" && !id) return listEdcsNumbers({ scope, params: url.searchParams });
   if (kind === "documents" && id) return readEdcsDocuments({ scope, transactionId: id });
   if (kind === "transactions") return id ? readEdcsTransaction({ scope, transactionId: id, params: url.searchParams }) : listEdcsTransactions({ scope, params: url.searchParams });
   if (kind === "sync-runs") return id ? readEdcsSyncRun({ scope, runId: id }) : listEdcsSyncRuns({ scope });

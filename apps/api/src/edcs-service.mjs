@@ -20,6 +20,7 @@ import {
 } from "../../../packages/core-domain/src/edcs-register.mjs";
 import { buildTransactionChains, chainForTransaction, extractTransactionId, revisionLabelFromFilename } from "../../../packages/core-domain/src/edcs-chains.mjs";
 import { TabularReadError } from "../../../packages/core-domain/src/tabular-file-reader.mjs";
+import { DEFAULT_STALE_DAYS, buildReservation, crossCheckRows, sequenceHeads, staleReservations, validateReserveRequest } from "../../../packages/core-domain/src/edcs-numbers.mjs";
 
 const OWNER_ROLES = ["principal", "PILOT_PRINCIPAL", "FIRM_PRINCIPAL", "ADMIN"];
 
@@ -194,6 +195,10 @@ export async function importRegister({ body, actor, readFileBytes }) {
     run.counts = engine.counts;
     run.rows_total = engine.results.length;
     run.rows_ignored = engine.ignored_rows;
+    // CE-S4: once the firm uses the Number Desk, rows whose ID was never reserved get an UNRESERVED warning
+    // (never a rejection), and reserved IDs that turn up are marked REGISTERED in the same commit.
+    const numberCheck = crossCheckRows({ rows: engine.results, reservations: await repo.listReservations(scope) });
+    if (numberCheck.active) for (const row of engine.results) row.warnings.push(...(numberCheck.warnings.get(row.row_number) ?? []));
     run.warnings_count = engine.results.reduce((sum, row) => sum + row.warnings.length, 0);
     missing = engine.missing;
     const touched = new Map();
@@ -260,6 +265,12 @@ export async function importRegister({ body, actor, readFileBytes }) {
       batch.edcs_sync_events.push(eventFor({ row_number: null, transaction_id: id, outcome: "ROW_MISSING", reasons: ["ROW_NOT_IN_SOURCE"], reason_details: [], before_fingerprint: record.row_fingerprint }));
       if (flagChange(record, "row_missing", true, startedAt)) record.row_missing_since_run_id = runId;
     }
+    for (const { reservation, row_number } of numberCheck.register) {
+      batch.edcs_number_reservations ??= [];
+      if (batch.edcs_number_reservations.some((item) => item.id === reservation.id)) continue;
+      batch.edcs_number_reservations.push({ ...reservation, status: "REGISTERED", registered_at: startedAt, registered_run_id: runId, registered_row_number: row_number });
+      audits.push({ event_type: "edcs.number_registered", aggregate_type: "EdcsNumberReservation", aggregate_id: reservation.id, payload: { transaction_id: reservation.transaction_id, run_id: runId, row_number }, summary: `Reserved number ${reservation.transaction_id} found in the register (import #${runNumber}).` });
+    }
     // Only records whose content actually changed go back to the repository.
     for (const [id, record] of touched) {
       const original = existing.get(id);
@@ -281,6 +292,70 @@ export async function importRegister({ body, actor, readFileBytes }) {
     run,
     rows: [...rows.map(compactRow), ...missing.map((id) => compactRow({ transaction_id: id, outcome: "ROW_MISSING", reasons: ["ROW_NOT_IN_SOURCE"] }))],
     file_outcome: run.file_outcome
+  };
+}
+
+// ---------------- number authority (CE-S4) ----------------
+
+// Reserve the next Transaction ID. Any verified human member of the firm may reserve (that is the point:
+// several people, one authority); voiding is the owner's. The number comes from the repository's atomic
+// reserve (advisory lock + unique index in Postgres, the store lock in JSON).
+export async function reserveNumber({ body, actor }) {
+  if (actor?.actor_type !== "HUMAN") throw httpError(403, "EDCS_HUMAN_REQUIRED", "Reserving a transaction number needs a signed-in person.");
+  const scope = scopeOf(body);
+  const connection = await repo.getConnection(scope);
+  if (!connection) throw httpError(409, "EDCS_NOT_CONNECTED", "Set up the BizKick connection (company code) before reserving numbers.");
+  const checked = validateReserveRequest(body, { currentYear: new Date().getUTCFullYear() });
+  if (!checked.ok) throw httpError(400, "VALIDATION_ERROR", checked.errors.join(" "));
+  const value = checked.value;
+  const at = now();
+  const reservation = await repo.reserveNumber(scope, { company_code: connection.company_code, document_type: value.document_type, year: value.year }, ({ sequence }) =>
+    buildReservation({ id: newUuid(), tenant_id: scope.tenant_id, firm_id: scope.firm_id, company_code: connection.company_code, value, sequence, actor_id: actor.actor_id ?? null, at }));
+  if (!reservation) throw httpError(409, "NUMBER_RANGE_EXHAUSTED", `All 9999 ${value.document_type} numbers for ${value.year} are used.`);
+  await recordAudit(scope, actor, [{ event_type: "edcs.number_reserved", aggregate_type: "EdcsNumberReservation", aggregate_id: reservation.id, payload: { transaction_id: reservation.transaction_id, purpose: reservation.purpose, counterparty: reservation.counterparty }, summary: `Number ${reservation.transaction_id} reserved: ${reservation.purpose}.` }]);
+  return { reservation };
+}
+
+// Owner cancels a RESERVED number. The row stays (status VOID), so the number is never issued again.
+export async function voidNumber({ body, actor }) {
+  requireOwner(actor, "Voiding a transaction number");
+  const scope = scopeOf(body);
+  const reason = String(body.reason ?? "").trim();
+  if (reason.length < 3) throw httpError(400, "VALIDATION_ERROR", "Say why the number is being voided (reason).");
+  const reservations = await repo.listReservations(scope);
+  const current = reservations.find((item) => (body.transaction_id && item.transaction_id === body.transaction_id) || (body.reservation_id && item.id === body.reservation_id));
+  if (!current) throw httpError(404, "NOT_FOUND", `edcs_number_reservations record not found: ${body.transaction_id ?? body.reservation_id}`);
+  if (current.status !== "RESERVED") throw httpError(409, "NUMBER_NOT_VOIDABLE", `${current.transaction_id} is ${current.status}; only a RESERVED number can be voided.`);
+  const timestamp = now();
+  const updated = { ...current, status: "VOID", void_at: timestamp, void_by: actor.actor_id ?? null, void_reason: reason };
+  await repo.commit(scope, { edcs_number_reservations: [updated] });
+  await recordAudit(scope, actor, [{ event_type: "edcs.number_voided", aggregate_type: "EdcsNumberReservation", aggregate_id: updated.id, payload: { transaction_id: updated.transaction_id, reason }, summary: `Number ${updated.transaction_id} voided: ${reason}. It will not be issued again.` }]);
+  return { reservation: updated };
+}
+
+// The Number Desk: reservations (filters: status, type, year), the "reserved but not registered" list, and the
+// next number per type/year.
+const numberTypes = () => Object.entries(EDCS_DOCUMENT_TYPES).map(([code, type]) => ({ code, name: type.name }));
+
+export async function listNumbers({ scope, params }) {
+  const connection = await repo.getConnection(scope);
+  if (!connection) return { connected: false, types: numberTypes(), company_code: null, reservations: [], stale: [], heads: [], counts: { RESERVED: 0, REGISTERED: 0, VOID: 0 }, stale_days: DEFAULT_STALE_DAYS, as_of: validAsOf(params?.get?.("as_of")) };
+  const all = await repo.listReservations(scope);
+  const transactions = await repo.listTransactions(scope);
+  const asOf = validAsOf(params?.get?.("as_of"));
+  const staleDaysParam = params?.get?.("stale_days");
+  const staleDaysRaw = staleDaysParam === null || staleDaysParam === undefined || staleDaysParam === "" ? NaN : Number(staleDaysParam);
+  const staleDays = Number.isInteger(staleDaysRaw) && staleDaysRaw >= 0 && staleDaysRaw <= 365 ? staleDaysRaw : DEFAULT_STALE_DAYS;
+  const status = params?.get?.("status") || null;
+  const type = params?.get?.("type") || null;
+  const year = params?.get?.("year") ? Number(params.get("year")) : null;
+  const reservations = all.filter((item) => (!status || item.status === status) && (!type || item.document_type === type) && (!year || item.year === year));
+  const counts = { RESERVED: 0, REGISTERED: 0, VOID: 0 };
+  for (const item of all) counts[item.status] = (counts[item.status] ?? 0) + 1;
+  return {
+    connected: true, types: numberTypes(), company_code: connection.company_code, reservations,
+    stale: staleReservations(all, asOf, staleDays), stale_days: staleDays, as_of: asOf,
+    heads: sequenceHeads({ reservations: all, transactions, company_code: connection.company_code }), counts
   };
 }
 

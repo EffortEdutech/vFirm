@@ -245,6 +245,10 @@ export const api = {
   listEdcsSyncRuns: () => request(withScope("/edcs/sync-runs"), { skipCache: true }),
   getEdcsSyncRun: (id) => request(withScope(`/edcs/sync-runs/${encodeURIComponent(id)}`), { skipCache: true }),
   getEdcsChains: () => request(withScope("/edcs/chains"), { skipCache: true }),
+  // CE-S4: Number Authority.
+  listEdcsNumbers: (params = "") => request(withScope(`/edcs/numbers${params ? `?${params}` : ""}`), { skipCache: true }),
+  reserveEdcsNumber: (body) => request("/edcs/numbers/reserve", { method: "POST", body }),
+  voidEdcsNumber: (body) => request("/edcs/numbers/void", { method: "POST", body }),
   // CE-S3: register-driven work rules.
   getEdcsSignals: () => request(withScope("/edcs/signals"), { skipCache: true }),
   listAutomationRules: () => request(withScope("/automation/rules"), { skipCache: true }),

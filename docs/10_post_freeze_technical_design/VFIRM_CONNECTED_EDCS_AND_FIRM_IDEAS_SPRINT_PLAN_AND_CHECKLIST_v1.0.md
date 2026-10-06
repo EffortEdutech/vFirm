@@ -236,11 +236,13 @@ Scope:
 
 Acceptance checks (`npm run check:ce:s4-number-authority`):
 
-- [ ] 50 concurrent reservations for the same type/year produce 50 distinct consecutive numbers (Postgres).
-- [ ] Sequence starts after the highest imported ID.
-- [ ] Voided numbers are never reissued.
-- [ ] Import flags unreserved IDs and marks matched reservations `REGISTERED`.
-- [ ] Another firm cannot reserve in or read this firm's sequences.
+- [x] 50 concurrent reservations for the same type/year produce 50 distinct consecutive numbers (Postgres).
+- [x] Sequence starts after the highest imported ID.
+- [x] Voided numbers are never reissued.
+- [x] Import flags unreserved IDs and marks matched reservations `REGISTERED`.
+- [x] Another firm cannot reserve in or read this firm's sequences.
+
+CE-S4 evidence (2026-10-06): `npm run check:ce:s4-number-authority` passes on the JSON store and on a fresh, fully migrated scratch Postgres (migrations 0001-0052), including 50 concurrent reservations (distinct and consecutive) and a direct test that the database unique index refuses a duplicate number. The regression set (W1, W2, W3, W4, hiring, work-assignment, workdesk-archive, HM-S4 items 2 to 7, CE-S0 to CE-S3) passes. Browser click-through (reserve, second reserve, void with reason, number not reused, validation message, import page note for unreserved numbers) ran with no unexpected console errors. Decisions taken: the cross-check only starts once the firm has reserved at least one number (gradual adoption; a firm that never uses the Number Desk is never warned); any signed-in member may reserve, only the owner may void; seeding is derived (highest of reserved and imported), with no set-up step. Side change: the development JSON store now runs read-modify-write cycles one at a time and queues reads behind writes (it previously could lose an update or read a half-written file under concurrency; production Postgres is unchanged). Not done here (BizKick release work, outside vFirm code): the "Connected edition" note on BizKick's NUMBER DESK, release notes and QA entry.
 
 ### CE-S5 — Delegation of Authority import
 
@@ -465,7 +467,7 @@ Acceptance checks (`npm run check:vi:s6-einvoice-readiness`):
 
 - [ ] 0050 `edcs_connections`, `edcs_transactions`, `edcs_transaction_revisions`, `edcs_sync_runs`, `edcs_sync_events`
 - [ ] 0051 `automation_rules`, `automation_rule_runs`
-- [ ] 0052 `edcs_number_reservations` (unique per firm/code/type/year/sequence)
+- [x] 0052 `edcs_number_reservations` (unique per firm/code/type/year/sequence) (CE-S4)
 - [ ] 0053 `approval_policies`
 - [ ] 0054 `edcs_connector_tokens`, `edcs_connector_heartbeats`
 - [ ] 0055 `firm_briefs`, `evidence_passports`, `trust_ladder_states`
@@ -475,7 +477,7 @@ Acceptance checks (`npm run check:vi:s6-einvoice-readiness`):
 - [ ] `/edcs/connection`, `/edcs/register-imports`, `/edcs/transactions`, `/edcs/sync-runs`, `/edcs/conflicts/resolve`, `/edcs/transactions/link-counterparty`
 - [x] File matching / linking endpoints (CE-S2): `POST /edcs/files/upload`, `GET /edcs/chains`, `GET /edcs/documents/<id>`
 - [x] `/automation/rules` CRUD + dry-run; `/automation/tick` (service token) (CE-S3)
-- [ ] `/edcs/numbers/reserve`, void, list
+- [x] `/edcs/numbers/reserve`, void, list (CE-S4)
 - [ ] `/edcs/approval-policy/import`, role mapping
 - [ ] `/edcs/sync` (connector); token issue/rotate/revoke; heartbeat
 - [ ] Graph adapter connect/disconnect
@@ -506,7 +508,7 @@ Acceptance checks (`npm run check:vi:s6-einvoice-readiness`):
 - [ ] `check:ce:s1-register-import`
 - [ ] `check:ce:s2-file-linking`
 - [ ] `check:ce:s3-register-rules`
-- [ ] `check:ce:s4-number-authority`
+- [x] `check:ce:s4-number-authority` (CE-S4)
 - [ ] `check:ce:s5-delegation-of-authority`
 - [ ] CE-H1 measurements
 - [ ] `check:ce:s6-connector`

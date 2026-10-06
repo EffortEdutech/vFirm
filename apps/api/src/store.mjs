@@ -180,7 +180,7 @@ const initialStore = () => ({
   edcs_sync_runs: [],
   edcs_sync_events: [],
   automation_rules: [],
-  automation_rule_runs: [],
+  automation_rule_runs: [], edcs_number_reservations: [],
   professional_authorities: [],
   actors: [],
   persons: [],
@@ -264,11 +264,16 @@ async function saveStore(store, ledgerBaseline, recordBaseline) {
 }
 
 async function loadJsonStore() {
-  try {
-    return normalizeStore(JSON.parse((await readFile(storePath, "utf8")).replace(/^\uFEFF/, "")));
-  } catch (error) {
-    if (error?.code === "ENOENT") return normalizeStore(initialStore());
-    throw error;
+  // CE-S4: a read can land while another request is mid-write (writeFile is not atomic). A half-written file
+  // fails to parse, so retry briefly instead of failing the request. (Development JSON store only.)
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return normalizeStore(JSON.parse((await readFile(storePath, "utf8")).replace(/^\uFEFF/, "")));
+    } catch (error) {
+      if (error?.code === "ENOENT") return normalizeStore(initialStore());
+      if (error instanceof SyntaxError && attempt < 6) { await new Promise((resolve) => setTimeout(resolve, 25 * attempt)); continue; }
+      throw error;
+    }
   }
 }
 
@@ -5855,13 +5860,23 @@ function changedRecords(store, name, recordBaseline) {
   });
 }
 
+// CE-S4: on the development JSON store every read-modify-write cycle runs one at a time, so two requests can
+// never both read the same state and overwrite each other (that would hand out one number twice). Production
+// (Postgres) is unchanged; its numbers are guarded by the unique index and an advisory lock instead.
+let jsonStoreChain = Promise.resolve();
 export async function withStore(mutator) {
-  const store = await loadStore();
-  const ledgerBaseline = captureLedgerBaseline(store);
-  const recordBaseline = captureRecordBaseline(store);
-  const result = await mutator(store);
-  await saveStore(store, ledgerBaseline, recordBaseline);
-  return result;
+  const run = async () => {
+    const store = await loadStore();
+    const ledgerBaseline = captureLedgerBaseline(store);
+    const recordBaseline = captureRecordBaseline(store);
+    const result = await mutator(store);
+    await saveStore(store, ledgerBaseline, recordBaseline);
+    return result;
+  };
+  if (storeBackend === "postgres") return run();
+  const next = jsonStoreChain.then(run, run);
+  jsonStoreChain = next.catch(() => {});
+  return next;
 }
 
 async function withAppState(mutator) {
@@ -5878,7 +5893,11 @@ async function withAppState(mutator) {
 // call (that's withStore/withAppState, deliberately left unscoped for now -- see loadPostgresStore's
 // comment). Every existing call site (readStore() with no argument) is completely unaffected.
 export async function readStore(tenantId = null) {
-  return loadStore(tenantId);
+  if (storeBackend === "postgres") return loadStore(tenantId);
+  // Development JSON store: queue the read behind any write in flight, so it never sees a half-written file.
+  const next = jsonStoreChain.then(() => loadStore(tenantId), () => loadStore(tenantId));
+  jsonStoreChain = next.catch(() => {});
+  return next;
 }
 
 export function requireFields(body, fields) {
@@ -6514,7 +6533,7 @@ function stripRelationalCollections(store) {
   edcs_sync_runs: [],
   edcs_sync_events: [],
   automation_rules: [],
-  automation_rule_runs: [],
+  automation_rule_runs: [], edcs_number_reservations: [],
   service_packs: [],
   service_skus: [],
   worker_templates: [],

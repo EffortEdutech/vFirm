@@ -18,7 +18,7 @@ import { isPostgresStore, readStore, withStore } from "./store.mjs";
 import { query, setTenantContext, withClient } from "./repositories/shared/db.mjs";
 
 // CE-S3 (ADR-097, migration 0051) adds the two automation tables to the same repository.
-export const EDCS_COLLECTIONS = ["edcs_connections", "edcs_transactions", "edcs_transaction_revisions", "edcs_sync_runs", "edcs_sync_events", "automation_rules", "automation_rule_runs"];
+export const EDCS_COLLECTIONS = ["edcs_connections", "edcs_transactions", "edcs_transaction_revisions", "edcs_sync_runs", "edcs_sync_events", "automation_rules", "automation_rule_runs", "edcs_number_reservations"];
 
 // The natural key inside (tenant, firm) of each collection.
 const naturalKey = {
@@ -29,7 +29,9 @@ const naturalKey = {
   edcs_sync_events: (record) => record.id,
   automation_rules: (record) => record.id,
   // An occurrence's key is rule | transaction | occurrence key (the dedupe key); an evaluation's is its id.
-  automation_rule_runs: (record) => record.key ?? record.id
+  automation_rule_runs: (record) => record.key ?? record.id,
+  // CE-S4: company | type | year | sequence (the unique index in 0052 mirrors it)
+  edcs_number_reservations: (record) => record.key ?? record.id
 };
 
 // A claimed occurrence that failed may be claimed again, up to this many attempts in total.
@@ -64,6 +66,20 @@ const jsonImpl = {
     const seen = new Map();
     for (const rule of store.automation_rules ?? []) if (rule.enabled) seen.set(`${rule.tenant_id}|${rule.firm_id}`, { tenant_id: rule.tenant_id, firm_id: rule.firm_id });
     return [...seen.values()];
+  },
+  // CE-S4: take the next free number inside the store lock. `build({ sequence })` returns the record (or null
+  // when the year is used up); the highest sequence comes from reservations (any state) and imported rows.
+  async reserveNumber(scope, { company_code, document_type, year }, build) {
+    return withStore((store) => {
+      store.edcs_number_reservations ??= [];
+      let highest = 0;
+      for (const item of [...store.edcs_number_reservations, ...(store.edcs_transactions ?? [])]) {
+        if (inScope(scope)(item) && item.company_code === company_code && item.document_type === document_type && Number(item.year) === Number(year)) highest = Math.max(highest, Number(item.sequence) || 0);
+      }
+      const record = build({ sequence: highest + 1 });
+      if (record) store.edcs_number_reservations.push(record);
+      return record;
+    });
   },
   // Atomically take an occurrence (the dedupe record). Returns the stored record when this caller won
   // the claim, or null when the occurrence already exists (CLAIMED/CREATED, or ERROR out of attempts).
@@ -125,6 +141,46 @@ const pgImpl = {
   async enabledScopes() {
     const { rows } = await query(`select distinct tenant_id, firm_id from automation_rules where enabled_c is true`, []);
     return rows.map((row) => ({ tenant_id: row.tenant_id, firm_id: row.firm_id }));
+  },
+  // CE-S4: per (firm, company, type, year) advisory lock so concurrent reservations queue; the unique index in
+  // 0052 is the backstop (a unique violation retries with a fresh read).
+  async reserveNumber(scope, { company_code, document_type, year }, build) {
+    for (let attempt = 1; attempt <= 8; attempt += 1) {
+      try {
+        return await withClient(async (client) => {
+          await client.query("begin");
+          try {
+            await setTenantContext(client, scope.tenant_id);
+            await query(`select pg_advisory_xact_lock(hashtext($1))`, [`${scope.firm_id}|${company_code}|${document_type}|${year}`], client);
+            const { rows } = await query(
+              `select greatest(
+                 coalesce((select max(sequence_c) from edcs_number_reservations where tenant_id = $1 and firm_id = $2 and company_code_c = $3 and document_type_c = $4 and year_c = $5), 0),
+                 coalesce((select max((record->>'sequence')::int) from edcs_transactions where tenant_id = $1 and firm_id = $2 and document_type_c = $4 and record->>'company_code' = $3 and (record->>'year')::int = $5), 0)
+               ) as highest`,
+              [scope.tenant_id, scope.firm_id, company_code, document_type, Number(year)],
+              client
+            );
+            const record = build({ sequence: Number(rows[0].highest) + 1 });
+            if (record) {
+              await query(
+                `insert into edcs_number_reservations (id, natural_key, tenant_id, firm_id, record, created_at, updated_at)
+                 values ($1::uuid, $2, $3::uuid, $4::uuid, $5::jsonb, now(), now())`,
+                [record.id, record.key, scope.tenant_id, scope.firm_id, JSON.stringify(record)],
+                client
+              );
+            }
+            await client.query("commit");
+            return record;
+          } catch (error) {
+            await client.query("rollback");
+            throw error;
+          }
+        });
+      } catch (error) {
+        if (error?.code !== "23505" || attempt === 8) throw error;
+      }
+    }
+    return null;
   },
   // Atomic claim in one statement pair: insert-if-absent, else retake an ERROR row that has attempts
   // left (the where clause makes the retake atomic too). Returns the record or null.
@@ -209,6 +265,13 @@ export const edcsRepository = {
   },
   async claimOccurrence(scope, record) {
     return impl().claim(scope, record);
+  },
+  // CE-S4: the Number Desk's reservations and the atomic "next number".
+  async listReservations(scope) {
+    return (await impl().read(scope, "edcs_number_reservations")).sort((a, b) => String(b.reserved_at).localeCompare(String(a.reserved_at)) || b.sequence - a.sequence);
+  },
+  async reserveNumber(scope, key, build) {
+    return impl().reserveNumber(scope, key, build);
   },
   // One atomic write. `batch` maps a collection name to the records to insert-or-replace.
   async commit(scope, batch) {
