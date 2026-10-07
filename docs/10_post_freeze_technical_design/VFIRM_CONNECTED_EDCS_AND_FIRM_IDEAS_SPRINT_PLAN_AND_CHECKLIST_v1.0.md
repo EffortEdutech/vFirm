@@ -566,4 +566,4 @@ Product owner: review this plan and the CE-S0 decisions, then say "Proceed CE-S0
 
 Owner decisions: host on Vercel (Singapore); run the production-auth sprint before real client data.
 Step 1 delivered: one request gate in front of every route on a production server (`request-auth-gate.mjs`), body scope check, dev-only routes closed. `npm run check:pa:request-gate` passes.
-Next steps (not started): (a) Vercel entry point for the API and the console, with pool settings for short-lived functions; (b) a real-token end-to-end check on the live host; (c) per-route role audit; (d) rate limiting.
+Step 2 delivered (ADR-104): Vercel adapter (`api/index.mjs`, `vercel.json`, console static build, pool attach, connector file default 3 MiB); `npm run check:vercel:adapter` passes. Next steps: (a) first preview deploy on Vercel (owner, guide Part 2); (b) a real-token end-to-end check on the live host; (c) per-route role audit; (d) rate limiting.

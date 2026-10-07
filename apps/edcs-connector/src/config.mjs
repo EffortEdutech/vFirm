@@ -16,7 +16,9 @@ const DEFAULTS = {
   heartbeat_interval_seconds: 60,
   watch: true,
   watch_debounce_ms: 1500,
-  max_file_bytes: 15 * 1024 * 1024,
+  // 3 MiB: a hosted vFirm on Vercel refuses request bodies over 4.5 MB, and a file travels as base64 inside JSON
+  // (about one third bigger). Raise it only when the vFirm API runs on a host without that limit.
+  max_file_bytes: 3 * 1024 * 1024,
   max_rows_per_delivery: 2000,
   retry: { base_ms: 5000, max_ms: 900000 },
   outbox_enabled: false,

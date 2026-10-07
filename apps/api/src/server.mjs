@@ -3842,7 +3842,8 @@ async function completeAwiaInternalWorkdeskItem(body, req = null) {
   return completeAwiaInternalWorkdeskItemRecord(body, actorFromBody(body, req, body.tenant_id, body.firm_id));
 }
 
-const server = createServer(async (req, res) => {
+// ADR-104: the request handler is exported so a serverless host (Vercel, api/index.mjs) can call it directly.
+export const handleRequest = async (req, res) => {
   try {
     if (req.method === "OPTIONS") {
       res.writeHead(204, {
@@ -3985,9 +3986,11 @@ const server = createServer(async (req, res) => {
   } catch (error) {
     sendJson(req, res, error.status ?? 500, { ok: false, error: { code: error.code ?? "INTERNAL_ERROR", message: error instanceof Error ? error.message : String(error), ...(error.details && typeof error.details === "object" ? { details: error.details } : {}) } });
   }
-});
+};
 
-server.listen(port, () => console.log(`vFirm API listening on http://127.0.0.1:${port}`));
+const server = createServer(handleRequest);
+// On Vercel the platform calls handleRequest itself; a listening server would only hold the function open.
+if (!process.env.VERCEL) server.listen(port, () => console.log(`vFirm API listening on http://127.0.0.1:${port}`));
 
 // CE-S3 local development only: an in-process timer runs the same tick the production scheduler calls
 // over HTTP. Off unless VFIRM_AUTOMATION_TICK_MS is set (at least one minute).

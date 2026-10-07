@@ -6114,6 +6114,11 @@ function getPool() {
       connectionString: databaseUrl,
       max: Number(process.env.DATABASE_POOL_MAX) || 10
     });
+    // ADR-104: on Vercel (Fluid compute) idle pool clients must be released before an instance is suspended.
+    // Optional: a missing package must never stop the API from starting.
+    if (process.env.VERCEL) {
+      import("@vercel/functions").then((module) => module.attachDatabasePool(pool)).catch(() => {});
+    }
   }
   return pool;
 }

@@ -28,81 +28,84 @@ host's "environment variables" screen or the Supabase SQL editor.
 2. Copy the result into your password manager as "vFirm service token". You will use it twice: on the API host
    (Part 2) and in Supabase (Part 4).
 
-## Part 2. Host the API
+## Part 2. Host the API and the console on Vercel (one project, Singapore)
 
-The API is a plain Node.js program: no build step and no extra packages beyond `npm install`.
+Decided 2026-10-06 (ADR-103); the adapter is ADR-104. One Vercel project serves the console pages and the API, so
+there is one address and no cross-site setup. The API lives under `/api` on that address.
 
-### Choosing a host (your decision)
+### Know these limits first
 
-Any service that can run a Node.js 20+ program from a GitHub repository and give it a public HTTPS address works
-(for example Render, Railway, Fly.io, or Azure App Service). Pick one you are comfortable paying for.
+- **Plan.** Vercel's free Hobby plan is for non-commercial use. vFirm is a business product, so use a paid plan
+  (Pro). Check the current terms on vercel.com/pricing before you deploy.
+- **Request size.** Vercel refuses a request body over about 4.5 MB. A file travels inside JSON (about a third bigger), so
+  the practical file limit is about 3 MB. The connector's `max_file_bytes` now defaults to 3 MiB (larger files are listed
+  as skipped, not sent). A register workbook uploaded in the console has the same limit. Raise it only on a host
+  without this limit.
+- **Run time.** The function is set to a 60 second limit in `vercel.json`. Normal requests take well under a second;
+  a 500-row register import takes about 1.5 seconds.
+- **Not tested on the real platform yet.** `npm run check:vercel:adapter` simulates it. The first preview deploy is
+  the real test (steps below).
 
-- Choose a **region close to your database**. Your Supabase pooler is in Seoul (`ap-northeast-2`), so choose
-  Seoul or Singapore for the host. Every page load talks to the database, so distance matters.
-- Choose a plan that **does not sleep** when idle (connectors and the daily schedule must reach it any time).
-- Start with one small instance. The scale tests (CE-H1) ran comfortably on a small machine.
+### Settings in Vercel
 
-### Settings on the host
-
-3. Connect the host to the GitHub repository (branch `main`).
-4. Build command: `npm install`.
-5. Start command: `node apps/api/src/server.mjs`. (The program reads the `PORT` the host provides.)
-6. Health check path (if the host asks): `/health`.
-7. Environment variables (type each one into the host's environment screen):
+3. Vercel dashboard, Add New, Project, import the GitHub repository `EffortEdutech/vFirm`. Framework preset: **Other**.
+   Leave the root directory as the repository root. Leave the build and output settings alone: `vercel.json` sets
+   them (build `node scripts/build-vercel-static.mjs`, output `dist`, region `sin1`, rewrite `/api/*` to the function).
+4. Environment variables, **Production only** (type each one into the Vercel screen):
 
    | Name | Value |
    |---|---|
    | `VFIRM_STORE_BACKEND` | `postgres` |
-   | `DATABASE_URL` | the `vfirm_app` pooler address with the **new** password. A password with special characters must be URL-encoded (for example `#` becomes `%23`). |
+   | `DATABASE_URL` | the `vfirm_app` address with the **new** password. Prefer Supabase's **Transaction** pooler (port 6543) for Vercel: many short-lived function instances share it better than the Session pooler. A password with special characters must be URL-encoded (`#` becomes `%23`). |
    | `VFIRM_SUPABASE_URL` | `https://gvjjljgzguimpybpgjsf.supabase.co` |
-   | `VFIRM_SUPABASE_SERVICE_ROLE_KEY` | Supabase dashboard, Project Settings, API, the **service_role** key. Secret. Needed for invite emails and file storage. |
+   | `VFIRM_SUPABASE_SERVICE_ROLE_KEY` | Supabase, Project Settings, API, the **service_role** key. Secret. |
    | `VFIRM_SERVICE_TOKEN` | the token from Part 1 |
-   | `DATABASE_POOL_MAX` | `5` (keeps the connection count small for the pooler) |
+   | `DATABASE_POOL_MAX` | `3` (each function instance keeps its own small pool) |
+   | `VFIRM_FILE_STORAGE_BACKEND`, `VFIRM_FILE_BUCKET` | the same values the current production setup uses |
 
-   **Do not set** any of these on the production host: `VFIRM_STORE_PATH`, `VFIRM_AUTOMATION_TICK_MS`,
-   `VFIRM_ALLOW_FULL_STORE_RESET`, `VFIRM_ALLOW_LEGACY_PILOT_PROVISION`, `VFIRM_ALLOW_TEST_FIRM_PURGE`,
-   `VFIRM_STORE_AUTH` (it switches itself on when Postgres and Supabase sign-in are both configured).
-
-8. Deploy. Note the public address the host gives you, for example `https://vfirm-api.example.com`.
+   **Do not set** `VFIRM_STORE_PATH`, `VFIRM_AUTOMATION_TICK_MS`, `VFIRM_ALLOW_FULL_STORE_RESET`,
+   `VFIRM_ALLOW_LEGACY_PILOT_PROVISION`, `VFIRM_ALLOW_TEST_FIRM_PURGE`, `VFIRM_STORE_AUTH`, `VFIRM_API_BASE` or
+   `VFIRM_WEB_CONSOLE_PORT`. Do not copy preview environments from production: previews should not touch the real database.
+5. Deploy. Vercel gives an address like `https://your-project.vercel.app`. Below, **API address** means that address
+   plus `/api`, for example `https://your-project.vercel.app/api`.
+6. If a check below returns an HTML sign-in page instead of data, Vercel's Deployment Protection is blocking the
+   address. Connectors and the daily schedule must reach the API without a Vercel login, so make sure protection does
+   not cover the production address (Project Settings, Deployment Protection), then try again.
 
 ### Check the API (from PowerShell)
 
-9. Health:
+7. Health:
    ```powershell
-   Invoke-RestMethod https://YOUR-API-ADDRESS/health | Select-Object backend, persistence
+   Invoke-RestMethod https://YOUR-PROJECT.vercel.app/api/health | Select-Object backend, persistence
    ```
    Expect `backend: postgres`.
-10. The store guard (ADR-102). Both of these must be **refused**:
+8. The store guard (ADR-102). Both of these must be **refused**:
+   ```powershell
+   try { Invoke-RestMethod https://YOUR-PROJECT.vercel.app/api/mvp/store } catch { $_.Exception.Response.StatusCode.value__ }
+   try { Invoke-RestMethod "https://YOUR-PROJECT.vercel.app/api/mvp/store?tenant_id=x" } catch { $_.Exception.Response.StatusCode.value__ }
+   ```
+   Expect `403` for the first and `401` for the second. If either returns data, **stop and take the project offline**.
+9. The production-auth gate (ADR-103). Both must be refused with `401`:
+   ```powershell
+   try { Invoke-RestMethod -Method Post -Uri https://YOUR-PROJECT.vercel.app/api/clients -ContentType 'application/json' -Body '{"tenant_id":"x","firm_id":"y","name":"t"}' } catch { $_.Exception.Response.StatusCode.value__ }
+   try { Invoke-RestMethod https://YOUR-PROJECT.vercel.app/api/dashboard/summary -Headers @{ 'x-vfirm-actor-id'='x'; 'x-vfirm-tenant-id'='x'; 'x-vfirm-role'='principal' } } catch { $_.Exception.Response.StatusCode.value__ }
+   ```
+10. The daily run, by hand:
     ```powershell
-    try { Invoke-RestMethod https://YOUR-API-ADDRESS/mvp/store } catch { $_.Exception.Response.StatusCode.value__ }
-    try { Invoke-RestMethod "https://YOUR-API-ADDRESS/mvp/store?tenant_id=x" } catch { $_.Exception.Response.StatusCode.value__ }
-    ```
-    Expect `403` for the first (whole-database dump locked) and `401` for the second (sign-in required).
-    If either returns data, **stop and take the host offline**, then tell me.
-10b. The production-auth gate (ADR-103). Both of these must be **refused** with `401`:
-    ```powershell
-    try { Invoke-RestMethod -Method Post -Uri https://YOUR-API-ADDRESS/clients -ContentType 'application/json' -Body '{"tenant_id":"x","firm_id":"y","name":"t"}' } catch { $_.Exception.Response.StatusCode.value__ }
-    try { Invoke-RestMethod https://YOUR-API-ADDRESS/dashboard/summary -Headers @{ 'x-vfirm-actor-id'='x'; 'x-vfirm-tenant-id'='x'; 'x-vfirm-role'='principal' } } catch { $_.Exception.Response.StatusCode.value__ }
-    ```
-    Then sign in on the console and confirm the pages still load (this is the real-token check).
-11. The daily run, by hand:
-    ```powershell
-    Invoke-RestMethod -Method Post -Uri https://YOUR-API-ADDRESS/automation/tick -Headers @{ 'x-vfirm-service-token' = 'PASTE-THE-TOKEN' }
+    Invoke-RestMethod -Method Post -Uri https://YOUR-PROJECT.vercel.app/api/automation/tick -Headers @{ 'x-vfirm-service-token' = 'PASTE-THE-TOKEN' }
     ```
     Expect a normal answer (HTTP 200). With a wrong token you get `401`; with no token set on the host, `503`.
 
-## Part 3. Host the console (the screen people use)
+## Part 3. The console
 
-The console is a second small program that serves the pages and passes `/api` calls to the API.
+The console pages are part of the same Vercel project.
 
-12. Create a second service from the same repository.
-13. Build command `npm install`. Start command `node apps/web-console/src/server.mjs`.
-14. Environment variable: `VFIRM_API_BASE` = the API address from Part 2 (no trailing slash).
-15. Deploy, open its address, sign in with your Supabase account. The BizKick pages should load.
+11. Open `https://YOUR-PROJECT.vercel.app/`, sign in with your Supabase account. The BizKick pages should load.
+    This is also the **real sign-in test** of the production-auth gate: if pages load, a verified token passes the gate.
 
 ## Part 4. The daily schedule (`pg_cron`) in Supabase
 
-Do this only after steps 9 to 11 work.
+Do this only after steps 7 to 10 work.
 
 16. Supabase dashboard, Database, Extensions: switch on **pg_cron** and **pg_net**.
 17. In the SQL editor, store the token safely (it stays out of the job text):
@@ -116,7 +119,7 @@ Do this only after steps 9 to 11 work.
       '0 22 * * *',
       $$
       select net.http_post(
-        url := 'https://YOUR-API-ADDRESS/automation/tick',
+        url := 'https://YOUR-PROJECT.vercel.app/api/automation/tick',
         headers := jsonb_build_object(
           'content-type', 'application/json',
           'x-vfirm-service-token', (select decrypted_secret from vault.decrypted_secrets where name = 'vfirm_service_token')
@@ -138,7 +141,7 @@ Do this only after steps 9 to 11 work.
 ## Part 5. Point connectors at the real API
 
 20. In the console, BizKick, Connector: register a connector, copy the token (shown once).
-21. On the connector PC, `vfirm_url` in `connector.config.json` is the API address from Part 2.
+21. On the connector PC, `vfirm_url` in `connector.config.json` is the API address from Part 2 (`https://YOUR-PROJECT.vercel.app/api`).
 22. Run the Windows manual test first (`CE_S6_WINDOWS_MANUAL_TEST_v1.0.md`), then install the scheduled task.
 
 ## What this guide solves and what it does NOT (read before inviting real users)
@@ -157,7 +160,5 @@ Do this only after steps 9 to 11 work.
 
 ## Decisions for you
 
-- Decided 2026-10-06: Vercel, Singapore region (ADR-103). Vercel runs functions, not a long-running server, so the API
-  needs a thin Vercel entry point before Part 2 can be followed on Vercel; Parts 1, 4 and 5 and the environment variables
-  stay the same. Until that is built, Part 2 steps 3 to 8 describe a generic Node host.
+- Decided 2026-10-06: Vercel, Singapore region (ADR-103). The Vercel adapter is built (ADR-104); the first preview deploy is the real test.
 - Decided 2026-10-06: run the production-auth sprint (gate delivered; see above).
