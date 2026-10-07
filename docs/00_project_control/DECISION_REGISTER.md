@@ -1269,3 +1269,13 @@ Boundaries: No migration. Not yet run on the real platform: the first preview de
 Known limitations: (1) Each function instance keeps its own small connection pool (DATABASE_POOL_MAX 3 recommended with the Transaction pooler). (2) Cold starts add a delay to the first request after idle time. (3) The rewrite behaviour (original URL kept or not) is handled both ways but only simulated. (4) Deployment Protection must not cover the production address, or connectors and pg_cron cannot reach the API.
 Follow-up: first preview deploy and the real-token sign-in check (owner); per-route role audit and rate limiting stay open. CE-S7 starts only on the owner's instruction.
 
+## ADR-105 - Register dates: day-month-year accepted, read day first
+Date: 2026-10-08
+Status: Accepted (product owner instruction "accept day-month-year dates" on 2026-10-08)
+Decision: The register date reader (normalizeRegisterDate) now accepts, besides Excel serials and ISO text YYYY-MM-DD, day-month-year text: DD-MM-YYYY, DD/MM/YYYY, DD.MM.YYYY and the two-digit-year forms DD-MM-YY, DD/MM/YY, DD.MM.YY, and YYYY/MM/DD. Day-month-year is always read DAY FIRST (Malaysian convention), so 01-09-26 is 1 September 2026. A two-digit year means 20YY. The date must be a real calendar date. Text such as "next Friday" or "01 Sep 2026" is still INVALID_DATE. Dates are stored as ISO in every case.
+Why: The Windows manual test (2026-10-07) showed that opening and saving register.csv in Excel rewrites dates as 01-09-26, and vFirm then rejected every row. The rejection was safe but made normal Excel use fail.
+Evidence: npm run check:ce:register-date-formats (pure check, 40-odd cases including leap days, day-first proof and rejects). CE-S0, CE-S1, CE-S2 and CE-S6 checks still pass; the contract's "Expiry date is text" reject row is unchanged.
+Boundaries: No migration. No change to amounts, statuses or the ISO storage form. A register that mixes two spellings of the same date in different rows is read row by row.
+Known limitations: (1) A date typed month-first (09-01-26 meaning 1 September) is read as 9 January, because the rule is day first; the owner must not mix conventions inside one register. (2) Other spellings such as 1 Sep 2026 stay invalid. (3) An Excel save can still pad rows with extra empty columns; that was harmless in the test.
+Follow-up: Contract v1.0 sections on dates and INVALID_DATE updated in the same change.
+

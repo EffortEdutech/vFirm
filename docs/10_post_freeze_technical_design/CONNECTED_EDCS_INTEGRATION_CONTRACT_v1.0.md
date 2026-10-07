@@ -38,7 +38,7 @@ BizKick is the source, the Bridge is the contract, vFirm is the governed record.
   whole file with STRUCTURE_CHANGED and no rows are processed.
 - Every one of the 500 rows is pre-seeded with the company code, revision R0 and currency MYR.
   A row with no Document Type, Year and Sequence is empty and is ignored. It is not an error.
-- Dates are accepted as Excel date serials or ISO text (`YYYY-MM-DD`). Any other text is INVALID_DATE.
+- Dates are accepted as Excel date serials, ISO text (`YYYY-MM-DD`), or day-month-year text (`DD-MM-YYYY`, `DD/MM/YYYY`, `DD.MM.YYYY`, and the two-digit-year forms such as `01-09-26`). Day-month-year is always read day first, a two-digit year means 20YY, and the date must be real (ADR-105). Any other text is INVALID_DATE.
 - Amount must be a number (zero or more). Text such as "RM 1,200" is INVALID_AMOUNT. Blank is allowed.
 
 ### 3.1 The 24 columns
@@ -215,7 +215,7 @@ REJECTED reasons:
 | IDENTITY_CHANGED | Existing ID arrives with a different company code or type. |
 | INVALID_STATUS | Status not in the 12. |
 | INVALID_AMOUNT | Amount is not a number or is negative. |
-| INVALID_DATE | A date cell is neither an Excel date nor ISO text. |
+| INVALID_DATE | A date cell is not an Excel date, ISO text or day-month-year text, or is not a real calendar date. |
 | INVALID_CURRENCY | Currency not in the LISTS currencies. |
 | INVALID_COUNTERPARTY_TYPE | Counterparty type (column I) is not one of the LISTS counterparty types. Blank is allowed. |
 | INVALID_REVISION | Revision is not `R` plus a whole number. |

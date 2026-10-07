@@ -47,6 +47,8 @@ Everything below is PowerShell. Use two windows. **Window 1** runs the API and s
 
 ## Part C. The five acceptance checks (Window 2)
 
+**About exit codes (checks 2 and 3).** Read the code straight after the command, in the same PowerShell window: `$LASTEXITCODE`. It must be read from a direct `node ...` call. If the connector is started through `npm run`, a wrapper or a test runner, any non-zero code is reported as `1`. The connector itself returns 0 (fine), 2 (a problem this round, work kept) or 3 (revoked). The printed `waiting: true` and `fatal: CONNECTOR_REVOKED` lines are the reliable signs either way.
+
 **Check 1. One changed row gives exactly one sync event, with the right outcome**
 
 5. First delivery:
@@ -60,8 +62,8 @@ Everything below is PowerShell. Use two windows. **Window 1** runs the API and s
    .\read-api.ps1 /edcs/sync-runs
    ```
    Expect one run with `CREATED: 6`.
-7. Open `C:\vfirm-connector-test\BizKick\EDCS\register.csv` in a text editor. Change the amount of **one** row
-   (the first quotation: `1000` to `1500`) and save. Do not change the revision (`R0`).
+7. Open `C:\vfirm-connector-test\BizKick\EDCS\register.csv` in **Notepad** (run `notepad C:\vfirm-connector-test\BizKick\EDCS\register.csv`). Change the amount of **one** row
+   (the first quotation: `1000` to `1500`) and save. Do not change the revision (`R0`). Change nothing else. (Excel also works since ADR-105: it rewrites the dates as `01-09-26`, which vFirm now reads day first. Before ADR-105 such a save made every row INVALID_DATE.)
 8. Run the connector again (from the virtual-firm folder) and look at the runs:
    ```powershell
    cd "C:\Users\user\Documents\00 Agent Skills\virtual-firm"

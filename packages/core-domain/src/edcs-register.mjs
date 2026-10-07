@@ -129,8 +129,19 @@ export function effectiveContentPolicy(documentType, connection) {
 const clean = (value) => String(value ?? "").trim();
 const blankToNull = (value) => (clean(value) === "" ? null : clean(value));
 
-// Excel serial (days since 1899-12-30) or ISO text YYYY-MM-DD. Anything else is invalid.
-// Returns { ok, value } where value is an ISO date string or null (blank).
+// Accepted date spellings (ADR-105):
+//   - Excel serial (days since 1899-12-30)
+//   - ISO text YYYY-MM-DD (also YYYY/MM/DD)
+//   - day-month-year: DD-MM-YYYY, DD/MM/YYYY, DD.MM.YYYY and the two-digit-year forms DD-MM-YY, DD/MM/YY, DD.MM.YY
+// Day-month-year is always read DAY FIRST (Malaysian convention): 01-09-26 is 1 September 2026, never 9 January.
+// A two-digit year means 20YY. The date must be a real calendar date (31-02-26 is invalid).
+// Anything else is invalid. Returns { ok, value } where value is an ISO date string or null (blank).
+function isoIfRealDate(year, month, day) {
+  const iso = `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  const date = new Date(`${iso}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === iso ? iso : null;
+}
+
 export function normalizeRegisterDate(raw) {
   const text = clean(raw);
   if (text === "") return { ok: true, value: null };
@@ -139,9 +150,16 @@ export function normalizeRegisterDate(raw) {
     if (serial >= 1 && serial <= 2958465) return { ok: true, value: new Date(Date.UTC(1899, 11, 30) + serial * 86400000).toISOString().slice(0, 10) };
     return { ok: false, value: null };
   }
-  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
-    const date = new Date(`${text}T00:00:00Z`);
-    if (!Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === text) return { ok: true, value: text };
+  const iso = text.match(/^(\d{4})[-/](\d{2})[-/](\d{2})$/);
+  if (iso) {
+    const value = isoIfRealDate(Number(iso[1]), Number(iso[2]), Number(iso[3]));
+    return value ? { ok: true, value } : { ok: false, value: null };
+  }
+  const dmy = text.match(/^(\d{1,2})([-/.])(\d{1,2})\2(\d{2}|\d{4})$/);
+  if (dmy) {
+    const year = dmy[4].length === 2 ? 2000 + Number(dmy[4]) : Number(dmy[4]);
+    const value = isoIfRealDate(year, Number(dmy[3]), Number(dmy[1]));
+    return value ? { ok: true, value } : { ok: false, value: null };
   }
   return { ok: false, value: null };
 }
