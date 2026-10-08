@@ -177,7 +177,7 @@ export async function applyRegisterRun({ scope, connection, actor, parsed, sourc
   const run = {
     id: runId, tenant_id: scope.tenant_id, firm_id: scope.firm_id, run_number: runNumber, status: "COMPLETED",
     source_file_id: source.file_id ?? null, source_filename: source.filename, source_sha256: source.sha256 ?? null, source_size_bytes: source.size_bytes ?? null,
-    source_kind: connector ? "CONNECTOR" : "UPLOAD", sync_mode: context ? "DELTA" : "FULL", connector_id: connector?.id ?? null, connector_name: connector?.name ?? null, idempotency_key: idempotencyKey,
+    source_kind: connector ? (connector.kind ?? "CONNECTOR") : "UPLOAD", source_ref: source.ref ?? null, sync_mode: context ? "DELTA" : "FULL", connector_id: connector?.id ?? null, connector_name: connector?.name ?? null, idempotency_key: idempotencyKey,
     actor_id: actor.actor_id ?? null, started_at: startedAt, finished_at: null,
     counts: Object.fromEntries(EDCS_OUTCOMES.map((outcome) => [outcome, 0])), rows_total: 0, rows_ignored: 0, warnings_count: 0, file_outcome: null
   };
@@ -595,7 +595,7 @@ const documentsSummary = (history) => history.linked ? {
 // lets it deliver metadata only, with no bytes -- which is all a metadata-only content policy ever stores. If
 // the policy stores content, bytes are required (409 CONTENT_REQUIRED); if bytes arrive under a metadata-only
 // policy they are still never stored.
-export async function linkEdcsFile({ scope: scopeInput, actor, filename, mime_type, buffer = null, meta = null, connector = null, transaction_id, role = "PRIMARY", storeBytes }) {
+export async function linkEdcsFile({ scope: scopeInput, actor, filename, mime_type, buffer = null, meta = null, connector = null, transaction_id, role = "PRIMARY", storeBytes, evidence = null }) {
   if (!connector) requireOwner(actor, "Linking a file to a BizKick transaction");
   const scope = scopeOf(scopeInput);
   const connection = await repo.getConnection(scope);
@@ -641,7 +641,7 @@ export async function linkEdcsFile({ scope: scopeInput, actor, filename, mime_ty
     tenant_id: scope.tenant_id, firm_id: scope.firm_id,
     transaction: { transaction_id: id, document_type: record.document_type, title: `${EDCS_DOCUMENT_TYPES[record.document_type].name} ${id}${record.subject ? ` - ${record.subject}` : ""}` },
     file: { file_id: fileId, filename, mime_type, size_bytes: sizeBytes, sha256, storage_backend: stored.storage_backend, storage_key: stored.storage_key, classification: fileClassificationFor(record.document_type) },
-    content_stored: contentStored, revision_label: revisionHint ?? record.revision ?? null, method, note: connector ? `Delivered by connector "${connector.name}"` : null, role
+    content_stored: contentStored, revision_label: revisionHint ?? record.revision ?? null, method, note: connector ? `Delivered by connector "${connector.name}"${evidence ? ` (${evidence})` : ""}` : null, role
   }, actor);
 
   const history = await documentHistory(scope, id);

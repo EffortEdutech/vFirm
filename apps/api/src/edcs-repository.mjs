@@ -18,7 +18,7 @@ import { isPostgresStore, readStore, withStore } from "./store.mjs";
 import { query, setTenantContext, withClient } from "./repositories/shared/db.mjs";
 
 // CE-S3 (ADR-097, migration 0051) adds the two automation tables to the same repository.
-export const EDCS_COLLECTIONS = ["edcs_connections", "edcs_transactions", "edcs_transaction_revisions", "edcs_sync_runs", "edcs_sync_events", "automation_rules", "automation_rule_runs", "edcs_number_reservations", "approval_policies", "edcs_connectors"];
+export const EDCS_COLLECTIONS = ["edcs_connections", "edcs_transactions", "edcs_transaction_revisions", "edcs_sync_runs", "edcs_sync_events", "automation_rules", "automation_rule_runs", "edcs_number_reservations", "approval_policies", "edcs_connectors", "edcs_graph_connections"];
 
 // The natural key inside (tenant, firm) of each collection.
 const naturalKey = {
@@ -35,7 +35,9 @@ const naturalKey = {
   // CE-S5: one immutable row per policy version (the unique index in 0053 mirrors it)
   approval_policies: (record) => String(record.version),
   // CE-S6: one row per registered connector (the token hash index in 0054 is global and unique)
-  edcs_connectors: (record) => record.id
+  edcs_connectors: (record) => record.id,
+  // CE-S7: at most one Microsoft 365 connection per firm (migration 0055)
+  edcs_graph_connections: () => "graph"
 };
 
 // A claimed occurrence that failed may be claimed again, up to this many attempts in total.
@@ -78,6 +80,11 @@ const jsonImpl = {
     await withStore((store) => {
       for (const collection of EDCS_COLLECTIONS) for (const record of batch[collection] ?? []) jsonUpsert(store, scope, collection, record);
     });
+  },
+  // CE-S7: firms whose Microsoft 365 connection is ACTIVE (the scheduled poll visits each).
+  async graphScopes() {
+    const store = await readStore();
+    return (store.edcs_graph_connections ?? []).filter((record) => record.status === "ACTIVE").map((record) => ({ tenant_id: record.tenant_id, firm_id: record.firm_id }));
   },
   async enabledScopes() {
     const store = await readStore();
@@ -190,6 +197,10 @@ const pgImpl = {
         throw error;
       }
     });
+  },
+  async graphScopes() {
+    const { rows } = await query(`select tenant_id, firm_id from edcs_graph_connections where status_c = 'ACTIVE'`, []);
+    return rows.map((row) => ({ tenant_id: row.tenant_id, firm_id: row.firm_id }));
   },
   async enabledScopes() {
     const { rows } = await query(`select distinct tenant_id, firm_id from automation_rules where enabled_c is true`, []);
@@ -398,10 +409,18 @@ export const edcsRepository = {
   async findConnectorByTokenHash(hash) {
     return impl().findConnectorByTokenHash(hash);
   },
+  // CE-S7: the firm's Microsoft 365 connection (secrets are stored encrypted; see edcs-graph-service.mjs).
+  async getGraphConnection(scope) {
+    return (await impl().read(scope, "edcs_graph_connections"))[0] ?? null;
+  },
+  async graphScopes() {
+    return impl().graphScopes();
+  },
   async exportCollections(scope) {
     const out = {};
     for (const collection of EDCS_COLLECTIONS) out[collection] = await impl().read(scope, collection);
     out.edcs_connectors = out.edcs_connectors.map(({ token_hash, ...rest }) => rest); // never export a token hash
+    out.edcs_graph_connections = out.edcs_graph_connections.map(({ secret_enc, ...rest }) => rest); // never export the encrypted secret
     return out;
   }
 };

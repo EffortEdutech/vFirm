@@ -41,6 +41,7 @@ export const OWNER_NAV = [
       { id: "bizkick-rules", label: "Rules", icon: "⚙" },
       { id: "bizkick-delegation", label: "Approval limits", icon: "⚖" },
       { id: "bizkick-connector", label: "Connector", icon: "⇄" },
+      { id: "bizkick-microsoft", label: "Microsoft 365", icon: "☁" },
     ],
   },
   {
@@ -101,6 +102,7 @@ export const PAGE_META = {
   "bizkick-numbers": { eyebrow: "BizKick", title: "Number Desk", desc: "Reserve the next transaction number here, so two people never get the same one." },
   "bizkick-rules": { eyebrow: "BizKick", title: "Rules", desc: "Let the register raise work for your team. Every rule starts off, and you preview it before turning it on." },
   "bizkick-delegation": { eyebrow: "BizKick", title: "Approval limits", desc: "Your BizKick approval limits decide who may approve work raised from a transaction. You confirm every mapping." },
+  "bizkick-microsoft": { eyebrow: "BizKick", title: "Microsoft 365", desc: "If the BizKick folders live in OneDrive or SharePoint, vFirm can read them there. One folder, read-only; your IT admin gives the access and can take it back at any time." },
   "bizkick-connector": { eyebrow: "BizKick", title: "Connector", desc: "A small program on the BizKick PC watches the register and sends only what changed. It reads BizKick; it never edits it." },
   "firm-settings": { eyebrow: "Firm", title: "Firm Settings", desc: "Profile, workspace and governance settings." },
 

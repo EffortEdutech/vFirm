@@ -333,6 +333,8 @@ Acceptance checks:
 - [ ] Revoking consent stops sync and shows the state in the console.
 - [ ] Access limited to the consented folder.
 
+**Delivered 2026-10-08 (ADR-106).** Sites.Selected app-only, read-only, one folder of one library; delta query; same `applyRegisterRun` / `linkEdcsFile` path as upload and connector; app secret stored AES-256-GCM encrypted (server key `VFIRM_SECRET_KEY`); consent lost = `ACCESS_LOST` and polling stops; daily tick also polls. Migration 0055 (`edcs_graph_connections`; the later `firm_briefs` checklist item moves to the next free number). Check: `npm run check:ce:s7-cloud-adapter` (simulated Microsoft, JSON and fresh Postgres). Owner guide: `CE_S7_MICROSOFT_365_ENTRA_SETUP_GUIDE_v1.0.md`. Real-tenant test still to do by the owner.
+
 ### CE-S8 — Governed drafting into BizKick masters
 
 Objective: workers prepare new BizKick documents; the owner approves; BizKick stays the source.
@@ -490,7 +492,7 @@ Acceptance checks (`npm run check:vi:s6-einvoice-readiness`):
 - [x] 0052 `edcs_number_reservations` (unique per firm/code/type/year/sequence) (CE-S4)
 - [x] 0053 `approval_policies` (CE-S5)
 - [ ] 0054 `edcs_connector_tokens`, `edcs_connector_heartbeats`
-- [ ] 0055 `firm_briefs`, `evidence_passports`, `trust_ladder_states`
+- [ ] (0055 is now `edcs_graph_connections`; next free number) `firm_briefs`, `evidence_passports`, `trust_ladder_states`
 
 ### API
 
@@ -532,7 +534,7 @@ Acceptance checks (`npm run check:vi:s6-einvoice-readiness`):
 - [x] `check:ce:s5-delegation-of-authority` (CE-S5)
 - [x] CE-H1 measurements (CE-H1)
 - [x] `check:ce:s6-connector` (CE-S6)
-- [ ] CE-S7 Graph test
+- [x] CE-S7 Graph test (simulated Microsoft, 2026-10-08); [ ] real-tenant test (owner)
 - [ ] `check:ce:s8-template-drafting`
 - [ ] CE-S9 evidence pack + acceptance gate
 - [ ] `check:vi:s1-standing-instructions`

@@ -31,6 +31,7 @@ import { createFileStorage, fileMaxBytes, sanitizeFilename, resolveAllowedMimeTy
 import { annotateDraftRequirement, checkDraftApproval, enforceDraftApproval, importDelegation as importEdcsDelegation, previewDelegation as previewEdcsDelegation, readDelegation as readEdcsDelegation } from "./edcs-delegation-service.mjs";
 import { EDCS_COLLECTIONS, listNumbers as listEdcsNumbers, reserveNumber as reserveEdcsNumber, voidNumber as voidEdcsNumber, linkEdcsFile, listEdcsChains, readEdcsDocuments, importRegister as importEdcsRegister, linkCounterparty as linkEdcsCounterparty, listConflicts as listEdcsConflicts, listSyncRuns as listEdcsSyncRuns, listTransactions as listEdcsTransactions, readConnection as readEdcsConnection, readEdcsExportCollections, readSyncRun as readEdcsSyncRun, readTransaction as readEdcsTransaction, resolveConflict as resolveEdcsConflict, saveConnection as saveEdcsConnection } from "./edcs-service.mjs";
 import { createRule as createAutomationRule, dryRunRule as dryRunAutomationRule, evaluateAfter as evaluateAutomationAfter, evaluateNow as evaluateAutomationNow, listRuleActivity as listAutomationRuleActivity, listRules as listAutomationRules, readSignals as readEdcsSignals, setRuleEnabled as setAutomationRuleEnabled, tick as tickAutomation, updateRule as updateAutomationRule } from "./edcs-automation-service.mjs";
+import { connectGraph as connectEdcsGraph, disconnectGraph as disconnectEdcsGraph, pollGraphConnections, readGraphConnection as readEdcsGraph, syncGraphNow as syncEdcsGraphNow } from "./edcs-graph-service.mjs";
 import { authenticateConnector as authenticateEdcsConnector, issueConnector as issueEdcsConnector, listConnectors as listEdcsConnectors, recordHeartbeat as recordEdcsConnectorHeartbeat, revokeConnector as revokeEdcsConnector, rotateConnector as rotateEdcsConnector, syncFile as syncEdcsFile, syncRegister as syncEdcsRegister } from "./edcs-connector-service.mjs";
 
 const root = process.cwd();
@@ -3203,6 +3204,10 @@ const routes = new Map([
   ["POST /edcs/connectors/rotate", rotateEdcsConnectorRoute],
   ["POST /edcs/connectors/revoke", revokeEdcsConnectorRoute],
   ["POST /edcs/connector/heartbeat", edcsConnectorHeartbeatRoute],
+  // CE-S7 (ADR-106): Microsoft 365 (OneDrive / SharePoint) cloud adapter. Owner routes behind the request gate.
+  ["POST /edcs/graph/connect", connectEdcsGraphRoute],
+  ["POST /edcs/graph/disconnect", disconnectEdcsGraphRoute],
+  ["POST /edcs/graph/sync", syncEdcsGraphRoute],
   ["POST /edcs/sync", edcsConnectorSyncRoute],
   ["POST /edcs/sync/file", edcsConnectorFileRoute],
   ["POST /edcs/transactions/link-counterparty", linkEdcsCounterpartyRoute],
@@ -3572,7 +3577,11 @@ async function automationTickRoute(req, url) {
   }
   const tenant_id = url.searchParams.get("tenant_id");
   const firm_id = url.searchParams.get("firm_id");
-  return tickAutomation({ deps: automationDeps, scope: tenant_id && firm_id ? { tenant_id, firm_id } : null });
+  const only = tenant_id && firm_id ? { tenant_id, firm_id } : null;
+  const result = await tickAutomation({ deps: automationDeps, scope: only });
+  // CE-S7: the same scheduled call also reads each firm's Microsoft 365 BizKick folder (a failure never fails the tick).
+  const graph = await pollGraphConnections({ deps: graphDeps, scope: only }).catch((error) => ({ error: error instanceof Error ? error.message : String(error) }));
+  return { ...result, graph };
 }
 
 // GET /automation/rules | /automation/rules/<id>/activity | /automation/activity (read: any verified member).
@@ -3635,6 +3644,35 @@ async function revokeEdcsConnectorRoute(body, req = null) {
   requireFields(body, ["tenant_id", "firm_id", "connector_id"]);
   const { actor } = edcsScope(req, body, "revoke a BizKick connector");
   return revokeEdcsConnector({ body, actor });
+}
+
+// CE-S7 (ADR-106): Microsoft 365. What only this file can provide to the sync: file storage and the rules hooks.
+const graphDeps = {
+  storeBytesFor: (scope) => async ({ file_id, buffer: bytes, mime_type: type }) => {
+    const storage_key = storageKeyFor({ tenant_id: scope.tenant_id, firm_id: scope.firm_id, file_id });
+    await fileStorage.put(storage_key, bytes, type);
+    return { storage_backend: fileStorage.backend, storage_key };
+  },
+  afterRegister: (scope) => evaluateAutomationAfter({ scope, trigger: "IMPORT", actor: systemActor(scope.tenant_id, scope.firm_id), deps: automationDeps }),
+  afterFile: (scope) => evaluateAutomationAfter({ scope, trigger: "FILE", actor: systemActor(scope.tenant_id, scope.firm_id), deps: automationDeps })
+};
+
+async function connectEdcsGraphRoute(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "ms_tenant_id", "client_id", "drive_id", "folder_path", "register_path"]);
+  const { actor } = edcsScope(req, body, "connect Microsoft 365");
+  return connectEdcsGraph({ body, actor });
+}
+
+async function disconnectEdcsGraphRoute(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id"]);
+  const { actor } = edcsScope(req, body, "disconnect Microsoft 365");
+  return disconnectEdcsGraph({ body, actor });
+}
+
+async function syncEdcsGraphRoute(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id"]);
+  const { actor, scope } = edcsScope(req, body, "read Microsoft 365 now");
+  return syncEdcsGraphNow({ body, actor, deps: graphDeps });
 }
 
 const connectorFromRequest = (req) => authenticateEdcsConnector(headerValue(req, "x-vfirm-connector-token"));
@@ -3725,7 +3763,7 @@ async function linkEdcsCounterpartyRoute(body, req = null) {
 // GET /edcs/connection | /edcs/transactions[/<id>] | /edcs/sync-runs[/<id>] | /edcs/conflicts
 // (?tenant_id=&firm_id= required; transactions also take type, status, alert, flag, search, as_of).
 async function readEdcsRoute(req, url) {
-  const match = url.pathname.match(/^\/edcs\/(connection|transactions|sync-runs|conflicts|chains|documents|signals|numbers|delegation|connectors)(?:\/([^/]+))?$/);
+  const match = url.pathname.match(/^\/edcs\/(connection|transactions|sync-runs|conflicts|chains|documents|signals|numbers|delegation|connectors|graph)(?:\/([^/]+))?$/);
   if (!match) return null;
   const [, kind, rawId] = match;
   const { scope } = edcsScope(req, { tenant_id: url.searchParams.get("tenant_id"), firm_id: url.searchParams.get("firm_id") }, "read BizKick data");
@@ -3737,6 +3775,7 @@ async function readEdcsRoute(req, url) {
   if (kind === "delegation" && !id) return readEdcsDelegation(scope, { version: url.searchParams.get("version") });
   if (kind === "numbers" && !id) return listEdcsNumbers({ scope, params: url.searchParams });
   if (kind === "connectors" && !id) return listEdcsConnectors({ scope });
+  if (kind === "graph" && !id) return readEdcsGraph({ scope });
   if (kind === "documents" && id) return readEdcsDocuments({ scope, transactionId: id });
   if (kind === "transactions") return id ? readEdcsTransaction({ scope, transactionId: id, params: url.searchParams }) : listEdcsTransactions({ scope, params: url.searchParams });
   if (kind === "sync-runs") return id ? readEdcsSyncRun({ scope, runId: id }) : listEdcsSyncRuns({ scope });

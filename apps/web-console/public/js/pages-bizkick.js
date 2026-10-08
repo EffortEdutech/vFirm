@@ -280,7 +280,7 @@ async function mountHistory(root) {
     { label: "#", key: "run_number" },
     { label: "When", render: (r) => escapeHtml(dt(r.started_at)) },
     { label: "Status", render: (r) => pill(r.status, r.status === "COMPLETED" ? "moss" : "rose") },
-    { label: "Source", render: (r) => r.source_kind === "CONNECTOR" ? `Connector <strong>${escapeHtml(r.connector_name ?? "")}</strong>` : "Upload" },
+    { label: "Source", render: (r) => r.source_kind === "CONNECTOR" ? `Connector <strong>${escapeHtml(r.connector_name ?? "")}</strong>` : r.source_kind === "CLOUD" ? "Microsoft 365" : "Upload" },
     { label: "Rows", render: (r) => String(r.rows_total ?? 0) },
     { label: "Created / Updated / Revised", render: (r) => `${r.counts?.CREATED ?? 0} / ${r.counts?.UPDATED ?? 0} / ${r.counts?.REVISED ?? 0}` },
     { label: "Conflicts / Rejected / Missing", render: (r) => `${r.counts?.CONFLICT ?? 0} / ${r.counts?.REJECTED ?? 0} / ${r.counts?.ROW_MISSING ?? 0}` },
@@ -604,8 +604,74 @@ async function mountConnector(root) {
   }));
 }
 
+// ---------------- Microsoft 365 (CE-S7) ----------------
+
+const GRAPH_TONE = { ACTIVE: "moss", ACCESS_LOST: "rose", DISCONNECTED: "default" };
+
+async function mountMicrosoft(root) {
+  let data;
+  try { data = await api.getEdcsGraph(); } catch (err) { root.innerHTML = errorBox(err, "the Microsoft 365 connection"); return; }
+  const g = data.graph;
+  const live = g && g.status !== "DISCONNECTED";
+  const f = (id, label, value, extra = "") => `<label class="field"><span>${label}</span><input id="${id}" type="text" value="${escapeHtml(value ?? "")}" ${extra} /></label>`;
+  const status = g ? `<p>${pill(g.status_text ?? g.status, GRAPH_TONE[g.status] ?? "default")}
+      ${g.status === "ACCESS_LOST" ? `<span class="field-note"> Microsoft no longer accepts vFirm's access. Syncing has stopped. Ask your IT admin to check the app, then press "Save and check access".</span>` : ""}</p>
+    ${statRow([
+      { value: g.last_run_number ? `#${g.last_run_number}` : "—", label: "Last register run" },
+      { value: g.error_count ?? 0, label: "Errors so far" }
+    ])}
+    <p class="field-note">Library folder: <strong>${escapeHtml(g.folder_path ?? "")}</strong> · register: <strong>${escapeHtml(g.register_path ?? "")}</strong> · app secret ${g.has_secret ? `stored encrypted (${escapeHtml(g.secret_hint ?? "")})` : "erased"}</p>
+    <p class="field-note">Last read: ${escapeHtml(dt(g.last_sync_at))}${g.last_sync_status ? ` — ${escapeHtml(g.last_sync_status)}` : ""}</p>
+    ${g.last_error ? `<p class="field-note">Last problem: ${escapeHtml(g.last_error)} (${escapeHtml(dt(g.last_error_at))})</p>` : ""}` : `<p class="field-note">Not connected. vFirm reads nothing from Microsoft 365 until the owner connects it.</p>`;
+  const folders = (g?.controlled_folders ?? []).map((c) => c.path + (c.role === "SUPPORTING" ? " (supporting)" : "")).join("\n");
+  root.innerHTML = GOLDEN_RULE
+    + (data.secret_key_configured ? "" : `<div class="notice">This server has no VFIRM_SECRET_KEY yet, so it cannot store a Microsoft 365 secret. Add it in the hosting settings first.</div>`)
+    + panel("Status", status + (live ? `<div class="form-actions"><button class="btn" id="msSync" type="button">Read now</button> <button class="btn btn-sm" id="msDisconnect" type="button">Disconnect</button></div>` : ""))
+    + `<div id="msMsg" style="min-height:1.2em"></div>`
+    + panel(live ? "Change the connection / check access again" : "Connect Microsoft 365", `
+      <p class="field-note">Your IT admin creates an app in Microsoft Entra with only the <strong>Sites.Selected</strong> permission and grants it read access to the one site. See the Entra guide for the steps. Never send the secret by email or chat; type it here only.</p>
+      <div class="form-grid">
+        ${f("msTenant", "Directory (tenant) ID", g?.ms_tenant_id)}
+        ${f("msClient", "Application (client) ID", g?.client_id)}
+        <label class="field"><span>Client secret value ${g?.has_secret ? "(leave empty to keep the stored one)" : ""}</span><input id="msSecret" type="password" autocomplete="new-password" value="" /></label>
+        ${f("msDrive", "Document library (drive) ID", g?.drive_id)}
+        ${f("msFolder", "The one folder vFirm may read", g?.folder_path, 'placeholder="BizKick"')}
+        ${f("msRegister", "Register file inside that folder", g?.register_path, 'placeholder="EDCS/register.xlsx"')}
+        <label class="field"><span>Controlled folders inside it (one per line)</span><textarea id="msControlled" rows="3" placeholder="Sales\nPurchases">${escapeHtml(folders)}</textarea></label>
+      </div>
+      <div class="form-actions"><button class="btn btn-primary" id="msSave" type="button">Save and check access</button></div>`);
+  const msg = root.querySelector("#msMsg");
+  const guard = (fn) => async () => { msg.textContent = "Working…"; try { await fn(); msg.textContent = ""; } catch (err) { msg.textContent = err.message; } };
+  root.querySelector("#msSave").addEventListener("click", guard(async () => {
+    const body = {
+      ms_tenant_id: root.querySelector("#msTenant").value, client_id: root.querySelector("#msClient").value, drive_id: root.querySelector("#msDrive").value,
+      folder_path: root.querySelector("#msFolder").value, register_path: root.querySelector("#msRegister").value,
+      controlled_folders: root.querySelector("#msControlled").value.split("\n").map((line) => line.trim()).filter(Boolean)
+    };
+    const secret = root.querySelector("#msSecret").value;
+    if (secret) body.client_secret = secret;
+    await api.connectEdcsGraph(body);
+    await mountMicrosoft(root);
+    const m = root.querySelector("#msMsg"); if (m) m.textContent = "Connected. Microsoft accepted the app and the folder opened.";
+  }));
+  root.querySelector("#msSync")?.addEventListener("click", guard(async () => {
+    const result = await api.syncEdcsGraph({});
+    await mountMicrosoft(root);
+    const s = result.summary;
+    const m = root.querySelector("#msMsg");
+    if (m) m.textContent = result.skipped ? `Skipped (${result.reason}).` : result.access_lost ? "Microsoft stopped the access." : result.failed ? `Problem: ${result.error}` : `Read done: register ${String(s.register).toLowerCase().replace(/_/g, " ")}, ${s.files.linked + s.files.revised} file(s) filed, ${s.files.unchanged} unchanged.`;
+  }));
+  const dis = root.querySelector("#msDisconnect");
+  dis?.addEventListener("click", guard(async () => {
+    if (!dis.dataset.armed) { dis.dataset.armed = "1"; dis.textContent = "Confirm: disconnect and erase the stored secret"; msg.textContent = "Click again to confirm."; return; }
+    await api.disconnectEdcsGraph({});
+    await mountMicrosoft(root);
+  }));
+}
+
 export const BIZKICK_PAGES = {
   "bizkick-connector": mountConnector,
+  "bizkick-microsoft": mountMicrosoft,
   "bizkick-delegation": mountDelegation,
   "bizkick-numbers": mountNumbers,
   "bizkick-rules": mountRules,

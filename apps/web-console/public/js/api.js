@@ -254,6 +254,10 @@ export const api = {
   issueEdcsConnector: (body) => request("/edcs/connectors", { method: "POST", body }),
   rotateEdcsConnector: (body) => request("/edcs/connectors/rotate", { method: "POST", body }),
   revokeEdcsConnector: (body) => request("/edcs/connectors/revoke", { method: "POST", body }),
+  getEdcsGraph: () => request(withScope("/edcs/graph"), { skipCache: true }),
+  connectEdcsGraph: (body) => request("/edcs/graph/connect", { method: "POST", body }),
+  disconnectEdcsGraph: (body) => request("/edcs/graph/disconnect", { method: "POST", body }),
+  syncEdcsGraph: (body) => request("/edcs/graph/sync", { method: "POST", body }),
   // CE-S5: Delegation of Authority.
   getEdcsDelegation: (version = "") => request(withScope(`/edcs/delegation${version ? `?version=${encodeURIComponent(version)}` : ""}`), { skipCache: true }),
   previewEdcsDelegation: (body) => request("/edcs/delegation/preview", { method: "POST", body }),
