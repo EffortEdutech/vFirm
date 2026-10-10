@@ -18,7 +18,7 @@ import { isPostgresStore, readStore, withStore } from "./store.mjs";
 import { query, setTenantContext, withClient } from "./repositories/shared/db.mjs";
 
 // CE-S3 (ADR-097, migration 0051) adds the two automation tables to the same repository.
-export const EDCS_COLLECTIONS = ["edcs_connections", "edcs_transactions", "edcs_transaction_revisions", "edcs_sync_runs", "edcs_sync_events", "automation_rules", "automation_rule_runs", "edcs_number_reservations", "approval_policies", "edcs_connectors", "edcs_graph_connections"];
+export const EDCS_COLLECTIONS = ["edcs_connections", "edcs_transactions", "edcs_transaction_revisions", "edcs_sync_runs", "edcs_sync_events", "automation_rules", "automation_rule_runs", "edcs_number_reservations", "approval_policies", "edcs_connectors", "edcs_graph_connections", "edcs_company_profiles", "edcs_template_drafts"];
 
 // The natural key inside (tenant, firm) of each collection.
 const naturalKey = {
@@ -37,7 +37,10 @@ const naturalKey = {
   // CE-S6: one row per registered connector (the token hash index in 0054 is global and unique)
   edcs_connectors: (record) => record.id,
   // CE-S7: at most one Microsoft 365 connection per firm (migration 0055)
-  edcs_graph_connections: () => "graph"
+  edcs_graph_connections: () => "graph",
+  // CE-S8: one company-details row per firm; one draft per document (migration 0056)
+  edcs_company_profiles: () => "company",
+  edcs_template_drafts: (record) => record.id
 };
 
 // A claimed occurrence that failed may be claimed again, up to this many attempts in total.
@@ -416,11 +419,23 @@ export const edcsRepository = {
   async graphScopes() {
     return impl().graphScopes();
   },
+  // CE-S8: the company details and the drafted documents. Draft rows carry the generated file (base64);
+  // callers that list drafts must drop `file_b64` (see edcs-drafting-service.mjs).
+  async getCompanyProfile(scope) {
+    return (await impl().read(scope, "edcs_company_profiles"))[0] ?? null;
+  },
+  async listDrafts(scope) {
+    return (await impl().read(scope, "edcs_template_drafts")).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+  },
+  async getDraft(scope, draftId) {
+    return (await impl().readWhere(scope, "edcs_template_drafts", { key: draftId }))[0] ?? null;
+  },
   async exportCollections(scope) {
     const out = {};
     for (const collection of EDCS_COLLECTIONS) out[collection] = await impl().read(scope, collection);
     out.edcs_connectors = out.edcs_connectors.map(({ token_hash, ...rest }) => rest); // never export a token hash
     out.edcs_graph_connections = out.edcs_graph_connections.map(({ secret_enc, ...rest }) => rest); // never export the encrypted secret
+    out.edcs_template_drafts = out.edcs_template_drafts.map(({ file_b64, ...rest }) => ({ ...rest, file_included: false })); // the hash stays; the bytes are downloaded from the draft
     return out;
   }
 };

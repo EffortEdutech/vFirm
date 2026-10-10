@@ -32,6 +32,7 @@ import { annotateDraftRequirement, checkDraftApproval, enforceDraftApproval, imp
 import { EDCS_COLLECTIONS, listNumbers as listEdcsNumbers, reserveNumber as reserveEdcsNumber, voidNumber as voidEdcsNumber, linkEdcsFile, listEdcsChains, readEdcsDocuments, importRegister as importEdcsRegister, linkCounterparty as linkEdcsCounterparty, listConflicts as listEdcsConflicts, listSyncRuns as listEdcsSyncRuns, listTransactions as listEdcsTransactions, readConnection as readEdcsConnection, readEdcsExportCollections, readSyncRun as readEdcsSyncRun, readTransaction as readEdcsTransaction, resolveConflict as resolveEdcsConflict, saveConnection as saveEdcsConnection } from "./edcs-service.mjs";
 import { createRule as createAutomationRule, dryRunRule as dryRunAutomationRule, evaluateAfter as evaluateAutomationAfter, evaluateNow as evaluateAutomationNow, listRuleActivity as listAutomationRuleActivity, listRules as listAutomationRules, readSignals as readEdcsSignals, setRuleEnabled as setAutomationRuleEnabled, tick as tickAutomation, updateRule as updateAutomationRule } from "./edcs-automation-service.mjs";
 import { connectGraph as connectEdcsGraph, disconnectGraph as disconnectEdcsGraph, pollGraphConnections, readGraphConnection as readEdcsGraph, syncGraphNow as syncEdcsGraphNow } from "./edcs-graph-service.mjs";
+import { approveDraft as approveEdcsDraft, cancelDraft as cancelEdcsDraft, checkDraft as checkEdcsDraft, createDraft as createEdcsDraft, downloadDraft as downloadEdcsDraft, listDrafts as listEdcsDrafts, outboxAcknowledge as edcsOutboxAcknowledge, outboxPending as edcsOutboxPending, readCompany as readEdcsCompany, readDraft as readEdcsDraft, rejectDraft as rejectEdcsDraft, saveCompany as saveEdcsCompany } from "./edcs-drafting-service.mjs";
 import { authenticateConnector as authenticateEdcsConnector, issueConnector as issueEdcsConnector, listConnectors as listEdcsConnectors, recordHeartbeat as recordEdcsConnectorHeartbeat, revokeConnector as revokeEdcsConnector, rotateConnector as rotateEdcsConnector, syncFile as syncEdcsFile, syncRegister as syncEdcsRegister } from "./edcs-connector-service.mjs";
 
 const root = process.cwd();
@@ -3204,6 +3205,16 @@ const routes = new Map([
   ["POST /edcs/connectors/rotate", rotateEdcsConnectorRoute],
   ["POST /edcs/connectors/revoke", revokeEdcsConnectorRoute],
   ["POST /edcs/connector/heartbeat", edcsConnectorHeartbeatRoute],
+  // CE-S8 (ADR-107): governed drafting into BizKick masters. Company details: owner. Drafts: any signed-in
+  // member prepares; approval follows the Delegation of Authority; the connector outbox routes carry a token.
+  ["POST /edcs/company", saveEdcsCompanyRoute],
+  ["POST /edcs/drafts", createEdcsDraftRoute],
+  ["POST /edcs/drafts/check", checkEdcsDraftRoute],
+  ["POST /edcs/drafts/approve", approveEdcsDraftRoute],
+  ["POST /edcs/drafts/reject", rejectEdcsDraftRoute],
+  ["POST /edcs/drafts/cancel", cancelEdcsDraftRoute],
+  ["POST /edcs/connector/outbox", edcsConnectorOutboxRoute],
+  ["POST /edcs/connector/outbox/ack", edcsConnectorOutboxAckRoute],
   // CE-S7 (ADR-106): Microsoft 365 (OneDrive / SharePoint) cloud adapter. Owner routes behind the request gate.
   ["POST /edcs/graph/connect", connectEdcsGraphRoute],
   ["POST /edcs/graph/disconnect", disconnectEdcsGraphRoute],
@@ -3718,6 +3729,68 @@ async function edcsConnectorFileRoute(body, req = null) {
   return linked;
 }
 
+// CE-S8 (ADR-107): governed drafting.
+async function saveEdcsCompanyRoute(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id"]);
+  const { actor } = edcsScope(req, body, "save company details");
+  return saveEdcsCompany({ body, actor });
+}
+
+async function createEdcsDraftRoute(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "template_id"]);
+  const { actor } = edcsScope(req, body, "draft a BizKick document");
+  return createEdcsDraft({ body, actor });
+}
+
+async function checkEdcsDraftRoute(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "draft_id"]);
+  const { actor, scope } = edcsScope(req, body, "check a draft's approval limit");
+  return checkEdcsDraft({ scope, actor, draftId: body.draft_id });
+}
+
+async function approveEdcsDraftRoute(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "draft_id"]);
+  const { actor } = edcsScope(req, body, "approve a draft");
+  return approveEdcsDraft({ body, actor });
+}
+
+async function rejectEdcsDraftRoute(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "draft_id", "reason"]);
+  const { actor } = edcsScope(req, body, "reject a draft");
+  return rejectEdcsDraft({ body, actor });
+}
+
+async function cancelEdcsDraftRoute(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "draft_id", "reason"]);
+  const { actor } = edcsScope(req, body, "cancel a draft");
+  return cancelEdcsDraft({ body, actor });
+}
+
+async function edcsConnectorOutboxRoute(body, req = null) {
+  const connector = await connectorFromRequest(req);
+  return edcsOutboxPending({ connector });
+}
+
+async function edcsConnectorOutboxAckRoute(body, req = null) {
+  const connector = await connectorFromRequest(req);
+  return edcsOutboxAcknowledge({ connector, body });
+}
+
+// GET /edcs/drafts/<id>/download?tenant_id=&firm_id= -- the approved working copy (.xlsx). 409 until approved.
+async function downloadEdcsDraftRoute(req, res, url, draftId) {
+  const { actor, scope } = edcsScope(req, { tenant_id: url.searchParams.get("tenant_id"), firm_id: url.searchParams.get("firm_id") }, "download a draft");
+  const file = await downloadEdcsDraft({ scope, actor, draftId });
+  res.writeHead(200, {
+    "content-type": file.mime_type,
+    "content-length": String(file.buffer.length),
+    "content-disposition": `attachment; filename="${file.filename.replace(/[^\x20-\x7e]/g, "_").replace(/["\\]/g, "_")}"; filename*=UTF-8''${encodeURIComponent(file.filename)}`,
+    "x-vfirm-file-sha256": file.sha256,
+    "cache-control": "no-store",
+    ...corsHeaders(req)
+  });
+  res.end(file.buffer);
+}
+
 async function reserveEdcsNumberRoute(body, req = null) {
   requireFields(body, ["tenant_id", "firm_id"]);
   const { actor } = edcsScope(req, body, "reserve a transaction number");
@@ -3763,7 +3836,7 @@ async function linkEdcsCounterpartyRoute(body, req = null) {
 // GET /edcs/connection | /edcs/transactions[/<id>] | /edcs/sync-runs[/<id>] | /edcs/conflicts
 // (?tenant_id=&firm_id= required; transactions also take type, status, alert, flag, search, as_of).
 async function readEdcsRoute(req, url) {
-  const match = url.pathname.match(/^\/edcs\/(connection|transactions|sync-runs|conflicts|chains|documents|signals|numbers|delegation|connectors|graph)(?:\/([^/]+))?$/);
+  const match = url.pathname.match(/^\/edcs\/(connection|transactions|sync-runs|conflicts|chains|documents|signals|numbers|delegation|connectors|graph|company|drafts)(?:\/([^/]+))?$/);
   if (!match) return null;
   const [, kind, rawId] = match;
   const { scope } = edcsScope(req, { tenant_id: url.searchParams.get("tenant_id"), firm_id: url.searchParams.get("firm_id") }, "read BizKick data");
@@ -3776,6 +3849,8 @@ async function readEdcsRoute(req, url) {
   if (kind === "numbers" && !id) return listEdcsNumbers({ scope, params: url.searchParams });
   if (kind === "connectors" && !id) return listEdcsConnectors({ scope });
   if (kind === "graph" && !id) return readEdcsGraph({ scope });
+  if (kind === "company" && !id) return readEdcsCompany({ scope });
+  if (kind === "drafts") return id ? readEdcsDraft({ scope, draftId: id }) : listEdcsDrafts({ scope, params: url.searchParams });
   if (kind === "documents" && id) return readEdcsDocuments({ scope, transactionId: id });
   if (kind === "transactions") return id ? readEdcsTransaction({ scope, transactionId: id, params: url.searchParams }) : listEdcsTransactions({ scope, params: url.searchParams });
   if (kind === "sync-runs") return id ? readEdcsSyncRun({ scope, runId: id }) : listEdcsSyncRuns({ scope });
@@ -3965,6 +4040,7 @@ export const handleRequest = async (req, res) => {
     if (req.method === "POST" && url.pathname === "/edcs/files/upload") return sendJson(req, res, 201, { ok: true, data: await linkEdcsFileRoute(req, url) });
     if (req.method === "POST" && url.pathname === "/files/upload") return sendJson(req, res, 201, { ok: true, data: await uploadFirmFile(req, url) });
     { const fileDownload = req.method === "GET" ? url.pathname.match(/^\/files\/([^/]+)\/download$/) : null; if (fileDownload) return await downloadFirmFile(req, res, url, decodeURIComponent(fileDownload[1])); }
+    { const draftDownload = req.method === "GET" ? url.pathname.match(/^\/edcs\/drafts\/([^/]+)\/download$/) : null; if (draftDownload) return await downloadEdcsDraftRoute(req, res, url, decodeURIComponent(draftDownload[1])); }
     { const edcsRead = req.method === "GET" && url.pathname.startsWith("/edcs/") ? await readEdcsRoute(req, url) : null; if (edcsRead) return sendJson(req, res, 200, { ok: true, data: edcsRead }); }
     if (req.method === "GET" && url.pathname === "/mvp/store") {
       // CE-H1 (ADR-100): ?tenant_id=<id> returns that tenant's records only (the ledgers -- event_log,

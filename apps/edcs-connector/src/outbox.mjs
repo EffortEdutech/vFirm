@@ -5,7 +5,7 @@
 // anything that would land outside the outbox: absolute paths, "..", and drive tricks all throw. It does
 // nothing at all unless outbox_enabled is true in the configuration.
 
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 export class OutboxError extends Error {}
@@ -24,6 +24,20 @@ export function createOutbox(config) {
   return {
     enabled: Boolean(config.outbox_enabled),
     root,
+    // CE-S8: place a delivered file. Never overwrites: an existing file with the same bytes counts as already
+    // delivered ("SAME"); an existing file with other bytes is left alone ("CONFLICT").
+    async place(name, content) {
+      const path = target(name);
+      await mkdir(dirname(path), { recursive: true });
+      try {
+        await writeFile(path, content, { flag: "wx" });
+        return { path, status: "WRITTEN" };
+      } catch (error) {
+        if (error?.code !== "EEXIST") throw error;
+        const existing = await readFile(path);
+        return { path, status: Buffer.compare(existing, Buffer.from(content)) === 0 ? "SAME" : "CONFLICT" };
+      }
+    },
     async write(name, content) {
       const path = target(name);
       await mkdir(dirname(path), { recursive: true });

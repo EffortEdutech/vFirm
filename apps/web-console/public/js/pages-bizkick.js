@@ -669,7 +669,134 @@ async function mountMicrosoft(root) {
   }));
 }
 
+// ---------------- drafting (CE-S8) ----------------
+
+const DRAFT_TONE = { PENDING_APPROVAL: "amber", APPROVED: "moss", DELIVERED: "moss", REJECTED: "rose", CANCELLED: "default" };
+const DRAFT_TEXT = { PENDING_APPROVAL: "Waiting for approval", APPROVED: "Approved", DELIVERED: "Delivered", REJECTED: "Rejected", CANCELLED: "Cancelled" };
+
+async function mountDrafting(root) {
+  let company;
+  let drafts;
+  try { [company, drafts] = await Promise.all([api.getEdcsCompany(), api.listEdcsDrafts()]); } catch (err) { root.innerHTML = errorBox(err, "drafting"); return; }
+  const profile = company.company ?? {};
+  const templates = company.templates ?? [];
+  const num = (value) => (value === "" || value === undefined ? 0 : Number(value));
+  const today = new Date().toISOString().slice(0, 10);
+  let lines = [{ description: "", qty: 1, unit: "unit", unit_price: "", discount_percent: "" }];
+  const state = { templateId: templates[0]?.id ?? "" };
+  const field = (id, label, value, extra = "") => `<label class="field"><span>${label}</span><input id="${id}" type="text" value="${escapeHtml(value ?? "")}" ${extra} /></label>`;
+
+  const companyPanel = panel(profile.legal_name ? "Company details" : "Company details — fill these in once", `
+    <p class="field-note">These go on the Setup sheet of every document vFirm prepares. Only the firm owner can change them.</p>
+    <div class="form-grid">
+      ${company.fields.map((f) => field(`dfc_${f.key}`, `${escapeHtml(f.label)}${f.required ? " *" : ""}`, profile[f.key], `maxlength="${f.max}"`)).join("")}
+      ${field("dfc_default_tax_rate", "Default tax rate (%)", profile.default_tax_rate ?? 0)}
+      ${field("dfc_default_payment_days", "Default payment terms (days)", profile.default_payment_days ?? 30)}
+      ${field("dfc_default_validity_days", "Default quotation validity (days)", profile.default_validity_days ?? 30)}
+      ${field("dfc_default_delivery_days", "Default PO delivery period (days)", profile.default_delivery_days ?? 14)}
+    </div>
+    <div class="form-actions"><button class="btn" id="dfCompanySave" type="button">Save company details</button></div>`);
+
+  const draftsPanel = panel("Drafts", drafts.drafts.length ? `<div style="overflow-x:auto">` + table([
+    { label: "Number", render: (d) => `<code>${escapeHtml(d.transaction_id)}</code><div class="field-note">${escapeHtml(d.template_name)} · ${escapeHtml(d.filename)}</div>` },
+    { label: "For", render: (d) => escapeHtml(d.counterparty ?? "—") },
+    { label: "Total", render: (d) => escapeHtml(fmtMoney(d.totals?.grand, d.totals?.currency)) },
+    { label: "Status", render: (d) => pill(DRAFT_TEXT[d.status] ?? d.status, DRAFT_TONE[d.status] ?? "default") + (d.registered ? ` ${pill("In the register", "moss")}` : "") + (d.status === "PENDING_APPROVAL" && d.approval_summary ? `<div class="field-note">${escapeHtml(d.approval_summary)}</div>` : "") + (d.decision_reason && ["REJECTED", "CANCELLED"].includes(d.status) ? `<div class="field-note">${escapeHtml(d.decision_reason)}</div>` : "") + ((d.warnings ?? []).length ? `<div class="field-note">Note: ${d.warnings.map(escapeHtml).join(" ")}</div>` : "") },
+    { label: "", render: (d) => d.status === "PENDING_APPROVAL"
+      ? `<div style="white-space:nowrap"><button class="btn btn-sm btn-primary df-approve" data-id="${escapeHtml(d.id)}" type="button">Approve</button> <button class="btn btn-sm df-reject" data-id="${escapeHtml(d.id)}" type="button">Reject</button> <button class="btn btn-sm df-cancel" data-id="${escapeHtml(d.id)}" type="button">Cancel</button></div>`
+      : (d.status === "APPROVED" || d.status === "DELIVERED") ? `<button class="btn btn-sm btn-primary df-download" data-id="${escapeHtml(d.id)}" data-name="${escapeHtml(d.filename)}" type="button">Download</button>` : "" }
+  ], drafts.drafts, (d) => d.id) + `</div>
+    <label class="field"><span>Reason (needed to reject or cancel)</span><input id="dfReason" type="text" maxlength="300" /></label>
+    <p class="field-note">After you download the file, move it into your BizKick folder, add its row to the register, and the next sync links it. If a connector with the outbox switched on is installed, approved files also appear in its _vFirm_Outbox folder.</p>` : `<p class="field-note">No drafts yet.</p>`);
+
+  root.innerHTML = GOLDEN_RULE + companyPanel
+    + panel("Prepare a document", templates.length ? `
+      <label class="field"><span>Which document?</span><select id="dfTemplate">${templates.map((t) => `<option value="${escapeHtml(t.id)}">${escapeHtml(t.name)} (${escapeHtml(t.id)})</option>`).join("")}</select></label>
+      <div class="form-grid" id="dfFields"></div>
+      <div class="form-grid">${field("dfDate", "Issue date (YYYY-MM-DD)", today)}${field("dfOther", "Other charges (RM)", "0")}${field("dfDiscount", "Additional discount (RM)", "0")}</div>
+      <label class="field"><span>Notes</span><textarea id="dfNotes" rows="2" maxlength="600"></textarea></label>
+      <div id="dfLines"></div>
+      <div class="form-actions"><button class="btn" id="dfAddLine" type="button">Add a line</button> <button class="btn btn-primary" id="dfCreate" type="button">Prepare draft</button></div>
+      <p class="field-note" id="dfTotal"></p>` : `<p class="field-note">No templates are available.</p>`)
+    + `<div id="dfMsg" style="min-height:1.2em"></div>` + draftsPanel;
+
+  const msg = root.querySelector("#dfMsg");
+  const guard = (fn) => async (event) => { msg.textContent = "Working…"; try { await fn(event); } catch (err) { msg.textContent = err.message; } };
+  const template = () => templates.find((t) => t.id === state.templateId) ?? templates[0];
+
+  // ---- company details ----
+  root.querySelector("#dfCompanySave").addEventListener("click", guard(async () => {
+    const body = {};
+    for (const f of company.fields) body[f.key] = root.querySelector(`#dfc_${f.key}`).value;
+    for (const key of ["default_tax_rate", "default_payment_days", "default_validity_days", "default_delivery_days"]) body[key] = root.querySelector(`#dfc_${key}`).value;
+    await api.saveEdcsCompany(body);
+    await mountDrafting(root);
+    root.querySelector("#dfMsg").textContent = "Company details saved.";
+  }));
+
+  // ---- the form ----
+  const renderFields = () => {
+    root.querySelector("#dfFields").innerHTML = template().fields.map((f) => field(`dff_${f.key}`, `${escapeHtml(f.label)}${f.required ? " *" : ""}`, "", `maxlength="${f.max}"`)).join("");
+  };
+  const renderTotal = () => {
+    const rate = num(profile.default_tax_rate ?? 0) / 100;
+    const sub = lines.reduce((sum, l) => sum + num(l.qty) * num(l.unit_price) * (1 - num(l.discount_percent) / 100), 0);
+    const el = root.querySelector("#dfTotal");
+    if (el) el.textContent = `Estimate: subtotal ${fmtMoney(sub)}; with the default ${(rate * 100).toFixed(2)}% tax and your other charges the total is ${fmtMoney(sub * (1 + rate) + num(root.querySelector("#dfOther")?.value) - num(root.querySelector("#dfDiscount")?.value))}. The document's own formulas give the final figure.`;
+  };
+  const renderLines = () => {
+    const units = template().units;
+    root.querySelector("#dfLines").innerHTML = `<div style="overflow-x:auto"><table class="data-table"><thead><tr><th>#</th><th>Item / description</th><th>Qty</th><th>Unit</th><th>Unit price (RM)</th><th>Disc. %</th><th></th></tr></thead><tbody>${lines.map((l, i) => `<tr>
+      <td>${i + 1}</td>
+      <td><input class="df-line" data-i="${i}" data-k="description" type="text" maxlength="300" value="${escapeHtml(l.description)}" style="width:100%;min-width:14rem" /></td>
+      <td><input class="df-line" data-i="${i}" data-k="qty" type="text" inputmode="decimal" value="${escapeHtml(l.qty)}" style="width:5rem" /></td>
+      <td><select class="df-line" data-i="${i}" data-k="unit">${units.map((u) => `<option ${u === l.unit ? "selected" : ""}>${escapeHtml(u)}</option>`).join("")}</select></td>
+      <td><input class="df-line" data-i="${i}" data-k="unit_price" type="text" inputmode="decimal" value="${escapeHtml(l.unit_price)}" style="width:7rem" /></td>
+      <td><input class="df-line" data-i="${i}" data-k="discount_percent" type="text" inputmode="decimal" value="${escapeHtml(l.discount_percent)}" style="width:4rem" /></td>
+      <td>${lines.length > 1 ? `<button class="btn btn-sm df-remove" data-i="${i}" type="button">Remove</button>` : ""}</td></tr>`).join("")}</tbody></table></div>`;
+    for (const input of root.querySelectorAll(".df-line")) input.addEventListener("input", () => { lines[Number(input.dataset.i)][input.dataset.k] = input.value; renderTotal(); });
+    for (const button of root.querySelectorAll(".df-remove")) button.addEventListener("click", () => { lines.splice(Number(button.dataset.i), 1); renderLines(); renderTotal(); });
+    renderTotal();
+  };
+  if (templates.length) {
+    renderFields();
+    renderLines();
+    root.querySelector("#dfTemplate").addEventListener("change", (event) => { state.templateId = event.target.value; lines = lines.slice(0, template().max_items); renderFields(); renderLines(); });
+    root.querySelector("#dfAddLine").addEventListener("click", () => { if (lines.length >= template().max_items) { msg.textContent = `This template holds ${template().max_items} lines at most.`; return; } lines.push({ description: "", qty: 1, unit: "unit", unit_price: "", discount_percent: "" }); renderLines(); });
+    for (const id of ["#dfOther", "#dfDiscount"]) root.querySelector(id).addEventListener("input", renderTotal);
+    root.querySelector("#dfCreate").addEventListener("click", guard(async () => {
+      const fields = {};
+      for (const f of template().fields) fields[f.key] = root.querySelector(`#dff_${f.key}`).value;
+      const result = await api.createEdcsDraft({
+        template_id: template().id, issue_date: root.querySelector("#dfDate").value, fields, notes: root.querySelector("#dfNotes").value,
+        other_charges: root.querySelector("#dfOther").value, additional_discount: root.querySelector("#dfDiscount").value,
+        items: lines.map((l) => ({ description: l.description, qty: l.qty, unit: l.unit, unit_price: l.unit_price, discount_percent: l.discount_percent }))
+      });
+      await mountDrafting(root);
+      root.querySelector("#dfMsg").textContent = `Draft ${result.draft.transaction_id} prepared. ${result.draft.approval_summary ?? ""} It cannot be downloaded until it is approved.`;
+    }));
+  }
+
+  // ---- the drafts ----
+  const decide = (call, needReason) => guard(async (event) => {
+    const reason = root.querySelector("#dfReason")?.value ?? "";
+    if (needReason && reason.trim().length < 3) throw new Error("Type the reason first (at least 3 letters).");
+    await call({ draft_id: event.currentTarget.dataset.id, reason });
+    await mountDrafting(root);
+  });
+  for (const b of root.querySelectorAll(".df-approve")) b.addEventListener("click", decide((body) => api.approveEdcsDraft(body), false));
+  for (const b of root.querySelectorAll(".df-reject")) b.addEventListener("click", decide((body) => api.rejectEdcsDraft(body), true));
+  for (const b of root.querySelectorAll(".df-cancel")) b.addEventListener("click", decide((body) => api.cancelEdcsDraft(body), true));
+  for (const b of root.querySelectorAll(".df-download")) b.addEventListener("click", guard(async (event) => {
+    const button = event.currentTarget;
+    await api.downloadEdcsDraft(button.dataset.id, button.dataset.name);
+    await mountDrafting(root);
+    root.querySelector("#dfMsg").textContent = "Downloaded. Move the file into your BizKick folder and add its row to the register.";
+  }));
+}
+
 export const BIZKICK_PAGES = {
+  "bizkick-drafting": mountDrafting,
   "bizkick-connector": mountConnector,
   "bizkick-microsoft": mountMicrosoft,
   "bizkick-delegation": mountDelegation,

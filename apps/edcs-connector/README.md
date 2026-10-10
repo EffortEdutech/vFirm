@@ -54,6 +54,13 @@ BizKick register and your controlled document folders and sends vFirm only **wha
   the path and the account differ. File-change notifications are unreliable on shares, so the connector also
   checks on a timer (`poll_interval_seconds`); that is what guarantees nothing is missed.
 
+## Outbox (CE-S8, off by default)
+
+- Set `"outbox_enabled": true` in the config to let the connector collect documents the owner has approved in vFirm (BizKick > Drafting).
+- Each approved file is written into `_vFirm_Outbox` inside the BizKick folder, using the Transaction ID in the file name.
+- It is the only place the connector writes. It never overwrites: if a file with that name exists, it is left alone and the difference is reported.
+- Move the file into the right BizKick folder yourself and add its row to the register; the next sync links it.
+
 ## Commands
 
     node bin\edcs-connector.mjs run    --config <file>   keep running (what the scheduled task runs)

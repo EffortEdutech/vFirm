@@ -39,6 +39,9 @@ export function createApiClient({ baseUrl, token, timeoutMs = 30000, fetchImpl =
   return {
     heartbeat: (body) => post("/edcs/connector/heartbeat", body),
     syncRegister: (body) => post("/edcs/sync", body),
-    syncFile: (body) => post("/edcs/sync/file", body)
+    syncFile: (body) => post("/edcs/sync/file", body),
+    // CE-S8: approved drafts waiting for the outbox, and the acknowledgement once a file is placed.
+    outbox: () => post("/edcs/connector/outbox", {}),
+    outboxAck: (body) => post("/edcs/connector/outbox/ack", body)
   };
 }

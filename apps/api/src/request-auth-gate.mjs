@@ -12,7 +12,7 @@
 const PUBLIC = new Set(["GET /health", "GET /auth/provider/config", "GET /auth/me"]);
 // Own credential, checked by the route or its own guard.
 const SERVICE_TOKEN_ROUTES = new Set(["POST /automation/tick", "GET /mvp/store"]);
-const CONNECTOR_TOKEN_ROUTES = new Set(["POST /edcs/connector/heartbeat", "POST /edcs/sync", "POST /edcs/sync/file"]);
+const CONNECTOR_TOKEN_ROUTES = new Set(["POST /edcs/connector/heartbeat", "POST /edcs/sync", "POST /edcs/sync/file", "POST /edcs/connector/outbox", "POST /edcs/connector/outbox/ack"]);
 // Development-only routes: never available on an enforced server (sign-up goes through /auth/signup-firm).
 const DEV_ONLY = new Set(["POST /tenants", "POST /firms", "POST /mvp/reset"]);
 

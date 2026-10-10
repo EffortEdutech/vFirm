@@ -172,6 +172,7 @@
                     "check:ce:s5-delegation-of-authority": "node scripts/smoke-ce-s5-delegation-of-authority.mjs",
                     "check:ce:s6-connector":  "node scripts/smoke-ce-s6-connector.mjs",
                     "check:ce:s7-cloud-adapter":  "node scripts/smoke-ce-s7-cloud-adapter.mjs",
+                    "check:ce:s8-template-drafting": "node scripts/smoke-ce-s8-template-drafting.mjs",
                     "check:ce:h1-scoped-reads":  "node scripts/smoke-ce-h1-scoped-reads.mjs",
                     "check:ce:h1-store-read-guard":  "node scripts/smoke-ce-h1-store-read-guard.mjs",
                     "check:pa:request-gate":  "node scripts/smoke-pa-request-gate.mjs",

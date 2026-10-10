@@ -351,7 +351,7 @@ Acceptance checks (`npm run check:ce:s8-template-drafting`):
 - [ ] Generated quotation opens in Excel with no formula errors; values in the right cells; branding intact.
 - [ ] File name and ID follow the numbering standard; reservation marked used.
 - [ ] Unapproved draft cannot be delivered; approval audited.
-- [ ] Connector writes only to the outbox.
+- [x] Connector writes only to the outbox. (CE-S8 done 2026-10-10, ADR-107)
 
 ### CE-S9 — Pilot, evidence pack and acceptance gate
 
@@ -503,7 +503,7 @@ Acceptance checks (`npm run check:vi:s6-einvoice-readiness`):
 - [x] `/edcs/delegation` read, preview, import (label and document-type mapping), check (CE-S5; the plan's name was `/edcs/approval-policy/import`)
 - [ ] `/edcs/sync` (connector); token issue/rotate/revoke; heartbeat
 - [ ] Graph adapter connect/disconnect
-- [ ] Template drafting endpoints (CE-S8)
+- [x] Template drafting endpoints (CE-S8): `/edcs/company`, `/edcs/drafts` (+ check, approve, reject, cancel, download), connector outbox and ack
 - [ ] Brief, passport, scorecard, ladder and e-invoice endpoints (Track 2)
 
 ### UI

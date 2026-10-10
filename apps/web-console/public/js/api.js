@@ -188,6 +188,25 @@ async function downloadFile(fileId, filename = "download") {
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
+// CE-S8: the approved working copy (.xlsx). The server answers 409 until the draft is approved.
+async function downloadEdcsDraft(draftId, filename = "draft.xlsx") {
+  const res = await fetch(API_PREFIX + withScope(`/edcs/drafts/${encodeURIComponent(draftId)}/download`), { headers: { ...(await authHeaders()) } });
+  if (!res.ok) {
+    let message = `Download failed (${res.status})`;
+    try { message = (await res.json())?.error?.message ?? message; } catch { /* binary or empty */ }
+    throw new Error(message);
+  }
+  const url = URL.createObjectURL(await res.blob());
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  getCache.clear();
+}
+
 export const api = {
   // ---- confirmed real GET endpoints ----
   // CE-H1 (ADR-100): once the signed-in identity is known the store read is scoped to that tenant on the
@@ -254,6 +273,15 @@ export const api = {
   issueEdcsConnector: (body) => request("/edcs/connectors", { method: "POST", body }),
   rotateEdcsConnector: (body) => request("/edcs/connectors/rotate", { method: "POST", body }),
   revokeEdcsConnector: (body) => request("/edcs/connectors/revoke", { method: "POST", body }),
+  // CE-S8: governed drafting into BizKick masters (company details, drafts, approval, download).
+  getEdcsCompany: () => request(withScope("/edcs/company"), { skipCache: true }),
+  saveEdcsCompany: (body) => request("/edcs/company", { method: "POST", body }),
+  listEdcsDrafts: () => request(withScope("/edcs/drafts"), { skipCache: true }),
+  createEdcsDraft: (body) => request("/edcs/drafts", { method: "POST", body }),
+  approveEdcsDraft: (body) => request("/edcs/drafts/approve", { method: "POST", body }),
+  rejectEdcsDraft: (body) => request("/edcs/drafts/reject", { method: "POST", body }),
+  cancelEdcsDraft: (body) => request("/edcs/drafts/cancel", { method: "POST", body }),
+  downloadEdcsDraft,
   getEdcsGraph: () => request(withScope("/edcs/graph"), { skipCache: true }),
   connectEdcsGraph: (body) => request("/edcs/graph/connect", { method: "POST", body }),
   disconnectEdcsGraph: (body) => request("/edcs/graph/disconnect", { method: "POST", body }),

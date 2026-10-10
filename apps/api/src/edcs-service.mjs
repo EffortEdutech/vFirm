@@ -337,6 +337,8 @@ export async function voidNumber({ body, actor }) {
   const current = reservations.find((item) => (body.transaction_id && item.transaction_id === body.transaction_id) || (body.reservation_id && item.id === body.reservation_id));
   if (!current) throw httpError(404, "NOT_FOUND", `edcs_number_reservations record not found: ${body.transaction_id ?? body.reservation_id}`);
   if (current.status !== "RESERVED") throw httpError(409, "NUMBER_NOT_VOIDABLE", `${current.transaction_id} is ${current.status}; only a RESERVED number can be voided.`);
+  // CE-S8: a number held by a drafted document is released by rejecting or cancelling that draft.
+  if (current.draft_id) throw httpError(409, "NUMBER_HAS_DRAFT", `${current.transaction_id} belongs to a drafted document. Reject or cancel the draft to release the number.`);
   const timestamp = now();
   const updated = { ...current, status: "VOID", void_at: timestamp, void_by: actor.actor_id ?? null, void_reason: reason };
   await repo.commit(scope, { edcs_number_reservations: [updated] });

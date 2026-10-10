@@ -10,6 +10,7 @@
 // send a file's bytes where the content policy says metadata only, or keep sending after vFirm says the
 // connector is revoked.
 
+import { createHash } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { watch } from "node:fs";
 import { hostname } from "node:os";
@@ -17,6 +18,7 @@ import { dirname, join } from "node:path";
 import { AGENT_VERSION } from "./config.mjs";
 import { ApiError, createApiClient } from "./api-client.mjs";
 import { createQueue } from "./queue.mjs";
+import { OutboxError, createOutbox } from "./outbox.mjs";
 import { scanRegister } from "./register-sync.mjs";
 import { scanControlledFolders } from "./file-sync.mjs";
 
@@ -39,6 +41,7 @@ export function createAgent({ config, log = () => {}, fetchImpl = globalThis.fet
   const statePath = join(config.state_dir, "state.json");
   const queue = createQueue({ dir: config.state_dir, retry: config.retry, clock });
   const api = createApiClient({ baseUrl: config.vfirm_url, token: config.connector_token, fetchImpl });
+  const outbox = createOutbox(config);
   let state = null;
   let running = false;
   let stopped = false;
@@ -88,6 +91,23 @@ export function createAgent({ config, log = () => {}, fetchImpl = globalThis.fet
     }
   }
 
+  // CE-S8: collect approved drafts from vFirm and place each in _vFirm_Outbox (the one folder the connector may
+  // write). A file that already exists there is never overwritten; identical bytes count as delivered.
+  async function deliverOutbox() {
+    const result = { placed: 0, same: 0, conflicts: 0 };
+    if (!config.outbox_enabled) return result;
+    const pending = await api.outbox();
+    for (const item of pending.items ?? []) {
+      const bytes = Buffer.from(String(item.content_base64 ?? ""), "base64");
+      if (createHash("sha256").update(bytes).digest("hex") !== item.sha256) { noteError(`Outbox file ${item.filename} failed its integrity check; not written.`); continue; }
+      const placed = await outbox.place(item.filename, bytes);
+      if (placed.status === "CONFLICT") { result.conflicts += 1; noteError(`${item.filename} already exists in the outbox with different content; left untouched.`); continue; }
+      await api.outboxAck({ draft_id: item.draft_id, sha256: item.sha256 });
+      if (placed.status === "WRITTEN") result.placed += 1; else result.same += 1;
+    }
+    return result;
+  }
+
   async function runCycle() {
     if (running) return { skipped: true };
     running = true;
@@ -110,6 +130,15 @@ export function createAgent({ config, log = () => {}, fetchImpl = globalThis.fet
       }
       await saveState(statePath, state); // the queue holds the deliveries; the state holds what they were measured against
       summary.flush = await flush();
+      if (!health.fatal) {
+        try {
+          summary.outbox = await deliverOutbox();
+        } catch (error) {
+          if (!(error instanceof ApiError || error instanceof OutboxError)) throw error;
+          if (error instanceof ApiError && error.kind === "REVOKED") health.fatal = error.code ?? "CONNECTOR_REVOKED";
+          noteError(error.message);
+        }
+      }
       if (summary.flush.delivered > 0 && !summary.flush.waiting && !health.fatal) {
         // A clean round clears the visible error; the counter keeps counting for the record.
         health.last_error = null;
