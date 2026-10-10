@@ -536,7 +536,7 @@ Acceptance checks (`npm run check:vi:s6-einvoice-readiness`):
 - [x] `check:ce:s6-connector` (CE-S6)
 - [x] CE-S7 Graph test (simulated Microsoft, 2026-10-08); [ ] real-tenant test (owner)
 - [ ] `check:ce:s8-template-drafting`
-- [ ] CE-S9 evidence pack + acceptance gate
+- [~] CE-S9 evidence pack + acceptance gate (kit built 2026-10-12, ADR-108; the 14-day pilot and the owner decision are still to do)
 - [ ] `check:vi:s1-standing-instructions`
 - [ ] `check:vi:s2-morning-brief`
 - [ ] `check:vi:s3-evidence-passport`
