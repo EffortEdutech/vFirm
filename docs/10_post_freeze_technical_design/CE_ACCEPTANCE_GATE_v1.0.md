@@ -53,6 +53,16 @@ These are true today. Each must either be fixed or accepted below.
 
 ## 5. Decision record
 
+### Recorded decision, 2026-10-12: HOLD (pilot deferred by the product owner)
+
+- The product owner chose to move on to the next sprint (VI-S1) before running the 14-day pilot.
+- Effect: Connected EDCS is **built and tested, but not accepted**. Entry conditions 2 to 5 and 9 are "not done".
+- Until the pilot is run and this gate is signed: no real customer uses Connected EDCS, and no real client data goes in.
+- To reopen: run Phase A (`CE_S9_PILOT_STEP_BY_STEP_GUIDE_v1.0.md`), then fill sections 2 to 5 below.
+
+### Decision for the signed gate (fill in after the pilot)
+
+
 - Decision (tick one):  [ ] Accept   [ ] Accept with limitations   [ ] Hold   [ ] Reject
 - Limitations accepted (number from section 4, owner, date to close):
 

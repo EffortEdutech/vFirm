@@ -30,6 +30,7 @@ export const CHECKS = [
   { key: "s6", script: "check:ce:s6-connector", sprint: "CE-S6", what: "Connector agent (offline, retry, revoke, outbox guard)", postgres: true },
   { key: "s7", script: "check:ce:s7-cloud-adapter", sprint: "CE-S7", what: "Microsoft 365 read-only adapter (simulated Microsoft)", postgres: true },
   { key: "s8", script: "check:ce:s8-template-drafting", sprint: "CE-S8", what: "Governed drafting into BizKick masters", postgres: true },
+  { key: "vi1", script: "check:vi:s1-standing-instructions", sprint: "VI-S1", what: "Standing instructions (recurring work, once per period)", postgres: true },
   { key: "h1gu", script: "check:ce:h1-store-read-guard", sprint: "CE-H1", what: "Store read guard", postgres: false },
   { key: "pa", script: "check:pa:request-gate", sprint: "Production auth", what: "Request gate: no anonymous or fake-header calls", postgres: false },
   { key: "vercel", script: "check:vercel:adapter", sprint: "ADR-104", what: "Vercel adapter", postgres: false }
@@ -125,6 +126,7 @@ ${rows}
 - The connector sends only what changed, survives offline, stops when revoked, writes only to the outbox (S6).
 - The Microsoft 365 adapter reads one folder, read-only, and keeps no secret in the clear (S7).
 - A drafted document is a new numbered copy of the master, cannot be released before approval, and never overwrites a file (S8).
+- A standing instruction raises one work request per period, never twice, and a paused one raises nothing (VI-S1).
 - Another firm can never see this firm's data, and the tenant export holds no file bytes (isolation and export tests inside S1 to S8, the request gate and the store guard).
 
 ## What these checks do NOT cover

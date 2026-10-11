@@ -155,7 +155,7 @@ export async function setRuleEnabled({ body, actor }) {
 
 // ---------------- context and matching ----------------
 
-async function buildContext(scope, asOf) {
+export async function buildContext(scope, asOf) {
   const transactions = await repo.listTransactions(scope);
   const revisions = await repo.listRevisions(scope);
   const latestRevision = new Map();

@@ -388,10 +388,10 @@ Scope:
 
 Acceptance checks (`npm run check:vi:s1-standing-instructions`):
 
-- [ ] Tick on the due date creates exactly one request per period; repeated ticks don't duplicate.
-- [ ] Inputs pre-attached when available; "needs info" raised when not.
-- [ ] Paused instruction creates nothing; run-now works and is audited.
-- [ ] Assignment, review and approval unchanged.
+- [x] Tick on the due date creates exactly one request per period; repeated ticks don't duplicate.
+- [x] Inputs pre-attached when available; "needs info" raised when not.
+- [x] Paused instruction creates nothing; run-now works and is audited.
+- [x] Assignment, review and approval unchanged. (VI-S1 built 2026-10-11, ADR-109)
 
 ### VI-S2 — Owner Morning Brief
 
@@ -535,9 +535,9 @@ Acceptance checks (`npm run check:vi:s6-einvoice-readiness`):
 - [x] CE-H1 measurements (CE-H1)
 - [x] `check:ce:s6-connector` (CE-S6)
 - [x] CE-S7 Graph test (simulated Microsoft, 2026-10-08); [ ] real-tenant test (owner)
-- [ ] `check:ce:s8-template-drafting`
-- [~] CE-S9 evidence pack + acceptance gate (kit built 2026-10-12, ADR-108; the 14-day pilot and the owner decision are still to do)
-- [ ] `check:vi:s1-standing-instructions`
+- [x] `check:ce:s8-template-drafting` (CE-S8, ADR-107)
+- [~] CE-S9 evidence pack + acceptance gate (kit built 2026-10-12, ADR-108; pilot deferred by the owner on 2026-10-12, gate recorded as HOLD; reopen by running the pilot)
+- [x] `check:vi:s1-standing-instructions` (VI-S1, ADR-109, migration 0057)
 - [ ] `check:vi:s2-morning-brief`
 - [ ] `check:vi:s3-evidence-passport`
 - [ ] `check:vi:s4-scorecards`

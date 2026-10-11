@@ -441,6 +441,91 @@ async function mountRules(root) {
   }));
 }
 
+
+// ---------------- standing instructions (VI-S1) ----------------
+
+const WEEKDAY_TEXT = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const ordinal = (n) => `${n}${[11, 12, 13].includes(n % 100) ? "th" : ({ 1: "st", 2: "nd", 3: "rd" }[n % 10] ?? "th")}`;
+function scheduleText(sc) {
+  const shift = sc.business_day === "NEXT" ? "; if it is a day off, the next working day" : sc.business_day === "PREVIOUS" ? "; if it is a day off, the working day before" : "";
+  if (sc.frequency === "DAILY") return "Every working day";
+  if (sc.frequency === "WEEKLY") return `Every ${WEEKDAY_TEXT[sc.weekday] ?? "week"}${shift}`;
+  if (sc.frequency === "MONTHLY") return `Monthly on the ${ordinal(sc.day_of_month)}${shift}`;
+  return `Quarterly on the ${ordinal(sc.day_of_month)}${shift}`;
+}
+const inputText = (i) => i.mode === "LATEST_DOCUMENT" ? `Latest ${i.document_type || "matching"} document${i.title_contains ? ` ("${i.title_contains}")` : ""}` : i.mode === "TRANSACTIONS" ? `${i.transaction_type} transactions of the period` : "No input needed";
+const STANDING_STATE = { ACTIVE: ["On", "moss"], PAUSED: ["Paused", "default"], ARCHIVED: ["Archived", "default"] };
+const STANDING_RUN_TEXT = { CREATED: "Request raised", SKIPPED: "Skipped by you", ERROR: "Failed", CLAIMED: "In progress" };
+
+async function mountStanding(root) {
+  let data;
+  try { data = await api.listStanding(); } catch (err) { root.innerHTML = errorBox(err, "Standing instructions"); return; }
+  const items = (data.instructions ?? []).filter((i) => i.status !== "ARCHIVED");
+  const settings = data.settings ?? { holidays: [], weekend_days: [6, 0] };
+  root.innerHTML = GOLDEN_RULE
+    + `<p class="field-note">A standing instruction raises the same piece of work for your team every week, month or quarter, once per period. It is always a normal work request: assignment, review and approval work exactly as before. Times are Malaysia time.</p>`
+    + panel("Your standing instructions", items.length ? `<div style="overflow-x:auto">${table([
+      { label: "Instruction", render: (i) => `<strong>${escapeHtml(i.name)}</strong><div class="field-note">${escapeHtml(i.description ?? "")}</div>` },
+      { label: "When", render: (i) => `${escapeHtml(scheduleText(i.schedule))}<div class="field-note">${escapeHtml(inputText(i.input))}</div>` },
+      { label: "State", render: (i) => pill(STANDING_STATE[i.status]?.[0] ?? i.status, STANDING_STATE[i.status]?.[1] ?? "default") },
+      { label: "Next run", render: (i) => i.status === "ACTIVE" ? escapeHtml((i.next ?? []).map((r) => fmtDate(r.run_date)).slice(0, 1).join("")) || "—" : `<span class="field-note">${i.last_preview_at ? "Preview done" : "Preview first"}</span>` },
+      { label: "Raised", render: (i) => String(i.activity?.created ?? 0) + (i.activity?.needs_input ? ` <span class="field-note">(${i.activity.needs_input} needed info)</span>` : "") + (i.activity?.skipped ? ` <span class="field-note">(${i.activity.skipped} skipped)</span>` : "") + (i.activity?.errors ? ` <span class="field-note">(${i.activity.errors} failed)</span>` : "") },
+      { label: "", render: (i) => `<div style="white-space:nowrap"><button class="btn btn-sm bk-si-preview" data-id="${escapeHtml(i.id)}" type="button">Preview</button> `
+        + `<button class="btn btn-sm bk-si-toggle" data-id="${escapeHtml(i.id)}" data-on="${i.status === "ACTIVE" ? "1" : ""}" type="button"${i.status !== "ACTIVE" && !i.last_preview_at ? ' disabled title="Preview it first"' : ""}>${i.status === "ACTIVE" ? "Pause" : "Turn on"}</button> `
+        + (i.status === "ACTIVE" ? `<button class="btn btn-sm bk-si-skip" data-id="${escapeHtml(i.id)}" type="button">Skip next</button> ` : "")
+        + `<button class="btn btn-sm bk-si-run" data-id="${escapeHtml(i.id)}" type="button">Run now</button> `
+        + `<button class="btn btn-sm bk-si-log" data-id="${escapeHtml(i.id)}" type="button">History</button> `
+        + `<button class="btn btn-sm bk-si-archive" data-id="${escapeHtml(i.id)}" type="button">Archive</button></div>` }
+    ], items, (i) => i.id)}</div>` : `<p class="field-note">No standing instructions yet. Add one from the templates below.</p>`)
+    + `<div id="bkSiMsg" style="min-height:1.2em"></div><div id="bkSiPreview"></div><div id="bkSiHistory"></div>`
+    + panel("Templates", table([
+      { label: "Template", render: (t) => `<strong>${escapeHtml(t.name)}</strong><div class="field-note">${escapeHtml(t.description ?? "")}</div>` },
+      { label: "Raises", render: (t) => escapeHtml(t.request_type ?? "") },
+      { label: "", render: (t) => t.installed ? pill("Added", "default") : `<button class="btn btn-sm bk-si-add" data-id="${escapeHtml(t.template_id)}" type="button">Add (starts paused)</button>` }
+    ], data.templates ?? [], (t) => t.template_id))
+    + panel("Your calendar", `<p class="field-note">A run that falls on a weekend or a public holiday moves as you set on each instruction. Public holidays change by announcement, so you type them here. Dates as YYYY-MM-DD, one per line. Only the firm owner can change this.</p>
+      <label class="field"><span>Public holidays</span><textarea id="bkSiHolidays" rows="4" placeholder="2026-12-25">${escapeHtml((settings.holidays ?? []).join("\n"))}</textarea></label>
+      <label class="field"><span>Weekend</span><select id="bkSiWeekend"><option value="6,0">Saturday and Sunday</option><option value="5,6">Friday and Saturday</option><option value="0">Sunday only</option></select></label>
+      <div class="form-actions"><button class="btn btn-primary" id="bkSiSaveCal" type="button">Save calendar</button></div>`);
+  const msg = root.querySelector("#bkSiMsg");
+  const weekendKey = (settings.weekend_days ?? [6, 0]).join(",");
+  const weekendSel = root.querySelector("#bkSiWeekend");
+  if ([...weekendSel.options].some((o) => o.value === weekendKey)) weekendSel.value = weekendKey;
+  const reload = async () => { await mountStanding(root); };
+  const guard = (fn) => async (event) => { msg.textContent = "Working…"; try { await fn(event); } catch (err) { msg.textContent = err.message; } };
+  for (const b of root.querySelectorAll(".bk-si-add")) b.addEventListener("click", guard(async () => { await api.createStanding({ template_id: b.dataset.id }); await reload(); }));
+  for (const b of root.querySelectorAll(".bk-si-preview")) b.addEventListener("click", guard(async () => {
+    const d = await api.previewStanding({ instruction_id: b.dataset.id });
+    msg.textContent = d.summary ?? "";
+    root.querySelector("#bkSiPreview").innerHTML = panel(`Preview: ${escapeHtml(d.instruction?.name ?? "")}`, table([
+      { label: "Runs on", render: (r) => escapeHtml(fmtDate(r.run_date)) }, { label: "About", render: (r) => escapeHtml(r.covers) }, { label: "Request", render: (r) => escapeHtml(r.title) },
+      { label: "Input today", render: (r) => r.needs_input ? pill("Missing", "rose") + ` <span class="field-note">${escapeHtml(r.input_note ?? "")}</span>` : escapeHtml(r.input_note ?? "") }
+    ], d.next_runs ?? [], (r) => r.period_key) + `<p class="field-note">If an input is missing on the day, the request is still raised and asks you for it. You can now turn it on.</p>`);
+    for (const t of root.querySelectorAll(".bk-si-toggle")) if (t.dataset.id === b.dataset.id) { t.disabled = false; t.removeAttribute("title"); }
+  }));
+  for (const b of root.querySelectorAll(".bk-si-toggle")) b.addEventListener("click", guard(async () => { b.dataset.on ? await api.pauseStanding({ instruction_id: b.dataset.id }) : await api.resumeStanding({ instruction_id: b.dataset.id }); await reload(); }));
+  for (const b of root.querySelectorAll(".bk-si-skip")) b.addEventListener("click", guard(async () => { const r = await api.skipNextStanding({ instruction_id: b.dataset.id }); await reload(); root.querySelector("#bkSiMsg").textContent = `The run on ${fmtDate(r.skipped.run_date)} will be skipped.`; }));
+  for (const b of root.querySelectorAll(".bk-si-run")) b.addEventListener("click", guard(async () => { const r = await api.runStandingNow({ instruction_id: b.dataset.id }); await reload(); root.querySelector("#bkSiMsg").textContent = `Raised ${r.request_number}${r.needs_input ? " (it asks for a missing input)" : ""}. Find it in your Inbox.`; }));
+  for (const b of root.querySelectorAll(".bk-si-archive")) b.addEventListener("click", guard(async () => { await api.archiveStanding({ instruction_id: b.dataset.id }); await reload(); }));
+  for (const b of root.querySelectorAll(".bk-si-log")) b.addEventListener("click", guard(async () => {
+    const a = await api.getStandingHistory(b.dataset.id);
+    msg.textContent = "";
+    root.querySelector("#bkSiHistory").innerHTML = panel(`History: ${escapeHtml(a.instruction?.name ?? "")}`, (a.occurrences ?? []).length ? table([
+      { label: "Period", render: (o) => escapeHtml(o.covers ?? o.period_key) }, { label: "Result", render: (o) => pill(STANDING_RUN_TEXT[o.status] ?? o.status, o.status === "CREATED" ? "moss" : o.status === "ERROR" ? "rose" : "default") },
+      { label: "Request", render: (o) => escapeHtml(o.work_request_number ?? "—") },
+      { label: "Input", render: (o) => escapeHtml(o.input_note ?? "") },
+      { label: "Assignment", render: (o) => escapeHtml(o.assignment ? (o.assignment.outcome === "REFUSED" ? `Refused: in Inbox (${o.assignment.message ?? ""})` : o.assignment.outcome === "ASSIGNED" ? `Assigned to ${o.assignment.staff_code}` : "Waiting in the Inbox") : "—") },
+      { label: "When", render: (o) => escapeHtml(dt(o.at)) }
+    ], a.occurrences, (o) => o.id) : `<p class="field-note">Nothing raised yet.</p>`);
+  }));
+  root.querySelector("#bkSiSaveCal")?.addEventListener("click", guard(async () => {
+    const holidays = root.querySelector("#bkSiHolidays").value.split(/[\s,;]+/).filter(Boolean);
+    const weekend_days = root.querySelector("#bkSiWeekend").value.split(",").map(Number);
+    await api.saveStandingSettings({ holidays, weekend_days });
+    msg.textContent = "Calendar saved.";
+  }));
+}
+
 // ---------------- approval limits / delegation of authority (CE-S5) ----------------
 
 const LIMIT_FIELD_TEXT = { MONEY: (n) => `RM ${Number(n).toLocaleString("en-US")}`, PERCENT: (n) => `${n}%` };
@@ -802,6 +887,7 @@ export const BIZKICK_PAGES = {
   "bizkick-delegation": mountDelegation,
   "bizkick-numbers": mountNumbers,
   "bizkick-rules": mountRules,
+  "bizkick-standing": mountStanding,
   "bizkick-connection": mountConnection,
   "bizkick-import": mountImport,
   "bizkick-transactions": mountTransactions,

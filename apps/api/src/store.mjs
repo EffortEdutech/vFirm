@@ -180,7 +180,7 @@ const initialStore = () => ({
   edcs_sync_runs: [],
   edcs_sync_events: [],
   automation_rules: [],
-  automation_rule_runs: [], edcs_number_reservations: [], approval_policies: [], edcs_connectors: [], edcs_graph_connections: [], edcs_company_profiles: [], edcs_template_drafts: [],
+  automation_rule_runs: [], edcs_number_reservations: [], approval_policies: [], edcs_connectors: [], edcs_graph_connections: [], edcs_company_profiles: [], edcs_template_drafts: [], standing_instructions: [],
   professional_authorities: [],
   actors: [],
   persons: [],
@@ -680,7 +680,10 @@ export async function createWorkRequestRecord(body, actor) {
       // CE-S3: where the request came from when a BizKick rule raised it (shown as "From BizKick: <id>").
       source: body.source && typeof body.source === "object" && body.source.type === "BIZKICK_RULE"
         ? { type: "BIZKICK_RULE", transaction_id: String(body.source.transaction_id ?? "").slice(0, 60), rule_id: String(body.source.rule_id ?? "").slice(0, 60), rule_name: String(body.source.rule_name ?? "").slice(0, 120), reason: String(body.source.reason ?? "").slice(0, 80) }
-        : null,
+        : body.source && typeof body.source === "object" && body.source.type === "STANDING_INSTRUCTION"
+          // VI-S1: raised by a standing instruction (shown as "Standing instruction: <name>").
+          ? { type: "STANDING_INSTRUCTION", instruction_id: String(body.source.instruction_id ?? "").slice(0, 60), instruction_name: String(body.source.instruction_name ?? "").slice(0, 120), period_key: String(body.source.period_key ?? "").slice(0, 40), trigger: String(body.source.trigger ?? "").slice(0, 12) }
+          : null,
       triage_suggestion: { category: triage.category, priority: triage.priority, routed_to: triage.routed_to, suggested_position_id: positionForTriageQueue[triage.routed_to] ?? null, rationale: triage.rationale, boundary: triage.boundary },
       status: "SUBMITTED",
       task_id: null,
@@ -6546,7 +6549,7 @@ function stripRelationalCollections(store) {
   edcs_sync_runs: [],
   edcs_sync_events: [],
   automation_rules: [],
-  automation_rule_runs: [], edcs_number_reservations: [], approval_policies: [], edcs_connectors: [], edcs_graph_connections: [], edcs_company_profiles: [], edcs_template_drafts: [],
+  automation_rule_runs: [], edcs_number_reservations: [], approval_policies: [], edcs_connectors: [], edcs_graph_connections: [], edcs_company_profiles: [], edcs_template_drafts: [], standing_instructions: [],
   service_packs: [],
   service_skus: [],
   worker_templates: [],

@@ -575,6 +575,7 @@ export async function mountWorkdesk(root) {
       : "";
     return `<div class="wd-req-title"><span class="wd-num">${escapeHtml(req.request_number ?? "")}</span> ${escapeHtml(req.title)}</div>
       ${req.source?.type === "BIZKICK_RULE" ? `<span class="wd-sub" title="${escapeHtml(req.source.reason ?? "")}">From BizKick: ${escapeHtml(req.source.transaction_id)}</span>` : ""}
+      ${req.source?.type === "STANDING_INSTRUCTION" ? `<span class="wd-sub" title="${escapeHtml(req.source.period_key ?? "")}">Standing instruction: ${escapeHtml(req.source.instruction_name ?? "")}</span>` : ""}
       <span class="wd-sub">${escapeHtml(req.request_type_label ?? humanize(req.request_type_id))}${req.class_a ? " · Class A" : ""}${due}</span>
       ${req.instructions ? `<div class="wd-instructions">${escapeHtml(req.instructions)}</div>` : ""}
       ${suggestion}

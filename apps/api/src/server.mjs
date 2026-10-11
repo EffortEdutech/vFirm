@@ -30,6 +30,7 @@ import { createFileStorage, fileMaxBytes, sanitizeFilename, resolveAllowedMimeTy
 // CE-S1 (ADR-095): Connected EDCS -- BizKick register import and sync ledger.
 import { annotateDraftRequirement, checkDraftApproval, enforceDraftApproval, importDelegation as importEdcsDelegation, previewDelegation as previewEdcsDelegation, readDelegation as readEdcsDelegation } from "./edcs-delegation-service.mjs";
 import { EDCS_COLLECTIONS, listNumbers as listEdcsNumbers, reserveNumber as reserveEdcsNumber, voidNumber as voidEdcsNumber, linkEdcsFile, listEdcsChains, readEdcsDocuments, importRegister as importEdcsRegister, linkCounterparty as linkEdcsCounterparty, listConflicts as listEdcsConflicts, listSyncRuns as listEdcsSyncRuns, listTransactions as listEdcsTransactions, readConnection as readEdcsConnection, readEdcsExportCollections, readSyncRun as readEdcsSyncRun, readTransaction as readEdcsTransaction, resolveConflict as resolveEdcsConflict, saveConnection as saveEdcsConnection } from "./edcs-service.mjs";
+import { archiveStanding, createStanding, evaluateStanding, listStanding, listStandingHistory, pauseStanding, previewStanding, resumeStanding, runStandingNow, saveStandingSettings, skipNextStanding, tickStanding, updateStanding } from "./edcs-standing-service.mjs";
 import { createRule as createAutomationRule, dryRunRule as dryRunAutomationRule, evaluateAfter as evaluateAutomationAfter, evaluateNow as evaluateAutomationNow, listRuleActivity as listAutomationRuleActivity, listRules as listAutomationRules, readSignals as readEdcsSignals, setRuleEnabled as setAutomationRuleEnabled, tick as tickAutomation, updateRule as updateAutomationRule } from "./edcs-automation-service.mjs";
 import { connectGraph as connectEdcsGraph, disconnectGraph as disconnectEdcsGraph, pollGraphConnections, readGraphConnection as readEdcsGraph, syncGraphNow as syncEdcsGraphNow } from "./edcs-graph-service.mjs";
 import { approveDraft as approveEdcsDraft, cancelDraft as cancelEdcsDraft, checkDraft as checkEdcsDraft, createDraft as createEdcsDraft, downloadDraft as downloadEdcsDraft, listDrafts as listEdcsDrafts, outboxAcknowledge as edcsOutboxAcknowledge, outboxPending as edcsOutboxPending, readCompany as readEdcsCompany, readDraft as readEdcsDraft, rejectDraft as rejectEdcsDraft, saveCompany as saveEdcsCompany } from "./edcs-drafting-service.mjs";
@@ -3235,6 +3236,16 @@ const routes = new Map([
   ["POST /automation/rules/enable", enableAutomationRuleRoute],
   ["POST /automation/rules/dry-run", dryRunAutomationRuleRoute],
   ["POST /automation/evaluate", evaluateAutomationRoute],
+  // VI-S1 (ADR-109): standing instructions -- recurring work (owner only; see edcs-standing-service.mjs).
+  ["POST /standing/instructions", createStandingRoute],
+  ["POST /standing/instructions/update", updateStandingRoute],
+  ["POST /standing/instructions/preview", previewStandingRoute],
+  ["POST /standing/instructions/resume", resumeStandingRoute],
+  ["POST /standing/instructions/pause", pauseStandingRoute],
+  ["POST /standing/instructions/archive", archiveStandingRoute],
+  ["POST /standing/instructions/skip-next", skipNextStandingRoute],
+  ["POST /standing/instructions/run-now", runStandingNowRoute],
+  ["POST /standing/settings", saveStandingSettingsRoute],
   ["POST /awia/virtual-staff/memory/append", appendAwiaStaffMemoryEntry],
   ["POST /awia/virtual-staff/conversation/open", openAwiaStaffConversationThread],
   ["POST /awia/virtual-staff/conversation/message", postAwiaStaffConversationMessage],
@@ -3551,6 +3562,32 @@ async function dryRunAutomationRuleRoute(body, req = null) {
   return dryRunAutomationRule({ body, actor });
 }
 
+// VI-S1: standing instructions. Same owner-only, same-firm pattern as the rules above.
+async function standingRoute(action, fields, handler, body, req) {
+  requireFields(body, ["tenant_id", "firm_id", ...fields]);
+  const { actor } = edcsScope(req, body, action);
+  return handler({ body, actor, deps: automationDeps });
+}
+async function createStandingRoute(body, req = null) { return standingRoute("create a standing instruction", [], createStanding, body, req); }
+async function updateStandingRoute(body, req = null) { return standingRoute("edit a standing instruction", ["instruction_id"], updateStanding, body, req); }
+async function previewStandingRoute(body, req = null) { return standingRoute("preview a standing instruction", ["instruction_id"], previewStanding, body, req); }
+async function resumeStandingRoute(body, req = null) { return standingRoute("turn on a standing instruction", ["instruction_id"], resumeStanding, body, req); }
+async function pauseStandingRoute(body, req = null) { return standingRoute("pause a standing instruction", ["instruction_id"], pauseStanding, body, req); }
+async function archiveStandingRoute(body, req = null) { return standingRoute("archive a standing instruction", ["instruction_id"], archiveStanding, body, req); }
+async function skipNextStandingRoute(body, req = null) { return standingRoute("skip a standing instruction run", ["instruction_id"], skipNextStanding, body, req); }
+async function runStandingNowRoute(body, req = null) { return standingRoute("run a standing instruction", ["instruction_id"], runStandingNow, body, req); }
+async function saveStandingSettingsRoute(body, req = null) { return standingRoute("set the firm calendar", [], saveStandingSettings, body, req); }
+
+// GET /standing/instructions | /standing/instructions/<id>/history | /standing/history (read: any verified member).
+async function readStandingRoute(req, url) {
+  const match = url.pathname.match(/^\/standing\/(instructions|history)(?:\/([^/]+)\/history)?$/);
+  if (!match) return null;
+  const { scope } = edcsScope(req, { tenant_id: url.searchParams.get("tenant_id"), firm_id: url.searchParams.get("firm_id") }, "read standing instructions");
+  if (match[1] === "instructions" && !match[2]) return listStanding({ scope });
+  if (match[1] === "instructions" && match[2]) return listStandingHistory({ scope, instructionId: decodeURIComponent(match[2]) });
+  return listStandingHistory({ scope, instructionId: null });
+}
+
 async function evaluateAutomationRoute(body, req = null) {
   requireFields(body, ["tenant_id", "firm_id"]);
   const { actor } = edcsScope(req, body, "run BizKick rules");
@@ -3592,7 +3629,9 @@ async function automationTickRoute(req, url) {
   const result = await tickAutomation({ deps: automationDeps, scope: only });
   // CE-S7: the same scheduled call also reads each firm's Microsoft 365 BizKick folder (a failure never fails the tick).
   const graph = await pollGraphConnections({ deps: graphDeps, scope: only }).catch((error) => ({ error: error instanceof Error ? error.message : String(error) }));
-  return { ...result, graph };
+  // VI-S1: the same scheduled call raises the day's standing instructions (a failure never fails the tick).
+  const standing = await tickStanding({ deps: automationDeps, scope: only }).catch((error) => ({ error: error instanceof Error ? error.message : String(error) }));
+  return { ...result, graph, standing };
 }
 
 // GET /automation/rules | /automation/rules/<id>/activity | /automation/activity (read: any verified member).
@@ -4036,6 +4075,7 @@ export const handleRequest = async (req, res) => {
     if (req.method === "GET" && url.pathname === "/database/schema") { const schema = await readFile(join(root, "infra/database/schema.sql"), "utf8"); return sendJson(req, res, 200, { ok: true, data: { path: "infra/database/schema.sql", bytes: schema.length } }); }
     if (req.method === "GET" && url.pathname === "/work-requests/request-types") return sendJson(req, res, 200, { ok: true, data: listWorkRequestTypes() });
     if (req.method === "POST" && url.pathname === "/automation/tick") return sendJson(req, res, 200, { ok: true, data: await automationTickRoute(req, url) });
+    { const standingRead = req.method === "GET" && url.pathname.startsWith("/standing/") ? await readStandingRoute(req, url) : null; if (standingRead) return sendJson(req, res, 200, { ok: true, data: standingRead }); }
     { const automationRead = req.method === "GET" && url.pathname.startsWith("/automation/") ? await readAutomationRoute(req, url) : null; if (automationRead) return sendJson(req, res, 200, { ok: true, data: automationRead }); }
     if (req.method === "POST" && url.pathname === "/edcs/files/upload") return sendJson(req, res, 201, { ok: true, data: await linkEdcsFileRoute(req, url) });
     if (req.method === "POST" && url.pathname === "/files/upload") return sendJson(req, res, 201, { ok: true, data: await uploadFirmFile(req, url) });

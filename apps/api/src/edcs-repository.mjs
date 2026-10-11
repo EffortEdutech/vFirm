@@ -18,7 +18,7 @@ import { isPostgresStore, readStore, withStore } from "./store.mjs";
 import { query, setTenantContext, withClient } from "./repositories/shared/db.mjs";
 
 // CE-S3 (ADR-097, migration 0051) adds the two automation tables to the same repository.
-export const EDCS_COLLECTIONS = ["edcs_connections", "edcs_transactions", "edcs_transaction_revisions", "edcs_sync_runs", "edcs_sync_events", "automation_rules", "automation_rule_runs", "edcs_number_reservations", "approval_policies", "edcs_connectors", "edcs_graph_connections", "edcs_company_profiles", "edcs_template_drafts"];
+export const EDCS_COLLECTIONS = ["edcs_connections", "edcs_transactions", "edcs_transaction_revisions", "edcs_sync_runs", "edcs_sync_events", "automation_rules", "automation_rule_runs", "edcs_number_reservations", "approval_policies", "edcs_connectors", "edcs_graph_connections", "edcs_company_profiles", "edcs_template_drafts", "standing_instructions"];
 
 // The natural key inside (tenant, firm) of each collection.
 const naturalKey = {
@@ -40,7 +40,9 @@ const naturalKey = {
   edcs_graph_connections: () => "graph",
   // CE-S8: one company-details row per firm; one draft per document (migration 0056)
   edcs_company_profiles: () => "company",
-  edcs_template_drafts: (record) => record.id
+  edcs_template_drafts: (record) => record.id,
+  // VI-S1: one row per standing instruction, and one settings row (holidays, weekend) per firm (migration 0057)
+  standing_instructions: (record) => (record.kind === "SETTINGS" ? "settings" : record.id)
 };
 
 // A claimed occurrence that failed may be claimed again, up to this many attempts in total.
@@ -88,6 +90,12 @@ const jsonImpl = {
   async graphScopes() {
     const store = await readStore();
     return (store.edcs_graph_connections ?? []).filter((record) => record.status === "ACTIVE").map((record) => ({ tenant_id: record.tenant_id, firm_id: record.firm_id }));
+  },
+  async standingScopes() {
+    const store = await readStore();
+    const seen = new Map();
+    for (const item of store.standing_instructions ?? []) if (item.kind === "INSTRUCTION" && item.status === "ACTIVE") seen.set(`${item.tenant_id}|${item.firm_id}`, { tenant_id: item.tenant_id, firm_id: item.firm_id });
+    return [...seen.values()];
   },
   async enabledScopes() {
     const store = await readStore();
@@ -203,6 +211,10 @@ const pgImpl = {
   },
   async graphScopes() {
     const { rows } = await query(`select tenant_id, firm_id from edcs_graph_connections where status_c = 'ACTIVE'`, []);
+    return rows.map((row) => ({ tenant_id: row.tenant_id, firm_id: row.firm_id }));
+  },
+  async standingScopes() {
+    const { rows } = await query(`select distinct tenant_id, firm_id from standing_instructions where kind_c = 'INSTRUCTION' and status_c = 'ACTIVE'`, []);
     return rows.map((row) => ({ tenant_id: row.tenant_id, firm_id: row.firm_id }));
   },
   async enabledScopes() {
@@ -376,6 +388,24 @@ export const edcsRepository = {
   },
   async claimOccurrence(scope, record) {
     return impl().claim(scope, record);
+  },
+  // VI-S1: standing instructions (and the firm's calendar settings) and the firms that have an active one.
+  async listStanding(scope) {
+    return (await impl().read(scope, "standing_instructions")).filter((record) => record.kind === "INSTRUCTION").sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
+  },
+  async getStanding(scope, id) {
+    return (await impl().read(scope, "standing_instructions")).find((record) => record.kind === "INSTRUCTION" && record.id === id) ?? null;
+  },
+  async getStandingSettings(scope) {
+    return (await impl().read(scope, "standing_instructions")).find((record) => record.kind === "SETTINGS") ?? null;
+  },
+  async listStandingScopes() {
+    return impl().standingScopes();
+  },
+  async listStandingRuns(scope, { instruction_id = null } = {}) {
+    return (await impl().read(scope, "automation_rule_runs"))
+      .filter((record) => record.kind === "SI_OCCURRENCE" && (!instruction_id || record.instruction_id === instruction_id))
+      .sort((a, b) => String(b.at ?? b.created_at).localeCompare(String(a.at ?? a.created_at)));
   },
   // CE-S4: the Number Desk's reservations and the atomic "next number".
   async listReservations(scope) {
