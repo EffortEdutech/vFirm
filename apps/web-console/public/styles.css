@@ -330,3 +330,13 @@ label{font-size:12.3px; color:var(--ink-soft); font-weight:600;}
 .btn-link{background:none; border:0; padding:0; color:inherit; text-decoration:underline; cursor:pointer; text-align:left; font:inherit;}
 .btn-link:hover{text-decoration:none;}
 .brief-saved{margin-top:12px;}
+
+/* VI-S3: Evidence Passport */
+.pp-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.pp-box { max-height: 220px; overflow: auto; border: 1px solid var(--line, #ddd); border-radius: 6px; padding: 6px 8px; }
+.pp-row { display: block; padding: 2px 0; }
+.pp-seal { font-size: 12px; }
+.pp-result { margin-top: 4px; }
+@media (max-width: 800px) { .pp-cols { grid-template-columns: 1fr; } }
+.pp-cols + .filters, .pp-cols ~ .filters { margin-top: 12px; }
+.pp-cols ~ .filters label { margin-right: 14px; }

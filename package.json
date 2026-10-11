@@ -175,6 +175,7 @@
                     "check:ce:s8-template-drafting": "node scripts/smoke-ce-s8-template-drafting.mjs",
                     "check:vi:s1-standing-instructions": "node scripts/smoke-vi-s1-standing-instructions.mjs",
                     "check:vi:s2-morning-brief": "node scripts/smoke-vi-s2-morning-brief.mjs",
+                    "check:vi:s3-evidence-passport": "node scripts/smoke-vi-s3-evidence-passport.mjs",
                     "check:ce:s9-evidence-pack": "node scripts/check-ce-s9-evidence-pack.mjs",
                     "ce:evidence-pack": "node scripts/ce-evidence-pack.mjs",
                     "check:ce:h1-scoped-reads":  "node scripts/smoke-ce-h1-scoped-reads.mjs",

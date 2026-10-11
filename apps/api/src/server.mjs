@@ -1,4 +1,5 @@
 import { briefToday_, briefHistory, briefOn, tickBriefs } from "./edcs-brief-service.mjs";
+import { createPassport, downloadPassport, listPassports, previewPassport, readPassport, verifyStoredPassport } from "./evidence-passport-service.mjs";
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { timingSafeEqual } from "node:crypto";
@@ -3189,6 +3190,9 @@ const routes = new Map([
   ["POST /awia/virtual-staff/client-delivery-draft/mark-sent", markAwiaClientDeliveryDraftSent],
   ["POST /awia/virtual-staff/workdesk-item/archive", archiveAwiaStaffWorkdeskItem],
   ["POST /awia/virtual-staff/workdesk-item/complete-internal", completeAwiaInternalWorkdeskItem],
+  // VI-S3 (ADR-111): Evidence Passport (owner-only): preview, then build.
+  ["POST /passports/preview", previewPassportRoute],
+  ["POST /passports", createPassportRoute],
   ["POST /work-requests", createWorkRequest],
   ["POST /work-requests/assign", assignWorkRequest],
   ["POST /work-requests/cancel", cancelWorkRequest],
@@ -3587,6 +3591,45 @@ async function readStandingRoute(req, url) {
   if (match[1] === "instructions" && !match[2]) return listStanding({ scope });
   if (match[1] === "instructions" && match[2]) return listStandingHistory({ scope, instructionId: decodeURIComponent(match[2]) });
   return listStandingHistory({ scope, instructionId: null });
+}
+
+// VI-S3 (ADR-111): Evidence Passport routes.
+async function previewPassportRoute(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id"]);
+  const { actor } = edcsScope(req, body, "preview an Evidence Passport");
+  return previewPassport({ body, actor });
+}
+
+async function createPassportRoute(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id"]);
+  const { actor } = edcsScope(req, body, "create an Evidence Passport");
+  return createPassport({ body, actor, deps: { fileStorage } });
+}
+
+// GET /passports, /passports/<id>, /passports/<id>/verify (owner-only reads).
+async function readPassportRoute(req, url) {
+  const match = url.pathname.match(/^\/passports(?:\/([^/]+)(?:\/(verify))?)?$/);
+  if (!match) return null;
+  const { scope, actor } = edcsScope(req, { tenant_id: url.searchParams.get("tenant_id"), firm_id: url.searchParams.get("firm_id") }, "read Evidence Passports");
+  if (!match[1]) return listPassports({ scope, actor });
+  if (match[2]) return verifyStoredPassport({ scope, actor, id: decodeURIComponent(match[1]), deps: { fileStorage } });
+  return readPassport({ scope, actor, id: decodeURIComponent(match[1]) });
+}
+
+// GET /passports/<id>/download?tenant_id=&firm_id= -- the sealed zip, re-verified before it is released.
+async function downloadPassportRoute(req, res, url, id) {
+  const { actor, scope } = edcsScope(req, { tenant_id: url.searchParams.get("tenant_id"), firm_id: url.searchParams.get("firm_id") }, "download an Evidence Passport");
+  const file = await downloadPassport({ scope, actor, id, deps: { fileStorage } });
+  res.writeHead(200, {
+    "content-type": file.mime_type,
+    "content-length": String(file.buffer.length),
+    "content-disposition": `attachment; filename="${file.filename.replace(/[^\x20-\x7e]/g, "_").replace(/["\\]/g, "_")}"; filename*=UTF-8''${encodeURIComponent(file.filename)}`,
+    "x-vfirm-file-sha256": file.sha256,
+    "x-vfirm-passport-seal": file.seal,
+    "cache-control": "no-store",
+    ...corsHeaders(req)
+  });
+  res.end(file.buffer);
 }
 
 // VI-S2: the Morning Brief (owner-only, read). GET /brief/today, /brief/history, /brief/<YYYY-MM-DD>.
@@ -4088,6 +4131,8 @@ export const handleRequest = async (req, res) => {
     if (req.method === "GET" && url.pathname === "/database/schema") { const schema = await readFile(join(root, "infra/database/schema.sql"), "utf8"); return sendJson(req, res, 200, { ok: true, data: { path: "infra/database/schema.sql", bytes: schema.length } }); }
     if (req.method === "GET" && url.pathname === "/work-requests/request-types") return sendJson(req, res, 200, { ok: true, data: listWorkRequestTypes() });
     if (req.method === "POST" && url.pathname === "/automation/tick") return sendJson(req, res, 200, { ok: true, data: await automationTickRoute(req, url) });
+    { const passportDownload = req.method === "GET" ? url.pathname.match(/^\/passports\/([^/]+)\/download$/) : null; if (passportDownload) return await downloadPassportRoute(req, res, url, decodeURIComponent(passportDownload[1])); }
+    { const passportRead = req.method === "GET" && url.pathname.startsWith("/passports") ? await readPassportRoute(req, url) : null; if (passportRead) return sendJson(req, res, 200, { ok: true, data: passportRead }); }
     { const briefRead = req.method === "GET" && url.pathname.startsWith("/brief/") ? await readBriefRoute(req, url) : null; if (briefRead) return sendJson(req, res, 200, { ok: true, data: briefRead }); }
     { const standingRead = req.method === "GET" && url.pathname.startsWith("/standing/") ? await readStandingRoute(req, url) : null; if (standingRead) return sendJson(req, res, 200, { ok: true, data: standingRead }); }
     { const automationRead = req.method === "GET" && url.pathname.startsWith("/automation/") ? await readAutomationRoute(req, url) : null; if (automationRead) return sendJson(req, res, 200, { ok: true, data: automationRead }); }

@@ -10,6 +10,7 @@ export const OWNER_NAV = [
       { id: "dashboard", label: "Dashboard", icon: "▣" },
       // VI-S2 (ADR-110): the firm in two minutes
       { id: "morning-brief", label: "Morning Brief", icon: "☀" },
+      { id: "evidence-passport", label: "Evidence Passport", icon: "🛂" },
     ],
   },
   {
@@ -92,6 +93,7 @@ export const ADMIN_NAV = [
 
 export const PAGE_META = {
   dashboard: { eyebrow: "Overview", title: "Dashboard", desc: "Where the firm stands right now." },
+  "evidence-passport": { eyebrow: "Overview", title: "Evidence Passport", desc: "Build a sealed dossier for a bank, tender board or auditor: documents, revisions, approvals and BizKick sync history, with a verifier that runs offline. Restricted items stay out unless you tick them." },
   "morning-brief": { eyebrow: "Overview", title: "Morning Brief", desc: "The firm's state in two minutes: what needs you, what is late, cash signals, your team yesterday, exceptions and standing instructions. Every line opens its record." },
   team: { eyebrow: "Workforce", title: "My Team", desc: "Hire, assign and manage your virtual staff." },
   workdesk: { eyebrow: "Workforce", title: "Workdesk", desc: "Track work from intake to client delivery." },

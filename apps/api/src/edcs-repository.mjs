@@ -18,7 +18,7 @@ import { isPostgresStore, readStore, withStore } from "./store.mjs";
 import { query, setTenantContext, withClient } from "./repositories/shared/db.mjs";
 
 // CE-S3 (ADR-097, migration 0051) adds the two automation tables to the same repository.
-export const EDCS_COLLECTIONS = ["edcs_connections", "edcs_transactions", "edcs_transaction_revisions", "edcs_sync_runs", "edcs_sync_events", "automation_rules", "automation_rule_runs", "edcs_number_reservations", "approval_policies", "edcs_connectors", "edcs_graph_connections", "edcs_company_profiles", "edcs_template_drafts", "standing_instructions", "firm_briefs"];
+export const EDCS_COLLECTIONS = ["edcs_connections", "edcs_transactions", "edcs_transaction_revisions", "edcs_sync_runs", "edcs_sync_events", "automation_rules", "automation_rule_runs", "edcs_number_reservations", "approval_policies", "edcs_connectors", "edcs_graph_connections", "edcs_company_profiles", "edcs_template_drafts", "standing_instructions", "firm_briefs", "evidence_passports"];
 
 // The natural key inside (tenant, firm) of each collection.
 const naturalKey = {
@@ -44,7 +44,9 @@ const naturalKey = {
   // VI-S1: one row per standing instruction, and one settings row (holidays, weekend) per firm (migration 0057)
   standing_instructions: (record) => (record.kind === "SETTINGS" ? "settings" : record.id),
   // VI-S2: one saved brief per firm per day (migration 0058); the first one saved that day stays
-  firm_briefs: (record) => record.as_of
+  firm_briefs: (record) => record.as_of,
+  // VI-S3: one row per issued Evidence Passport (migration 0059)
+  evidence_passports: (record) => record.id
 };
 
 // A claimed occurrence that failed may be claimed again, up to this many attempts in total.
@@ -454,6 +456,13 @@ export const edcsRepository = {
     return (await impl().read(scope, "automation_rule_runs"))
       .filter((record) => record.kind === "SI_OCCURRENCE" && (!instruction_id || record.instruction_id === instruction_id))
       .sort((a, b) => String(b.at ?? b.created_at).localeCompare(String(a.at ?? a.created_at)));
+  },
+  // VI-S3: issued Evidence Passports.
+  async listPassports(scope) {
+    return (await impl().read(scope, "evidence_passports")).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+  },
+  async getPassport(scope, id) {
+    return (await impl().readWhere(scope, "evidence_passports", { key: id }))[0] ?? null;
   },
   // VI-S2: saved morning briefs (one per firm per day).
   async listBriefs(scope) {

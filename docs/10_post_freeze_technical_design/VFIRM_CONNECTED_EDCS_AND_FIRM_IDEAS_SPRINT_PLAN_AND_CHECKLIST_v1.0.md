@@ -419,11 +419,13 @@ Scope:
 - Bundle (zip): documents (current or all revisions), `manifest.json` (files, SHA-256, revisions, approvals with approver and time, sync events for EDCS items), audit extract, cover page, and an offline `verify.html` that recomputes hashes in the browser (WebCrypto) — no account needed.
 - Passport record + audit event; bundle stored as a file object; re-download re-verifies.
 
+Built 2026-10-11 (ADR-111, migration 0059): scope is documents plus a BizKick chain with an optional date range; restricted items need a tick each; the verifier checks hashes plus a manifest seal.
+
 Acceptance checks (`npm run check:vi:s3-evidence-passport`):
 
-- [ ] Manifest hashes match the files; tampering with any file makes the verifier fail.
-- [ ] Restricted items excluded unless explicitly included; inclusion audited.
-- [ ] Cross-firm content impossible.
+- [x] Manifest hashes match the files; tampering with any file makes the verifier fail.
+- [x] Restricted items excluded unless explicitly included; inclusion audited.
+- [x] Cross-firm content impossible.
 
 ### VI-S4 — Worker Scorecards and cost-to-serve
 
@@ -539,7 +541,7 @@ Acceptance checks (`npm run check:vi:s6-einvoice-readiness`):
 - [~] CE-S9 evidence pack + acceptance gate (kit built 2026-10-12, ADR-108; pilot deferred by the owner on 2026-10-12, gate recorded as HOLD; reopen by running the pilot)
 - [x] `check:vi:s1-standing-instructions` (VI-S1, ADR-109, migration 0057)
 - [x] `check:vi:s2-morning-brief` (VI-S2, ADR-110, migration 0058)
-- [ ] `check:vi:s3-evidence-passport`
+- [x] `check:vi:s3-evidence-passport` (VI-S3, ADR-111, migration 0059)
 - [ ] `check:vi:s4-scorecards`
 - [ ] `check:vi:s5-trust-ladder`
 - [ ] `check:vi:s6-einvoice-readiness`

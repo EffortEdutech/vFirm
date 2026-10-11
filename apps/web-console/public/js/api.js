@@ -188,6 +188,24 @@ async function downloadFile(fileId, filename = "download") {
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
+// VI-S3: the sealed bundle (.zip). The server re-verifies it before sending and refuses a changed one.
+async function downloadPassport(id, filename = "evidence-passport.zip") {
+  const res = await fetch(API_PREFIX + withScope(`/passports/${encodeURIComponent(id)}/download`), { headers: { ...(await authHeaders()) } });
+  if (!res.ok) {
+    let message = `Download failed (${res.status})`;
+    try { message = (await res.json())?.error?.message ?? message; } catch { /* binary or empty */ }
+    throw new Error(message);
+  }
+  const url = URL.createObjectURL(await res.blob());
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+
 // CE-S8: the approved working copy (.xlsx). The server answers 409 until the draft is approved.
 async function downloadEdcsDraft(draftId, filename = "draft.xlsx") {
   const res = await fetch(API_PREFIX + withScope(`/edcs/drafts/${encodeURIComponent(draftId)}/download`), { headers: { ...(await authHeaders()) } });
@@ -303,6 +321,12 @@ export const api = {
   setAutomationRuleEnabled: (body) => request("/automation/rules/enable", { method: "POST", body }),
   dryRunAutomationRule: (body) => request("/automation/rules/dry-run", { method: "POST", body }),
   runAutomationNow: (body = {}) => request("/automation/evaluate", { method: "POST", body }),
+  // VI-S3: Evidence Passport (owner-only)
+  listPassports: () => request(withScope("/passports"), { skipCache: true }),
+  previewPassport: (body) => request("/passports/preview", { method: "POST", body }),
+  createPassport: (body) => request("/passports", { method: "POST", body }),
+  verifyPassport: (id) => request(withScope(`/passports/${encodeURIComponent(id)}/verify`), { skipCache: true }),
+  downloadPassport,
   // VI-S2: Morning Brief (owner-only reads)
   getBriefToday: () => request(withScope("/brief/today"), { skipCache: true }),
   getBriefHistory: () => request(withScope("/brief/history"), { skipCache: true }),
