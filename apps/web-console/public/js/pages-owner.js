@@ -17,6 +17,7 @@
 import { api, HIREABLE_ROLES, AWIA_HIRE_PACKAGE_CODE, scopeStoreToCurrentFirm, clearCache } from "./api.js";
 import { panel, table, statRow, tabBar, statusPill, empty, errorBox, inspector, fmtDate, escapeHtml } from "./ui.js";
 // ADR-090 W2 (F1): the owner's "+ New request" drawer and worker-eligibility helper.
+import { mountWorkerScorecards, mountClientEconomics } from "./pages-scorecard.js";
 import { openNewRequestDrawer, workerFitsType, skillFieldHtml, readSkillFields } from "./request-drawer.js";
 
 function loading() {
@@ -293,9 +294,11 @@ export async function mountTeam(root) {
         { value: retiredCount, label: "Retired" },
       ])}
       ${panel("Your team", rosterBody)}
+      <div id="teamScorecards"></div>
       ${capabilityPanel}
       ${hirePanel}
     `;
+    mountWorkerScorecards(root.querySelector("#teamScorecards"));
   } catch (err) {
     root.innerHTML = errorBox(err, "your team");
     return;
@@ -1062,10 +1065,12 @@ function formatBytes(bytes) {
 // ---------------------------------------------------------------- Sales
 export async function mountSales(root) {
   await withStore(root, (store) => `
+    <div id="clientEconomics"></div>
     ${panel("Clients", inspector(store.clients ?? []))}
     ${panel("Proposals", inspector(store.proposals ?? []))}
     ${panel("Front desk enquiries", inspector(store.front_desk_enquiries ?? []))}
   `);
+  mountClientEconomics(root.querySelector("#clientEconomics"));
 }
 
 // ---------------------------------------------------------------- Projects

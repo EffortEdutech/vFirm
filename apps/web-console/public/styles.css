@@ -340,3 +340,9 @@ label{font-size:12.3px; color:var(--ink-soft); font-weight:600;}
 @media (max-width: 800px) { .pp-cols { grid-template-columns: 1fr; } }
 .pp-cols + .filters, .pp-cols ~ .filters { margin-top: 12px; }
 .pp-cols ~ .filters label { margin-right: 14px; }
+
+/* VI-S4: scorecards */
+.sc-table td, .sc-table th { vertical-align: top; }
+.sc-skill td { font-size: 13px; opacity: .92; }
+.sc-period { margin-bottom: 8px; }
+.sc-period label { margin-right: 12px; }

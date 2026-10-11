@@ -33,6 +33,7 @@ export const CHECKS = [
   { key: "vi1", script: "check:vi:s1-standing-instructions", sprint: "VI-S1", what: "Standing instructions (recurring work, once per period)", postgres: true },
   { key: "vi2", script: "check:vi:s2-morning-brief", sprint: "VI-S2", what: "Owner Morning Brief (deterministic, linked, saved daily)", postgres: true },
   { key: "vi3", script: "check:vi:s3-evidence-passport", sprint: "VI-S3", what: "Evidence Passport (sealed, offline-verifiable dossier; restricted opt-in)", postgres: true },
+  { key: "vi4", script: "check:vi:s4-scorecards", sprint: "VI-S4", what: "Worker scorecards and cost-to-serve (first-pass rates, waits, per-client effort vs invoiced)", postgres: true },
   { key: "h1gu", script: "check:ce:h1-store-read-guard", sprint: "CE-H1", what: "Store read guard", postgres: false },
   { key: "pa", script: "check:pa:request-gate", sprint: "Production auth", what: "Request gate: no anonymous or fake-header calls", postgres: false },
   { key: "vercel", script: "check:vercel:adapter", sprint: "ADR-104", what: "Vercel adapter", postgres: false }

@@ -321,6 +321,8 @@ export const api = {
   setAutomationRuleEnabled: (body) => request("/automation/rules/enable", { method: "POST", body }),
   dryRunAutomationRule: (body) => request("/automation/rules/dry-run", { method: "POST", body }),
   runAutomationNow: (body = {}) => request("/automation/evaluate", { method: "POST", body }),
+  // VI-S4: scorecards and cost-to-serve (owner-only read)
+  getScorecards: (params = "") => request(withScope(`/scorecards${params ? `?${params}` : ""}`), { skipCache: true }),
   // VI-S3: Evidence Passport (owner-only)
   listPassports: () => request(withScope("/passports"), { skipCache: true }),
   previewPassport: (body) => request("/passports/preview", { method: "POST", body }),

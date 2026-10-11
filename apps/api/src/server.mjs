@@ -1,4 +1,5 @@
 import { briefToday_, briefHistory, briefOn, tickBriefs } from "./edcs-brief-service.mjs";
+import { readScorecards } from "./scorecard-service.mjs";
 import { createPassport, downloadPassport, listPassports, previewPassport, readPassport, verifyStoredPassport } from "./evidence-passport-service.mjs";
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
@@ -3642,6 +3643,13 @@ async function readBriefRoute(req, url) {
   return briefOn({ scope, actor, asOf: decodeURIComponent(match[1]) });
 }
 
+// VI-S4: scorecards and cost-to-serve (owner-only, read). GET /scorecards?period=30d|90d|ytd|custom&from=&to=
+async function readScorecardsRoute(req, url) {
+  if (url.pathname !== "/scorecards") return null;
+  const { scope, actor } = edcsScope(req, { tenant_id: url.searchParams.get("tenant_id"), firm_id: url.searchParams.get("firm_id") }, "read scorecards");
+  return readScorecards({ scope, actor, params: url.searchParams });
+}
+
 async function evaluateAutomationRoute(body, req = null) {
   requireFields(body, ["tenant_id", "firm_id"]);
   const { actor } = edcsScope(req, body, "run BizKick rules");
@@ -4133,6 +4141,7 @@ export const handleRequest = async (req, res) => {
     if (req.method === "POST" && url.pathname === "/automation/tick") return sendJson(req, res, 200, { ok: true, data: await automationTickRoute(req, url) });
     { const passportDownload = req.method === "GET" ? url.pathname.match(/^\/passports\/([^/]+)\/download$/) : null; if (passportDownload) return await downloadPassportRoute(req, res, url, decodeURIComponent(passportDownload[1])); }
     { const passportRead = req.method === "GET" && url.pathname.startsWith("/passports") ? await readPassportRoute(req, url) : null; if (passportRead) return sendJson(req, res, 200, { ok: true, data: passportRead }); }
+    { const scorecardRead = req.method === "GET" && url.pathname === "/scorecards" ? await readScorecardsRoute(req, url) : null; if (scorecardRead) return sendJson(req, res, 200, { ok: true, data: scorecardRead }); }
     { const briefRead = req.method === "GET" && url.pathname.startsWith("/brief/") ? await readBriefRoute(req, url) : null; if (briefRead) return sendJson(req, res, 200, { ok: true, data: briefRead }); }
     { const standingRead = req.method === "GET" && url.pathname.startsWith("/standing/") ? await readStandingRoute(req, url) : null; if (standingRead) return sendJson(req, res, 200, { ok: true, data: standingRead }); }
     { const automationRead = req.method === "GET" && url.pathname.startsWith("/automation/") ? await readAutomationRoute(req, url) : null; if (automationRead) return sendJson(req, res, 200, { ok: true, data: automationRead }); }

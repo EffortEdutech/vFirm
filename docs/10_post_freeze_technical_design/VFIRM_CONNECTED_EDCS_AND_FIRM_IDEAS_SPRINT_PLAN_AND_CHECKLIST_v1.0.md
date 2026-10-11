@@ -437,10 +437,12 @@ Scope:
 - Per client: requests, worker jobs, owner review time (where recorded) vs. invoiced amount.
 - Scorecard view on My Team; client view on Clients.
 
+Built 2026-10-11 (ADR-112, no migration): revenue from BizKick invoices plus vFirm invoices; selectable period, default last 90 days; under 5 reviewed jobs is flagged low sample, not hidden.
+
 Acceptance checks (`npm run check:vi:s4-scorecards`):
 
-- [ ] Metrics match hand-computed values on a fixture history.
-- [ ] Only the firm's own data; no performance profiling of human staff.
+- [x] Metrics match hand-computed values on a fixture history.
+- [x] Only the firm's own data; no performance profiling of human staff.
 
 ### VI-S5 — Trust Ladder (requires its own ADR and decision D5)
 
@@ -542,7 +544,7 @@ Acceptance checks (`npm run check:vi:s6-einvoice-readiness`):
 - [x] `check:vi:s1-standing-instructions` (VI-S1, ADR-109, migration 0057)
 - [x] `check:vi:s2-morning-brief` (VI-S2, ADR-110, migration 0058)
 - [x] `check:vi:s3-evidence-passport` (VI-S3, ADR-111, migration 0059)
-- [ ] `check:vi:s4-scorecards`
+- [x] `check:vi:s4-scorecards` (VI-S4, ADR-112, no migration)
 - [ ] `check:vi:s5-trust-ladder`
 - [ ] `check:vi:s6-einvoice-readiness`
 
