@@ -473,8 +473,8 @@ Scope:
 
 Acceptance checks (`npm run check:vi:s6-einvoice-readiness`):
 
-- [ ] Fixture invoices produce the expected pass/fail per field.
-- [ ] No submission capability exists in code.
+- [x] Fixture invoices produce the expected pass/fail per field.
+- [x] No submission capability exists in code.
 
 ---
 
@@ -487,7 +487,7 @@ Acceptance checks (`npm run check:vi:s6-einvoice-readiness`):
 - [x] Production scheduler for ticks chosen (CE-S3): recommendation is Supabase `pg_cron` + `pg_net` to `POST /automation/tick`; owner to apply
 - [ ] BizKick v1.1 "Connected edition" release decision (CE-S4)
 - [x] D5 Trust Ladder decision + its ADR (before VI-S5)
-- [ ] Current LHDN spec confirmed (before VI-S6)
+- [x] Current LHDN spec confirmed (before VI-S6; recorded in ADR-114)
 
 ### Data model (planned migrations)
 
@@ -546,7 +546,7 @@ Acceptance checks (`npm run check:vi:s6-einvoice-readiness`):
 - [x] `check:vi:s3-evidence-passport` (VI-S3, ADR-111, migration 0059)
 - [x] `check:vi:s4-scorecards` (VI-S4, ADR-112, no migration)
 - [x] `check:vi:s5-trust-ladder` (VI-S5, ADR-113, migration 0060)
-- [ ] `check:vi:s6-einvoice-readiness`
+- [x] `check:vi:s6-einvoice-readiness` (VI-S6, ADR-114, migration 0061)
 
 ---
 

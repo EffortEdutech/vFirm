@@ -35,6 +35,7 @@ export const CHECKS = [
   { key: "vi3", script: "check:vi:s3-evidence-passport", sprint: "VI-S3", what: "Evidence Passport (sealed, offline-verifiable dossier; restricted opt-in)", postgres: true },
   { key: "vi4", script: "check:vi:s4-scorecards", sprint: "VI-S4", what: "Worker scorecards and cost-to-serve (first-pass rates, waits, per-client effort vs invoiced)", postgres: true },
   { key: "vi5", script: "check:vi:s5-trust-ladder", sprint: "VI-S5", what: "Trust Ladder (shadow runs kept out of Approval, owner-click promotion, batch approval, automatic demotion)", postgres: true },
+  { key: "vi6", script: "check:vi:s6-einvoice-readiness", sprint: "VI-S6", what: "e-Invoice readiness (field-by-field fix lists, bands, consolidated draft, no submission capability)", postgres: true },
   { key: "h1gu", script: "check:ce:h1-store-read-guard", sprint: "CE-H1", what: "Store read guard", postgres: false },
   { key: "pa", script: "check:pa:request-gate", sprint: "Production auth", what: "Request gate: no anonymous or fake-header calls", postgres: false },
   { key: "vercel", script: "check:vercel:adapter", sprint: "ADR-104", what: "Vercel adapter", postgres: false }

@@ -18,7 +18,7 @@ import { isPostgresStore, readStore, withStore } from "./store.mjs";
 import { query, setTenantContext, withClient } from "./repositories/shared/db.mjs";
 
 // CE-S3 (ADR-097, migration 0051) adds the two automation tables to the same repository.
-export const EDCS_COLLECTIONS = ["edcs_connections", "edcs_transactions", "edcs_transaction_revisions", "edcs_sync_runs", "edcs_sync_events", "automation_rules", "automation_rule_runs", "edcs_number_reservations", "approval_policies", "edcs_connectors", "edcs_graph_connections", "edcs_company_profiles", "edcs_template_drafts", "standing_instructions", "firm_briefs", "evidence_passports", "trust_ladder"];
+export const EDCS_COLLECTIONS = ["edcs_connections", "edcs_transactions", "edcs_transaction_revisions", "edcs_sync_runs", "edcs_sync_events", "automation_rules", "automation_rule_runs", "edcs_number_reservations", "approval_policies", "edcs_connectors", "edcs_graph_connections", "edcs_company_profiles", "edcs_template_drafts", "standing_instructions", "firm_briefs", "evidence_passports", "trust_ladder", "einvoice_profiles"];
 
 // The natural key inside (tenant, firm) of each collection.
 const naturalKey = {
@@ -48,7 +48,9 @@ const naturalKey = {
   // VI-S3: one row per issued Evidence Passport (migration 0059)
   evidence_passports: (record) => record.id,
   // VI-S5: trust ladder rows (migration 0060): PAIR = one per worker-skill, SHADOW = one per shadow run, BATCH = one per batch approval
-  trust_ladder: (record) => (record.kind === "PAIR" ? `pair:${record.staff_code}|${record.skill_id}` : `${String(record.kind).toLowerCase()}:${record.id}`)
+  trust_ladder: (record) => (record.kind === "PAIR" ? `pair:${record.staff_code}|${record.skill_id}` : `${String(record.kind).toLowerCase()}:${record.id}`),
+  // VI-S6: e-Invoice profiles (migration 0061): SUPPLIER = one per firm, BUYER = one per buyer key
+  einvoice_profiles: (record) => (record.kind === "SUPPLIER" ? "supplier" : `buyer:${record.buyer_key}`)
 };
 
 // A claimed occurrence that failed may be claimed again, up to this many attempts in total.
@@ -472,6 +474,13 @@ export const edcsRepository = {
   },
   async getLadderPair(scope, staffCode, skillId) {
     return (await impl().readWhere(scope, "trust_ladder", { key: `pair:${staffCode}|${skillId}` }))[0] ?? null;
+  },
+  // VI-S6: e-Invoice supplier / buyer profiles.
+  async listEinvoiceProfiles(scope) {
+    return impl().read(scope, "einvoice_profiles");
+  },
+  async getEinvoiceProfile(scope, naturalKey) {
+    return (await impl().readWhere(scope, "einvoice_profiles", { key: naturalKey }))[0] ?? null;
   },
   // VI-S2: saved morning briefs (one per firm per day).
   async listBriefs(scope) {

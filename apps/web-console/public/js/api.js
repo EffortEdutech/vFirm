@@ -330,6 +330,10 @@ export const api = {
   markShadow: (body) => request("/trust-ladder/shadow/mark", { method: "POST", body }),
   previewLadderBatch: (body) => request("/trust-ladder/batch/preview", { method: "POST", body }),
   approveLadderBatch: (body) => request("/trust-ladder/batch/approve", { method: "POST", body }),
+  // VI-S6: e-Invoice readiness (owner-only, check only)
+  getEinvoiceReadiness: (q) => request(withScope(`/einvoice/readiness?${new URLSearchParams(Object.entries(q).filter(([, v]) => v)).toString()}`), { skipCache: true }),
+  saveEinvoiceSupplier: (body) => request("/einvoice/supplier", { method: "POST", body }),
+  saveEinvoiceBuyer: (body) => request("/einvoice/buyer", { method: "POST", body }),
   // VI-S3: Evidence Passport (owner-only)
   listPassports: () => request(withScope("/passports"), { skipCache: true }),
   previewPassport: (body) => request("/passports/preview", { method: "POST", body }),

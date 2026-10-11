@@ -353,3 +353,12 @@ label{font-size:12.3px; color:var(--ink-soft); font-weight:600;}
 .tl-drafts { display: grid; gap: 6px; margin: 8px 0; }
 .tl-draft { display: block; }
 #tlMsg { min-height: 1.2em; }
+
+/* VI-S6 e-Invoice readiness */
+.ei-banner { padding: 10px 12px; border-radius: 6px; margin: 10px 0; border: 1px solid var(--line, #ddd); }
+.ei-on { background: #fff7e6; } .ei-off { background: #e8f7ee; }
+.ei-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; margin-bottom: 8px; }
+.ei-f { display: flex; flex-direction: column; font-size: 12px; gap: 2px; }
+.ei-inv { border: 1px solid var(--line, #ddd); border-radius: 6px; padding: 6px 10px; margin: 6px 0; }
+.ei-fix li { margin: 4px 0; }
+.ei-counts { margin: 8px 0; }

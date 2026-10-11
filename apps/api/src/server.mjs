@@ -1,5 +1,6 @@
 import { briefToday_, briefHistory, briefOn, tickBriefs } from "./edcs-brief-service.mjs";
 import { readScorecards } from "./scorecard-service.mjs";
+import { readEinvoice, saveBuyer as einvoiceSaveBuyer, saveSupplier as einvoiceSaveSupplier } from "./einvoice-service.mjs";
 import { afterReview as ladderAfterReview, approveBatch as ladderApproveBatch, markShadow as ladderMarkShadow, previewBatch as ladderPreviewBatch, readLadder, saveShadowRun as ladderSaveShadowRun, setStage as ladderSetStage, setThresholds as ladderSetThresholds, stageOf as ladderStageOf, skillOfItem as ladderSkillOf } from "./trust-ladder-service.mjs";
 import { createPassport, downloadPassport, listPassports, previewPassport, readPassport, verifyStoredPassport } from "./evidence-passport-service.mjs";
 import { createServer } from "node:http";
@@ -3198,6 +3199,8 @@ const routes = new Map([
   // VI-S3 (ADR-111): Evidence Passport (owner-only): preview, then build.
   ["POST /passports/preview", previewPassportRoute],
   ["POST /passports", createPassportRoute],
+  ["POST /einvoice/supplier", einvoiceSupplierRoute],
+  ["POST /einvoice/buyer", einvoiceBuyerRoute],
   ["POST /trust-ladder/stage", ladderStageRoute],
   ["POST /trust-ladder/thresholds", ladderThresholdsRoute],
   ["POST /trust-ladder/shadow/mark", ladderShadowMarkRoute],
@@ -3659,6 +3662,22 @@ async function readScorecardsRoute(req, url) {
   return readScorecards({ scope, actor, params: url.searchParams });
 }
 
+// VI-S6: e-Invoice readiness (owner-only, check only -- nothing is ever submitted). GET /einvoice/readiness; the POSTs save profiles.
+async function readEinvoiceRoute(req, url) {
+  if (url.pathname !== "/einvoice/readiness") return null;
+  const { scope, actor } = edcsScope(req, { tenant_id: url.searchParams.get("tenant_id"), firm_id: url.searchParams.get("firm_id") }, "read e-Invoice readiness");
+  return readEinvoice({ scope, actor, params: url.searchParams });
+}
+async function einvoiceSupplierRoute(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id"]);
+  const { scope, actor } = edcsScope(req, body, "save e-Invoice supplier details");
+  return einvoiceSaveSupplier({ scope, actor, body });
+}
+async function einvoiceBuyerRoute(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "buyer_key"]);
+  const { scope, actor } = edcsScope(req, body, "save e-Invoice buyer details");
+  return einvoiceSaveBuyer({ scope, actor, body });
+}
 // VI-S5: Trust Ladder (owner-only). GET /trust-ladder reads; the POST routes are in the route table.
 async function readTrustLadderRoute(req, url) {
   if (url.pathname !== "/trust-ladder") return null;
@@ -4194,6 +4213,7 @@ export const handleRequest = async (req, res) => {
     if (req.method === "POST" && url.pathname === "/automation/tick") return sendJson(req, res, 200, { ok: true, data: await automationTickRoute(req, url) });
     { const passportDownload = req.method === "GET" ? url.pathname.match(/^\/passports\/([^/]+)\/download$/) : null; if (passportDownload) return await downloadPassportRoute(req, res, url, decodeURIComponent(passportDownload[1])); }
     { const passportRead = req.method === "GET" && url.pathname.startsWith("/passports") ? await readPassportRoute(req, url) : null; if (passportRead) return sendJson(req, res, 200, { ok: true, data: passportRead }); }
+    { const einvoiceRead = req.method === "GET" && url.pathname === "/einvoice/readiness" ? await readEinvoiceRoute(req, url) : null; if (einvoiceRead) return sendJson(req, res, 200, { ok: true, data: einvoiceRead }); }
     { const ladderRead = req.method === "GET" && url.pathname === "/trust-ladder" ? await readTrustLadderRoute(req, url) : null; if (ladderRead) return sendJson(req, res, 200, { ok: true, data: ladderRead }); }
     { const scorecardRead = req.method === "GET" && url.pathname === "/scorecards" ? await readScorecardsRoute(req, url) : null; if (scorecardRead) return sendJson(req, res, 200, { ok: true, data: scorecardRead }); }
     { const briefRead = req.method === "GET" && url.pathname.startsWith("/brief/") ? await readBriefRoute(req, url) : null; if (briefRead) return sendJson(req, res, 200, { ok: true, data: briefRead }); }
