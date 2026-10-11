@@ -303,6 +303,10 @@ export const api = {
   setAutomationRuleEnabled: (body) => request("/automation/rules/enable", { method: "POST", body }),
   dryRunAutomationRule: (body) => request("/automation/rules/dry-run", { method: "POST", body }),
   runAutomationNow: (body = {}) => request("/automation/evaluate", { method: "POST", body }),
+  // VI-S2: Morning Brief (owner-only reads)
+  getBriefToday: () => request(withScope("/brief/today"), { skipCache: true }),
+  getBriefHistory: () => request(withScope("/brief/history"), { skipCache: true }),
+  getBriefOn: (date) => request(withScope(`/brief/${encodeURIComponent(date)}`), { skipCache: true }),
   // VI-S1: standing instructions
   listStanding: () => request(withScope("/standing/instructions"), { skipCache: true }),
   getStandingHistory: (id) => request(withScope(`/standing/instructions/${encodeURIComponent(id)}/history`), { skipCache: true }),

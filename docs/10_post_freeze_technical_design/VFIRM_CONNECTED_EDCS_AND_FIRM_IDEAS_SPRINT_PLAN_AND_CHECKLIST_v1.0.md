@@ -400,14 +400,14 @@ Objective: the firm's state in two minutes, deterministic and linked.
 Scope:
 
 - Sections: Needs you (W4 tray); due/overdue (requests + BizKick); cash signals (receivables aging from INV/RC, unreconciled months from BR); worker throughput yesterday; exceptions (conflicts, duplicates, missing links, unreserved IDs); standing instructions due today.
-- Console page "Today" + daily snapshot (`firm_briefs`) for history; every line links to its record.
+- Console page "Morning Brief" (a new page beside the Dashboard; ADR-110) + daily snapshot (`firm_briefs`) for history; every line links to its record.
 - Email/WhatsApp delivery deferred (needs a provider decision and consent).
 
 Acceptance checks (`npm run check:vi:s2-morning-brief`):
 
-- [ ] Fixture produces the expected numbers in each section.
-- [ ] Every item links to an existing record; no cross-firm data.
-- [ ] Deterministic: same data → same brief.
+- [x] Fixture produces the expected numbers in each section.
+- [x] Every item links to an existing record; no cross-firm data.
+- [x] Deterministic: same data → same brief.
 
 ### VI-S3 — Evidence Passport
 
@@ -538,7 +538,7 @@ Acceptance checks (`npm run check:vi:s6-einvoice-readiness`):
 - [x] `check:ce:s8-template-drafting` (CE-S8, ADR-107)
 - [~] CE-S9 evidence pack + acceptance gate (kit built 2026-10-12, ADR-108; pilot deferred by the owner on 2026-10-12, gate recorded as HOLD; reopen by running the pilot)
 - [x] `check:vi:s1-standing-instructions` (VI-S1, ADR-109, migration 0057)
-- [ ] `check:vi:s2-morning-brief`
+- [x] `check:vi:s2-morning-brief` (VI-S2, ADR-110, migration 0058)
 - [ ] `check:vi:s3-evidence-passport`
 - [ ] `check:vi:s4-scorecards`
 - [ ] `check:vi:s5-trust-ladder`

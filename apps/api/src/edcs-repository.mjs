@@ -18,7 +18,7 @@ import { isPostgresStore, readStore, withStore } from "./store.mjs";
 import { query, setTenantContext, withClient } from "./repositories/shared/db.mjs";
 
 // CE-S3 (ADR-097, migration 0051) adds the two automation tables to the same repository.
-export const EDCS_COLLECTIONS = ["edcs_connections", "edcs_transactions", "edcs_transaction_revisions", "edcs_sync_runs", "edcs_sync_events", "automation_rules", "automation_rule_runs", "edcs_number_reservations", "approval_policies", "edcs_connectors", "edcs_graph_connections", "edcs_company_profiles", "edcs_template_drafts", "standing_instructions"];
+export const EDCS_COLLECTIONS = ["edcs_connections", "edcs_transactions", "edcs_transaction_revisions", "edcs_sync_runs", "edcs_sync_events", "automation_rules", "automation_rule_runs", "edcs_number_reservations", "approval_policies", "edcs_connectors", "edcs_graph_connections", "edcs_company_profiles", "edcs_template_drafts", "standing_instructions", "firm_briefs"];
 
 // The natural key inside (tenant, firm) of each collection.
 const naturalKey = {
@@ -42,7 +42,9 @@ const naturalKey = {
   edcs_company_profiles: () => "company",
   edcs_template_drafts: (record) => record.id,
   // VI-S1: one row per standing instruction, and one settings row (holidays, weekend) per firm (migration 0057)
-  standing_instructions: (record) => (record.kind === "SETTINGS" ? "settings" : record.id)
+  standing_instructions: (record) => (record.kind === "SETTINGS" ? "settings" : record.id),
+  // VI-S2: one saved brief per firm per day (migration 0058); the first one saved that day stays
+  firm_briefs: (record) => record.as_of
 };
 
 // A claimed occurrence that failed may be claimed again, up to this many attempts in total.
@@ -86,6 +88,17 @@ const jsonImpl = {
       for (const collection of EDCS_COLLECTIONS) for (const record of batch[collection] ?? []) jsonUpsert(store, scope, collection, record);
     });
   },
+  // VI-S2: insert a record only if its natural key is free. Returns { saved: true, record } or { saved: false, record: <existing> }.
+  async saveOnce(scope, collection, record) {
+    return withStore((store) => {
+      store[collection] ??= [];
+      const key = naturalKey[collection](record);
+      const existing = store[collection].find((item) => inScope(scope)(item) && naturalKey[collection](item) === key);
+      if (existing) return { saved: false, record: existing };
+      store[collection].push(record);
+      return { saved: true, record };
+    });
+  },
   // CE-S7: firms whose Microsoft 365 connection is ACTIVE (the scheduled poll visits each).
   async graphScopes() {
     const store = await readStore();
@@ -95,6 +108,12 @@ const jsonImpl = {
     const store = await readStore();
     const seen = new Map();
     for (const item of store.standing_instructions ?? []) if (item.kind === "INSTRUCTION" && item.status === "ACTIVE") seen.set(`${item.tenant_id}|${item.firm_id}`, { tenant_id: item.tenant_id, firm_id: item.firm_id });
+    return [...seen.values()];
+  },
+  async briefScopes() {
+    const store = await readStore();
+    const seen = new Map();
+    for (const list of [store.edcs_transactions ?? [], store.standing_instructions ?? [], store.work_requests ?? []]) for (const item of list) if (item.tenant_id && item.firm_id) seen.set(`${item.tenant_id}|${item.firm_id}`, { tenant_id: item.tenant_id, firm_id: item.firm_id });
     return [...seen.values()];
   },
   async enabledScopes() {
@@ -209,12 +228,41 @@ const pgImpl = {
       }
     });
   },
+  async saveOnce(scope, collection, record) {
+    return withClient(async (client) => {
+      await client.query("begin");
+      try {
+        await setTenantContext(client, scope.tenant_id);
+        const inserted = await query(
+          `insert into ${collection} (id, natural_key, tenant_id, firm_id, record, created_at, updated_at)
+           values ($1::uuid, $2, $3::uuid, $4::uuid, $5::jsonb, now(), now())
+           on conflict (tenant_id, firm_id, natural_key) do nothing returning id`,
+          [record.id, naturalKey[collection](record), scope.tenant_id, scope.firm_id, JSON.stringify(record)],
+          client
+        );
+        let result = { saved: true, record };
+        if (!inserted.rows.length) {
+          const { rows } = await query(`select record from ${collection} where tenant_id = $1 and firm_id = $2 and natural_key = $3`, [scope.tenant_id, scope.firm_id, naturalKey[collection](record)], client);
+          result = { saved: false, record: rows[0]?.record ?? record };
+        }
+        await client.query("commit");
+        return result;
+      } catch (error) {
+        await client.query("rollback");
+        throw error;
+      }
+    });
+  },
   async graphScopes() {
     const { rows } = await query(`select tenant_id, firm_id from edcs_graph_connections where status_c = 'ACTIVE'`, []);
     return rows.map((row) => ({ tenant_id: row.tenant_id, firm_id: row.firm_id }));
   },
   async standingScopes() {
     const { rows } = await query(`select distinct tenant_id, firm_id from standing_instructions where kind_c = 'INSTRUCTION' and status_c = 'ACTIVE'`, []);
+    return rows.map((row) => ({ tenant_id: row.tenant_id, firm_id: row.firm_id }));
+  },
+  async briefScopes() {
+    const { rows } = await query(`select tenant_id, firm_id from edcs_transactions union select tenant_id, firm_id from standing_instructions union select tenant_id, firm_id from work_requests`, []);
     return rows.map((row) => ({ tenant_id: row.tenant_id, firm_id: row.firm_id }));
   },
   async enabledScopes() {
@@ -406,6 +454,19 @@ export const edcsRepository = {
     return (await impl().read(scope, "automation_rule_runs"))
       .filter((record) => record.kind === "SI_OCCURRENCE" && (!instruction_id || record.instruction_id === instruction_id))
       .sort((a, b) => String(b.at ?? b.created_at).localeCompare(String(a.at ?? a.created_at)));
+  },
+  // VI-S2: saved morning briefs (one per firm per day).
+  async listBriefs(scope) {
+    return (await impl().read(scope, "firm_briefs")).sort((a, b) => String(b.as_of).localeCompare(String(a.as_of)));
+  },
+  async getBrief(scope, asOf) {
+    return (await impl().read(scope, "firm_briefs")).find((record) => record.as_of === asOf) ?? null;
+  },
+  async saveBriefOnce(scope, record) {
+    return impl().saveOnce(scope, "firm_briefs", record);
+  },
+  async listBriefScopes() {
+    return impl().briefScopes();
   },
   // CE-S4: the Number Desk's reservations and the atomic "next number".
   async listReservations(scope) {

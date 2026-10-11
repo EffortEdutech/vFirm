@@ -1,3 +1,4 @@
+import { briefToday_, briefHistory, briefOn, tickBriefs } from "./edcs-brief-service.mjs";
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { timingSafeEqual } from "node:crypto";
@@ -3588,6 +3589,16 @@ async function readStandingRoute(req, url) {
   return listStandingHistory({ scope, instructionId: null });
 }
 
+// VI-S2: the Morning Brief (owner-only, read). GET /brief/today, /brief/history, /brief/<YYYY-MM-DD>.
+async function readBriefRoute(req, url) {
+  const match = url.pathname.match(/^\/brief\/([^/]+)$/);
+  if (!match) return null;
+  const { scope, actor } = edcsScope(req, { tenant_id: url.searchParams.get("tenant_id"), firm_id: url.searchParams.get("firm_id") }, "read the Morning Brief");
+  if (match[1] === "today") return briefToday_({ scope, actor });
+  if (match[1] === "history") return briefHistory({ scope, actor });
+  return briefOn({ scope, actor, asOf: decodeURIComponent(match[1]) });
+}
+
 async function evaluateAutomationRoute(body, req = null) {
   requireFields(body, ["tenant_id", "firm_id"]);
   const { actor } = edcsScope(req, body, "run BizKick rules");
@@ -3631,7 +3642,9 @@ async function automationTickRoute(req, url) {
   const graph = await pollGraphConnections({ deps: graphDeps, scope: only }).catch((error) => ({ error: error instanceof Error ? error.message : String(error) }));
   // VI-S1: the same scheduled call raises the day's standing instructions (a failure never fails the tick).
   const standing = await tickStanding({ deps: automationDeps, scope: only }).catch((error) => ({ error: error instanceof Error ? error.message : String(error) }));
-  return { ...result, graph, standing };
+  // VI-S2: after the day's standing instructions are raised, save every firm's morning brief (insert-if-absent).
+  const briefs = await tickBriefs({ scope: only }).catch((error) => ({ error: error instanceof Error ? error.message : String(error) }));
+  return { ...result, graph, standing, briefs };
 }
 
 // GET /automation/rules | /automation/rules/<id>/activity | /automation/activity (read: any verified member).
@@ -4075,6 +4088,7 @@ export const handleRequest = async (req, res) => {
     if (req.method === "GET" && url.pathname === "/database/schema") { const schema = await readFile(join(root, "infra/database/schema.sql"), "utf8"); return sendJson(req, res, 200, { ok: true, data: { path: "infra/database/schema.sql", bytes: schema.length } }); }
     if (req.method === "GET" && url.pathname === "/work-requests/request-types") return sendJson(req, res, 200, { ok: true, data: listWorkRequestTypes() });
     if (req.method === "POST" && url.pathname === "/automation/tick") return sendJson(req, res, 200, { ok: true, data: await automationTickRoute(req, url) });
+    { const briefRead = req.method === "GET" && url.pathname.startsWith("/brief/") ? await readBriefRoute(req, url) : null; if (briefRead) return sendJson(req, res, 200, { ok: true, data: briefRead }); }
     { const standingRead = req.method === "GET" && url.pathname.startsWith("/standing/") ? await readStandingRoute(req, url) : null; if (standingRead) return sendJson(req, res, 200, { ok: true, data: standingRead }); }
     { const automationRead = req.method === "GET" && url.pathname.startsWith("/automation/") ? await readAutomationRoute(req, url) : null; if (automationRead) return sendJson(req, res, 200, { ok: true, data: automationRead }); }
     if (req.method === "POST" && url.pathname === "/edcs/files/upload") return sendJson(req, res, 201, { ok: true, data: await linkEdcsFileRoute(req, url) });

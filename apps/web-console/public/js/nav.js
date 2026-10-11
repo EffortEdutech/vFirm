@@ -6,7 +6,11 @@
 export const OWNER_NAV = [
   {
     category: "Overview",
-    items: [{ id: "dashboard", label: "Dashboard", icon: "▣" }],
+    items: [
+      { id: "dashboard", label: "Dashboard", icon: "▣" },
+      // VI-S2 (ADR-110): the firm in two minutes
+      { id: "morning-brief", label: "Morning Brief", icon: "☀" },
+    ],
   },
   {
     category: "Workforce",
@@ -88,6 +92,7 @@ export const ADMIN_NAV = [
 
 export const PAGE_META = {
   dashboard: { eyebrow: "Overview", title: "Dashboard", desc: "Where the firm stands right now." },
+  "morning-brief": { eyebrow: "Overview", title: "Morning Brief", desc: "The firm's state in two minutes: what needs you, what is late, cash signals, your team yesterday, exceptions and standing instructions. Every line opens its record." },
   team: { eyebrow: "Workforce", title: "My Team", desc: "Hire, assign and manage your virtual staff." },
   workdesk: { eyebrow: "Workforce", title: "Workdesk", desc: "Track work from intake to client delivery." },
   sales: { eyebrow: "Clients", title: "Clients & Sales", desc: "Enquiries, opportunities and proposals." },
