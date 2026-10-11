@@ -65,7 +65,7 @@ function topMissing(counter) {
 }
 
 // One row of facts per workdesk item: the first draft, the first decision on it, and whether the worker asked for more.
-function factsFor(item, drafts, reviews, messages) {
+export function factsFor(item, drafts, reviews, messages) {
   const mine = drafts.filter((d) => d.workdesk_item_id === item.id)
     .sort((a, b) => (Number(a.revision_number ?? 1) - Number(b.revision_number ?? 1)) || String(a.created_at).localeCompare(String(b.created_at)) || String(a.id).localeCompare(String(b.id)));
   const first = mine[0] ?? null;
@@ -74,7 +74,7 @@ function factsFor(item, drafts, reviews, messages) {
   const missing = new Set();
   for (const ask of asks) for (const input of missingInputsOf(String(ask.content ?? ""))) missing.add(input);
   return {
-    item, first, decision: firstReview?.review_decision ?? null,
+    item, first, decision: firstReview?.review_decision ?? null, decided_at: firstReview?.reviewed_at ?? null,
     drafted: Boolean(first), draft_count: mine.length,
     minutes_to_draft: first ? minutesBetween(item.assigned_at, first.created_at) : null,
     waited_minutes: first && firstReview ? minutesBetween(first.created_at, firstReview.reviewed_at) : null,

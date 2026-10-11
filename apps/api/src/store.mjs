@@ -180,7 +180,7 @@ const initialStore = () => ({
   edcs_sync_runs: [],
   edcs_sync_events: [],
   automation_rules: [],
-  automation_rule_runs: [], edcs_number_reservations: [], approval_policies: [], edcs_connectors: [], edcs_graph_connections: [], edcs_company_profiles: [], edcs_template_drafts: [], standing_instructions: [], firm_briefs: [], evidence_passports: [],
+  automation_rule_runs: [], edcs_number_reservations: [], approval_policies: [], edcs_connectors: [], edcs_graph_connections: [], edcs_company_profiles: [], edcs_template_drafts: [], standing_instructions: [], firm_briefs: [], evidence_passports: [], trust_ladder: [],
   professional_authorities: [],
   actors: [],
   persons: [],
@@ -5209,6 +5209,9 @@ export async function reviewAwiaStaffOutputDraftRecord(body, actor) {
       review_notes: body.review_notes ?? null,
       reviewed_by_actor_id: actor.actor_id,
       professional_authority_ref: body.professional_authority_ref ?? null,
+      // VI-S5: a batch approval still writes one review per draft; this names the batch.
+      batch_id: body.batch_id ?? null,
+      batch_number: body.batch_number ?? null,
       reviewed_at: now(),
       boundary: "human_review_required_before_client_delivery_draft"
     };
@@ -6549,7 +6552,7 @@ function stripRelationalCollections(store) {
   edcs_sync_runs: [],
   edcs_sync_events: [],
   automation_rules: [],
-  automation_rule_runs: [], edcs_number_reservations: [], approval_policies: [], edcs_connectors: [], edcs_graph_connections: [], edcs_company_profiles: [], edcs_template_drafts: [], standing_instructions: [], firm_briefs: [], evidence_passports: [],
+  automation_rule_runs: [], edcs_number_reservations: [], approval_policies: [], edcs_connectors: [], edcs_graph_connections: [], edcs_company_profiles: [], edcs_template_drafts: [], standing_instructions: [], firm_briefs: [], evidence_passports: [], trust_ladder: [],
   service_packs: [],
   service_skus: [],
   worker_templates: [],

@@ -1,5 +1,6 @@
 import { briefToday_, briefHistory, briefOn, tickBriefs } from "./edcs-brief-service.mjs";
 import { readScorecards } from "./scorecard-service.mjs";
+import { afterReview as ladderAfterReview, approveBatch as ladderApproveBatch, markShadow as ladderMarkShadow, previewBatch as ladderPreviewBatch, readLadder, saveShadowRun as ladderSaveShadowRun, setStage as ladderSetStage, setThresholds as ladderSetThresholds, stageOf as ladderStageOf, skillOfItem as ladderSkillOf } from "./trust-ladder-service.mjs";
 import { createPassport, downloadPassport, listPassports, previewPassport, readPassport, verifyStoredPassport } from "./evidence-passport-service.mjs";
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
@@ -2042,7 +2043,10 @@ async function reviewAwiaStaffOutputDraft(body, req = null) {
   const actor = actorFromBody(body, req, body.tenant_id, body.firm_id);
   // CE-S5: an EDCS-linked draft above the reviewer's tier cannot go to client-draft (409 names the approver).
   await enforceDraftApproval({ scope: { tenant_id: body.tenant_id, firm_id: body.firm_id }, actor, output_draft_id: body.output_draft_id, review_decision: body.review_decision });
-  return reviewAwiaStaffOutputDraftRecord(body, actor);
+  const result = await reviewAwiaStaffOutputDraftRecord(body, actor);
+  // VI-S5: a rejection (or too many sent-back drafts) on a Proven worker-skill demotes it to Supervised.
+  const demotion = await ladderAfterReview({ scope: { tenant_id: body.tenant_id, firm_id: body.firm_id }, actor, output_draft_id: body.output_draft_id });
+  return demotion ? { ...result, trust_ladder_demotion: demotion } : result;
 }
 
 async function decideAwiaStaffClassAApproval(body, req = null) {
@@ -3194,6 +3198,11 @@ const routes = new Map([
   // VI-S3 (ADR-111): Evidence Passport (owner-only): preview, then build.
   ["POST /passports/preview", previewPassportRoute],
   ["POST /passports", createPassportRoute],
+  ["POST /trust-ladder/stage", ladderStageRoute],
+  ["POST /trust-ladder/thresholds", ladderThresholdsRoute],
+  ["POST /trust-ladder/shadow/mark", ladderShadowMarkRoute],
+  ["POST /trust-ladder/batch/preview", ladderBatchPreviewRoute],
+  ["POST /trust-ladder/batch/approve", ladderBatchApproveRoute],
   ["POST /work-requests", createWorkRequest],
   ["POST /work-requests/assign", assignWorkRequest],
   ["POST /work-requests/cancel", cancelWorkRequest],
@@ -3650,6 +3659,42 @@ async function readScorecardsRoute(req, url) {
   return readScorecards({ scope, actor, params: url.searchParams });
 }
 
+// VI-S5: Trust Ladder (owner-only). GET /trust-ladder reads; the POST routes are in the route table.
+async function readTrustLadderRoute(req, url) {
+  if (url.pathname !== "/trust-ladder") return null;
+  const { scope, actor } = edcsScope(req, { tenant_id: url.searchParams.get("tenant_id"), firm_id: url.searchParams.get("firm_id") }, "read the Trust Ladder");
+  return readLadder({ scope, actor });
+}
+async function ladderStageRoute(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "staff_code", "skill_id", "to"]);
+  const { scope, actor } = edcsScope(req, body, "change a worker's stage");
+  return ladderSetStage({ scope, actor, body });
+}
+async function ladderThresholdsRoute(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "staff_code", "skill_id"]);
+  const { scope, actor } = edcsScope(req, body, "set Trust Ladder thresholds");
+  return ladderSetThresholds({ scope, actor, body });
+}
+async function ladderShadowMarkRoute(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id", "shadow_id", "verdict"]);
+  const { scope, actor } = edcsScope(req, body, "mark a shadow draft");
+  return ladderMarkShadow({ scope, actor, body });
+}
+const ladderBatchDeps = (req) => ({
+  enforce: (args) => enforceDraftApproval(args),
+  review: (reviewBody) => reviewAwiaStaffOutputDraft(reviewBody, req)
+});
+async function ladderBatchPreviewRoute(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id"]);
+  const { scope, actor } = edcsScope(req, body, "preview a batch approval");
+  return ladderPreviewBatch({ scope, actor, body, deps: ladderBatchDeps(req) });
+}
+async function ladderBatchApproveRoute(body, req = null) {
+  requireFields(body, ["tenant_id", "firm_id"]);
+  const { scope, actor } = edcsScope(req, body, "approve a batch");
+  return ladderApproveBatch({ scope, actor, body, deps: ladderBatchDeps(req) });
+}
+
 async function evaluateAutomationRoute(body, req = null) {
   requireFields(body, ["tenant_id", "firm_id"]);
   const { actor } = edcsScope(req, body, "run BizKick rules");
@@ -4042,6 +4087,14 @@ async function runAwiaWorkdeskSkill(body, req = null) {
     purpose: "WORK_OUTPUT",
     linked_to: { type: "AwiaStaffWorkdeskItem", id: prep.item.id }
   }, actor);
+  // VI-S5: a worker in SHADOW runs, but its output is kept out of Approval and the Outbox. The human completes the job.
+  const ladderScope = { tenant_id: body.tenant_id, firm_id: body.firm_id };
+  if (await ladderStageOf(ladderScope, prep.item.staff_code, ladderSkillOf(prep.item)) === "SHADOW") {
+    return ladderSaveShadowRun({ scope: ladderScope, actor, item: prep.item, result: {
+      output_title: result.output_title, output_summary: result.output_summary, output_payload: result.payload, output_file_id: file_id,
+      generation: { method: "DETERMINISTIC_SKILL_MODULE", skill_id: result.skill_id, input_files: result.input_files, shadow: true }
+    } });
+  }
   return annotateProducedDraft(await produceAwiaStaffOutputDraftRecord({
     tenant_id: body.tenant_id,
     firm_id: body.firm_id,
@@ -4141,6 +4194,7 @@ export const handleRequest = async (req, res) => {
     if (req.method === "POST" && url.pathname === "/automation/tick") return sendJson(req, res, 200, { ok: true, data: await automationTickRoute(req, url) });
     { const passportDownload = req.method === "GET" ? url.pathname.match(/^\/passports\/([^/]+)\/download$/) : null; if (passportDownload) return await downloadPassportRoute(req, res, url, decodeURIComponent(passportDownload[1])); }
     { const passportRead = req.method === "GET" && url.pathname.startsWith("/passports") ? await readPassportRoute(req, url) : null; if (passportRead) return sendJson(req, res, 200, { ok: true, data: passportRead }); }
+    { const ladderRead = req.method === "GET" && url.pathname === "/trust-ladder" ? await readTrustLadderRoute(req, url) : null; if (ladderRead) return sendJson(req, res, 200, { ok: true, data: ladderRead }); }
     { const scorecardRead = req.method === "GET" && url.pathname === "/scorecards" ? await readScorecardsRoute(req, url) : null; if (scorecardRead) return sendJson(req, res, 200, { ok: true, data: scorecardRead }); }
     { const briefRead = req.method === "GET" && url.pathname.startsWith("/brief/") ? await readBriefRoute(req, url) : null; if (briefRead) return sendJson(req, res, 200, { ok: true, data: briefRead }); }
     { const standingRead = req.method === "GET" && url.pathname.startsWith("/standing/") ? await readStandingRoute(req, url) : null; if (standingRead) return sendJson(req, res, 200, { ok: true, data: standingRead }); }

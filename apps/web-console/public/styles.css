@@ -346,3 +346,10 @@ label{font-size:12.3px; color:var(--ink-soft); font-weight:600;}
 .sc-skill td { font-size: 13px; opacity: .92; }
 .sc-period { margin-bottom: 8px; }
 .sc-period label { margin-right: 12px; }
+
+/* VI-S5: Trust Ladder */
+.tl-th { margin-top: 6px; }
+.tl-th summary { cursor: pointer; font-size: 13px; }
+.tl-drafts { display: grid; gap: 6px; margin: 8px 0; }
+.tl-draft { display: block; }
+#tlMsg { min-height: 1.2em; }

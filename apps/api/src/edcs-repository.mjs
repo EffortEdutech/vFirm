@@ -18,7 +18,7 @@ import { isPostgresStore, readStore, withStore } from "./store.mjs";
 import { query, setTenantContext, withClient } from "./repositories/shared/db.mjs";
 
 // CE-S3 (ADR-097, migration 0051) adds the two automation tables to the same repository.
-export const EDCS_COLLECTIONS = ["edcs_connections", "edcs_transactions", "edcs_transaction_revisions", "edcs_sync_runs", "edcs_sync_events", "automation_rules", "automation_rule_runs", "edcs_number_reservations", "approval_policies", "edcs_connectors", "edcs_graph_connections", "edcs_company_profiles", "edcs_template_drafts", "standing_instructions", "firm_briefs", "evidence_passports"];
+export const EDCS_COLLECTIONS = ["edcs_connections", "edcs_transactions", "edcs_transaction_revisions", "edcs_sync_runs", "edcs_sync_events", "automation_rules", "automation_rule_runs", "edcs_number_reservations", "approval_policies", "edcs_connectors", "edcs_graph_connections", "edcs_company_profiles", "edcs_template_drafts", "standing_instructions", "firm_briefs", "evidence_passports", "trust_ladder"];
 
 // The natural key inside (tenant, firm) of each collection.
 const naturalKey = {
@@ -46,7 +46,9 @@ const naturalKey = {
   // VI-S2: one saved brief per firm per day (migration 0058); the first one saved that day stays
   firm_briefs: (record) => record.as_of,
   // VI-S3: one row per issued Evidence Passport (migration 0059)
-  evidence_passports: (record) => record.id
+  evidence_passports: (record) => record.id,
+  // VI-S5: trust ladder rows (migration 0060): PAIR = one per worker-skill, SHADOW = one per shadow run, BATCH = one per batch approval
+  trust_ladder: (record) => (record.kind === "PAIR" ? `pair:${record.staff_code}|${record.skill_id}` : `${String(record.kind).toLowerCase()}:${record.id}`)
 };
 
 // A claimed occurrence that failed may be claimed again, up to this many attempts in total.
@@ -463,6 +465,13 @@ export const edcsRepository = {
   },
   async getPassport(scope, id) {
     return (await impl().readWhere(scope, "evidence_passports", { key: id }))[0] ?? null;
+  },
+  // VI-S5: trust ladder rows.
+  async listLadder(scope, kind = null) {
+    return (await impl().read(scope, "trust_ladder")).filter((record) => !kind || record.kind === kind);
+  },
+  async getLadderPair(scope, staffCode, skillId) {
+    return (await impl().readWhere(scope, "trust_ladder", { key: `pair:${staffCode}|${skillId}` }))[0] ?? null;
   },
   // VI-S2: saved morning briefs (one per firm per day).
   async listBriefs(scope) {

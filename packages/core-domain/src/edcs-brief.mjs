@@ -235,6 +235,12 @@ export function buildBrief(input) {
     { key: "exceptions", label: "Exceptions in the register", count: e.conflicts.total + e.duplicates.total + e.missing_links.total + e.unreserved_ids.total, urgent: false },
     { key: "standing", label: "Standing instructions needing info", count: sections.standing.needs_info.total + sections.standing.failed.total, urgent: false }
   ];
+  // VI-S5: tell the owner when a worker was moved back to Supervised automatically. Absent when there is nothing to say.
+  const demotions = [...(input.trust?.demotions ?? [])].sort((x, y) => String(x.staff_code).localeCompare(String(y.staff_code)) || String(x.skill_id).localeCompare(String(y.skill_id)));
+  if (demotions.length) {
+    sections.trust = { demotions: demotions.map((d) => ({ staff_code: d.staff_code, skill_id: d.skill_id, reason: d.reason, at: d.at })) };
+    headline.push({ key: "trust", label: "Workers moved back to Supervised", count: demotions.length, urgent: true });
+  }
   return { as_of: today, yesterday, headline, sections };
 }
 

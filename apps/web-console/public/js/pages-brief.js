@@ -76,6 +76,13 @@ function standingHtml(section) {
   return panel("Standing instructions", parts || quiet(section.active ? `${count(section.active, "instruction is", "instructions are")} on; nothing is due today.` : "No standing instruction is turned on."));
 }
 
+// VI-S5: shown only when a worker was moved back to Supervised automatically.
+function trustHtml(section) {
+  if (!section?.demotions?.length) return "";
+  const rows = section.demotions.map((d) => `<li><strong>${escapeHtml(d.staff_code)}</strong> / ${escapeHtml(d.skill_id)}: ${escapeHtml(d.reason)} <button class="btn btn-sm" type="button" data-nav-page="team">Open My Team</button></li>`).join("");
+  return panel("Moved back to Supervised", `<p class="field-note">These workers lost their Proven stage automatically. Their drafts are reviewed one by one again until you promote them.</p><ul class="brief-list">${rows}</ul>`);
+}
+
 export async function mountMorningBrief(root) {
   let data;
   try { data = await api.getBriefToday(); } catch (err) { root.innerHTML = errorBox(err, "Morning Brief"); return; }
@@ -87,7 +94,7 @@ export async function mountMorningBrief(root) {
     : `This matches today's saved copy (${escapeHtml(snap.saved_by === "TICK" ? "saved by the daily job" : "saved when first opened")}).`;
   root.innerHTML = `<p class="field-note">${escapeHtml(fmtDate(brief.as_of))}, Malaysia time. Built from your own records only; nothing here is estimated. Click a line to open it. ${note}</p>`
     + headlineHtml(brief.headline)
-    + needsYouHtml(s.needs_you) + dueHtml(s.due) + cashHtml(s.cash) + throughputHtml(s.throughput) + exceptionsHtml(s.exceptions) + standingHtml(s.standing)
+    + trustHtml(s.trust) + needsYouHtml(s.needs_you) + dueHtml(s.due) + cashHtml(s.cash) + throughputHtml(s.throughput) + exceptionsHtml(s.exceptions) + standingHtml(s.standing)
     + `<div id="briefHistory"></div><div class="form-actions"><button class="btn btn-sm" id="briefHistoryBtn" type="button">Earlier briefs</button> <button class="btn btn-sm" id="briefRefresh" type="button">Refresh</button></div>`;
   root.onclick = (event) => {
     const target = event.target.closest("button[data-nav-page]");

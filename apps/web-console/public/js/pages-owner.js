@@ -17,6 +17,7 @@
 import { api, HIREABLE_ROLES, AWIA_HIRE_PACKAGE_CODE, scopeStoreToCurrentFirm, clearCache } from "./api.js";
 import { panel, table, statRow, tabBar, statusPill, empty, errorBox, inspector, fmtDate, escapeHtml } from "./ui.js";
 // ADR-090 W2 (F1): the owner's "+ New request" drawer and worker-eligibility helper.
+import { mountTrustLadder } from "./pages-ladder.js";
 import { mountWorkerScorecards, mountClientEconomics } from "./pages-scorecard.js";
 import { openNewRequestDrawer, workerFitsType, skillFieldHtml, readSkillFields } from "./request-drawer.js";
 
@@ -294,10 +295,12 @@ export async function mountTeam(root) {
         { value: retiredCount, label: "Retired" },
       ])}
       ${panel("Your team", rosterBody)}
+      <div id="teamLadder"></div>
       <div id="teamScorecards"></div>
       ${capabilityPanel}
       ${hirePanel}
     `;
+    mountTrustLadder(root.querySelector("#teamLadder"));
     mountWorkerScorecards(root.querySelector("#teamScorecards"));
   } catch (err) {
     root.innerHTML = errorBox(err, "your team");

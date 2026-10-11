@@ -6,6 +6,7 @@
 // was shown. Owner-only. Nothing here calls a model or sends anything.
 
 import { appendEventAndAudit, newUuid, now, readStore, systemActor, withStore } from "./store.mjs";
+import { ladderNotices } from "./trust-ladder-service.mjs";
 import { edcsRepository as repo } from "./edcs-repository.mjs";
 import { isFirmOwner } from "./edcs-owner.mjs";
 import { buildBrief, briefDigest } from "../../../packages/core-domain/src/edcs-brief.mjs";
@@ -43,7 +44,8 @@ export async function composeBrief(scope, asOf = briefToday()) {
     transactions: transactions.filter((record) => record.tenant_id === scope.tenant_id && record.firm_id === scope.firm_id),
     reservations: reservations.filter((record) => record.tenant_id === scope.tenant_id && record.firm_id === scope.firm_id),
     standing: { instructions, settings, runs },
-    connected: transactions.length > 0
+    connected: transactions.length > 0,
+    trust: await ladderNotices(scope, { asOf })
   });
 }
 

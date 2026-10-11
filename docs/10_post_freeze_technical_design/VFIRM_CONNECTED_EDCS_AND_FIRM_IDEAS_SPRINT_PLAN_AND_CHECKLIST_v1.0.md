@@ -457,10 +457,10 @@ Scope:
 
 Acceptance checks (`npm run check:vi:s5-trust-ladder`):
 
-- [ ] Shadow outputs never reach Approval/Outbox.
-- [ ] Batch approval refused for Class A, non-Proven pairs and regulated types.
-- [ ] Each draft in a batch has its own review record; the batch is audited.
-- [ ] A rejection demotes automatically.
+- [x] Shadow outputs never reach Approval/Outbox.
+- [x] Batch approval refused for Class A, non-Proven pairs and regulated types.
+- [x] Each draft in a batch has its own review record; the batch is audited.
+- [x] A rejection demotes automatically.
 
 ### VI-S6 — e-Invoice readiness check (gated)
 
@@ -486,7 +486,7 @@ Acceptance checks (`npm run check:vi:s6-einvoice-readiness`):
 - [x] Integration contract v1.0 approved (2026-10-05; Inventory = full content, Legal = metadata only, recorded in ADR-095)
 - [x] Production scheduler for ticks chosen (CE-S3): recommendation is Supabase `pg_cron` + `pg_net` to `POST /automation/tick`; owner to apply
 - [ ] BizKick v1.1 "Connected edition" release decision (CE-S4)
-- [ ] D5 Trust Ladder decision + its ADR (before VI-S5)
+- [x] D5 Trust Ladder decision + its ADR (before VI-S5)
 - [ ] Current LHDN spec confirmed (before VI-S6)
 
 ### Data model (planned migrations)
@@ -545,7 +545,7 @@ Acceptance checks (`npm run check:vi:s6-einvoice-readiness`):
 - [x] `check:vi:s2-morning-brief` (VI-S2, ADR-110, migration 0058)
 - [x] `check:vi:s3-evidence-passport` (VI-S3, ADR-111, migration 0059)
 - [x] `check:vi:s4-scorecards` (VI-S4, ADR-112, no migration)
-- [ ] `check:vi:s5-trust-ladder`
+- [x] `check:vi:s5-trust-ladder` (VI-S5, ADR-113, migration 0060)
 - [ ] `check:vi:s6-einvoice-readiness`
 
 ---

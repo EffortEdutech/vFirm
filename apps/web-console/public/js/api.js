@@ -323,6 +323,13 @@ export const api = {
   runAutomationNow: (body = {}) => request("/automation/evaluate", { method: "POST", body }),
   // VI-S4: scorecards and cost-to-serve (owner-only read)
   getScorecards: (params = "") => request(withScope(`/scorecards${params ? `?${params}` : ""}`), { skipCache: true }),
+  // VI-S5: Trust Ladder (owner-only)
+  getTrustLadder: () => request(withScope("/trust-ladder"), { skipCache: true }),
+  setLadderStage: (body) => request("/trust-ladder/stage", { method: "POST", body }),
+  setLadderThresholds: (body) => request("/trust-ladder/thresholds", { method: "POST", body }),
+  markShadow: (body) => request("/trust-ladder/shadow/mark", { method: "POST", body }),
+  previewLadderBatch: (body) => request("/trust-ladder/batch/preview", { method: "POST", body }),
+  approveLadderBatch: (body) => request("/trust-ladder/batch/approve", { method: "POST", body }),
   // VI-S3: Evidence Passport (owner-only)
   listPassports: () => request(withScope("/passports"), { skipCache: true }),
   previewPassport: (body) => request("/passports/preview", { method: "POST", body }),
