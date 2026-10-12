@@ -1,5 +1,6 @@
 import { briefToday_, briefHistory, briefOn, tickBriefs } from "./edcs-brief-service.mjs";
 import { readScorecards } from "./scorecard-service.mjs";
+import { evaluateRolePolicy, inviteRoleError } from "./route-role-policy.mjs";
 import { readEinvoice, saveBuyer as einvoiceSaveBuyer, saveSupplier as einvoiceSaveSupplier } from "./einvoice-service.mjs";
 import { afterReview as ladderAfterReview, approveBatch as ladderApproveBatch, markShadow as ladderMarkShadow, previewBatch as ladderPreviewBatch, readLadder, saveShadowRun as ladderSaveShadowRun, setStage as ladderSetStage, setThresholds as ladderSetThresholds, stageOf as ladderStageOf, skillOfItem as ladderSkillOf } from "./trust-ladder-service.mjs";
 import { createPassport, downloadPassport, listPassports, previewPassport, readPassport, verifyStoredPassport } from "./evidence-passport-service.mjs";
@@ -1125,6 +1126,7 @@ async function signupFirm(body, req) {
 // via Supabase's own auth.admin API -- no email infrastructure of our own.
 async function inviteFirmMember(body, req) {
   requireFields(body, ["tenant_id", "firm_id", "email"]);
+  { const roleError = inviteRoleError(body.role); if (roleError) { const error = new Error(roleError); error.status = 400; error.code = "VALIDATION_ERROR"; throw error; } }
   const auth = req?.vfirmSupabaseAuth;
   const actor = auth?.ok ? auth.actor : null;
   if (!actor) {
@@ -3028,6 +3030,7 @@ async function updateSupportCase(body, req = null) {
 }
 async function invitePilotUser(body, req = null) {
   requireFields(body, ["tenant_id", "email"]);
+  { const roleError = inviteRoleError(body.pilot_role ?? body.role); if (roleError) { const error = new Error(roleError); error.status = 400; error.code = "VALIDATION_ERROR"; throw error; } }
   const actor = actorFromBody(body, req, body.tenant_id, body.firm_id ?? null);
   return invitePilotUserRecord(body, actor);
 }
@@ -4160,6 +4163,12 @@ export const handleRequest = async (req, res) => {
       });
       req.vfirmEnforced = storeAuthEnforced({ backend: getStoreInfo().backend, supabaseConfigured: Boolean(supabaseJwks) });
       if (!gate.allow) return sendJson(req, res, gate.status, { ok: false, error: { code: gate.code, message: gate.message } });
+    }
+    // ADR-115: role policy. Runs whenever the caller is known (verified Bearer actor, or the dev-header actor off-production).
+    {
+      const roleActor = req.vfirmSupabaseAuth ? (req.vfirmSupabaseAuth.ok ? req.vfirmSupabaseAuth.actor : null) : devActorFromHeaders(req);
+      const verdict = evaluateRolePolicy({ method: req.method, pathname: url.pathname, actor: roleActor });
+      if (!verdict.allow) return sendJson(req, res, verdict.status, { ok: false, error: { code: verdict.code, message: verdict.message } });
     }
     if (req.method === "GET" && url.pathname === "/auth/me") return sendJson(req, res, 200, { ok: true, data: await readAuthMe(req) });
     if (req.method === "GET" && url.pathname === "/health") return sendJson(req, res, 200, { ok: true, service: "vfirm-api", phase: "persistent-mvp-command-loop", ...getStoreInfo(), port_family: "309#", api_port: port });
