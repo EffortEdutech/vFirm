@@ -37,6 +37,7 @@ export const CHECKS = [
   { key: "vi5", script: "check:vi:s5-trust-ladder", sprint: "VI-S5", what: "Trust Ladder (shadow runs kept out of Approval, owner-click promotion, batch approval, automatic demotion)", postgres: true },
   { key: "vi6", script: "check:vi:s6-einvoice-readiness", sprint: "VI-S6", what: "e-Invoice readiness (field-by-field fix lists, bands, consolidated draft, no submission capability)", postgres: true },
   { key: "ra", script: "check:ra:role-audit", sprint: "RA", what: "Role audit (every write route classified; members do daily work, observers read-only, owner-only by default)", postgres: true },
+  { key: "rl", script: "check:ra:rate-limit", sprint: "RA-RL", what: "Rate limiting (Balanced limits per user / address, HTTP 429 with retry time, Postgres counters, fault never blocks work)", postgres: true },
   { key: "h1gu", script: "check:ce:h1-store-read-guard", sprint: "CE-H1", what: "Store read guard", postgres: false },
   { key: "pa", script: "check:pa:request-gate", sprint: "Production auth", what: "Request gate: no anonymous or fake-header calls", postgres: false },
   { key: "vercel", script: "check:vercel:adapter", sprint: "ADR-104", what: "Vercel adapter", postgres: false }

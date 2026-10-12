@@ -180,6 +180,7 @@
                     "check:vi:s5-trust-ladder": "node scripts/smoke-vi-s5-trust-ladder.mjs",
                     "check:vi:s6-einvoice-readiness": "node scripts/smoke-vi-s6-einvoice-readiness.mjs",
                     "check:ra:role-audit": "node scripts/smoke-ra-role-audit.mjs",
+                    "check:ra:rate-limit": "node scripts/smoke-ra-rate-limit.mjs",
                     "check:ce:s9-evidence-pack": "node scripts/check-ce-s9-evidence-pack.mjs",
                     "ce:evidence-pack": "node scripts/ce-evidence-pack.mjs",
                     "check:ce:h1-scoped-reads":  "node scripts/smoke-ce-h1-scoped-reads.mjs",

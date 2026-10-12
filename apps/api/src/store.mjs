@@ -6096,6 +6096,9 @@ export async function resetStore() {
   return store;
 }
 
+// Rate limiting (ADR-116): the counter service shares the one connection pool.
+export function getSharedPool() { return getPool(); }
+
 function getPool() {
   if (!pool) {
     // HM-S7 Phase 4f, slice 2 (2026-09-29): loadPostgresStore() now fires its ~120 read queries

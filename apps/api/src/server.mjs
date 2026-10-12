@@ -1,6 +1,8 @@
 import { briefToday_, briefHistory, briefOn, tickBriefs } from "./edcs-brief-service.mjs";
 import { readScorecards } from "./scorecard-service.mjs";
 import { evaluateRolePolicy, inviteRoleError } from "./route-role-policy.mjs";
+import { clientIp, rateKey, rateLimitEnabled } from "./rate-limit-policy.mjs";
+import { consume as consumeRate } from "./rate-limit-service.mjs";
 import { readEinvoice, saveBuyer as einvoiceSaveBuyer, saveSupplier as einvoiceSaveSupplier } from "./einvoice-service.mjs";
 import { afterReview as ladderAfterReview, approveBatch as ladderApproveBatch, markShadow as ladderMarkShadow, previewBatch as ladderPreviewBatch, readLadder, saveShadowRun as ladderSaveShadowRun, setStage as ladderSetStage, setThresholds as ladderSetThresholds, stageOf as ladderStageOf, skillOfItem as ladderSkillOf } from "./trust-ladder-service.mjs";
 import { createPassport, downloadPassport, listPassports, previewPassport, readPassport, verifyStoredPassport } from "./evidence-passport-service.mjs";
@@ -203,11 +205,12 @@ function corsHeaders(req) {
   };
 }
 
-function sendJson(req, res, status, body) {
+function sendJson(req, res, status, body, extraHeaders = {}) {
   res.writeHead(status, {
     "content-type": "application/json; charset=utf-8",
     "cache-control": "no-store",
-    ...corsHeaders(req)
+    ...corsHeaders(req),
+    ...extraHeaders
   });
   res.end(JSON.stringify(body, null, 2));
 }
@@ -4169,6 +4172,17 @@ export const handleRequest = async (req, res) => {
       const roleActor = req.vfirmSupabaseAuth ? (req.vfirmSupabaseAuth.ok ? req.vfirmSupabaseAuth.actor : null) : devActorFromHeaders(req);
       const verdict = evaluateRolePolicy({ method: req.method, pathname: url.pathname, actor: roleActor });
       if (!verdict.allow) return sendJson(req, res, verdict.status, { ok: false, error: { code: verdict.code, message: verdict.message } });
+    }
+    // ADR-116: rate limit. After the gates, so only known callers are counted per user; before any route work.
+    if (rateLimitEnabled({ enforced: req.vfirmEnforced })) {
+      const rateActor = req.vfirmSupabaseAuth ? (req.vfirmSupabaseAuth.ok ? req.vfirmSupabaseAuth.actor : null) : devActorFromHeaders(req);
+      const rk = rateKey({ method: req.method, pathname: url.pathname, actorId: rateActor?.actor_id ?? rateActor?.id ?? null, ip: clientIp({ headers: req.headers, socketAddress: req.socket?.remoteAddress }) });
+      if (rk) {
+        const rate = await consumeRate({ key: rk.key, limit: rk.limit });
+        if (!rate.allowed) {
+          return sendJson(req, res, 429, { ok: false, error: { code: "RATE_LIMITED", message: `Too many requests. Try again in ${rate.retry_after} seconds.`, retry_after_seconds: rate.retry_after, limit: rate.limit } }, { "retry-after": String(rate.retry_after) });
+        }
+      }
     }
     if (req.method === "GET" && url.pathname === "/auth/me") return sendJson(req, res, 200, { ok: true, data: await readAuthMe(req) });
     if (req.method === "GET" && url.pathname === "/health") return sendJson(req, res, 200, { ok: true, service: "vfirm-api", phase: "persistent-mvp-command-loop", ...getStoreInfo(), port_family: "309#", api_port: port });
